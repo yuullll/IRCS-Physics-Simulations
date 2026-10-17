@@ -1,0 +1,7 @@
+{
+  "name": "AP Physics C 3D Simulation Platform",
+  "description": "Calculus-based interactive 3D physics simulation platform for AP Physics C Electricity & Magnetism and Mechanics, featuring 3D Electric Field & Potential sandboxes, Lorentz force trajectory integration, and an interactive Circuit Workbench with a Generalized Modified Nodal Analysis (MNA) solver.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
+
