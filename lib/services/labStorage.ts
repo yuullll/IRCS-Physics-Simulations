@@ -363,6 +363,107 @@ class LabStorageService {
     return fallback;
   }
 
+  // Teacher Class Roster & Administrative Controls
+  public getClassStudents(classId?: string): UserProfile[] {
+    return this.memoryUsers.filter(
+      u => u.role === 'student' && (!classId || u.classId === classId)
+    );
+  }
+
+  public enrollStudentInClass(data: {
+    name: string;
+    email: string;
+    className?: string;
+    classId?: string;
+  }): UserProfile {
+    const newStudent: UserProfile = {
+      id: `user_stu_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      name: data.name.trim(),
+      email: data.email.trim().toLowerCase(),
+      role: 'student',
+      avatar: '🧑‍🎓',
+      classId: data.classId || 'ap_phys_p3',
+      className: data.className?.trim() || 'AP Physics C: E&M (Period 3)',
+    };
+
+    const existingIdx = this.memoryUsers.findIndex(
+      u => u.email.toLowerCase() === newStudent.email
+    );
+    if (existingIdx >= 0) {
+      this.memoryUsers[existingIdx] = { ...this.memoryUsers[existingIdx], ...newStudent };
+    } else {
+      this.memoryUsers.push(newStudent);
+    }
+
+    this.persistUsers();
+    return newStudent;
+  }
+
+  public removeStudentFromClass(studentId: string): void {
+    this.memoryUsers = this.memoryUsers.filter(u => u.id !== studentId);
+    this.memorySubmissions = this.memorySubmissions.filter(s => s.studentId !== studentId);
+    this.memorySavedScenes = this.memorySavedScenes.filter(e => e.userId !== studentId);
+
+    if (this.currentUserId === studentId) {
+      const instructor = this.memoryUsers.find(u => u.role === 'instructor') || this.memoryUsers[0];
+      if (instructor) {
+        this.currentUserId = instructor.id;
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.setItem(STORAGE_KEYS.CURRENT_USER, instructor.id);
+          } catch (e) {}
+        }
+      }
+    }
+
+    this.persistUsers();
+    this.persistSubmissions();
+    this.persistSavedScenes();
+  }
+
+  public updateStudentInfo(
+    studentId: string,
+    updates: { name?: string; email?: string; className?: string }
+  ): UserProfile | null {
+    const idx = this.memoryUsers.findIndex(u => u.id === studentId);
+    if (idx === -1) return null;
+
+    const updated = {
+      ...this.memoryUsers[idx],
+      ...(updates.name ? { name: updates.name.trim() } : {}),
+      ...(updates.email ? { email: updates.email.trim().toLowerCase() } : {}),
+      ...(updates.className ? { className: updates.className.trim() } : {}),
+    };
+    this.memoryUsers[idx] = updated;
+
+    // Sync student name/email in submissions
+    this.memorySubmissions = this.memorySubmissions.map(sub =>
+      sub.studentId === studentId
+        ? { ...sub, studentName: updated.name, studentEmail: updated.email, className: updated.className }
+        : sub
+    );
+
+    this.persistUsers();
+    this.persistSubmissions();
+    return updated;
+  }
+
+  public resetStudentSubmission(studentId: string, assignmentId?: string): void {
+    this.memorySubmissions = this.memorySubmissions.filter(
+      s => !(s.studentId === studentId && (!assignmentId || s.assignmentId === assignmentId))
+    );
+    this.persistSubmissions();
+  }
+
+  private persistUsers(): void {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(this.memoryUsers));
+      } catch (e) {}
+    }
+    this.notify();
+  }
+
   // Auto-Save across refreshes
   public saveAutoSave(userId: string, mode: 'field' | 'circuit', snapshot: SceneSnapshot): void {
     const key = `${userId}_${mode}`;

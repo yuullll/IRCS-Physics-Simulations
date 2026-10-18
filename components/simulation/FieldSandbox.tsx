@@ -67,6 +67,19 @@ export const FieldSandbox: React.FC<FieldSandboxProps> = ({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
+  const propsRef = useRef({
+    controlsState,
+    tracerSettings,
+    placementMode,
+    defaultSourceQ,
+  });
+  propsRef.current = {
+    controlsState,
+    tracerSettings,
+    placementMode,
+    defaultSourceQ,
+  };
+
   // Three.js instances ref
   const threeRef = useRef<{
     scene: THREE.Scene;
@@ -580,14 +593,17 @@ export const FieldSandbox: React.FC<FieldSandboxProps> = ({
         state.selectionRing.children[0].rotation.z += 0.02;
       }
 
-      // Step test particles with Lorentz integrator
-      const bVec = controlsState.bField.enabled
-        ? new THREE.Vector3(controlsState.bField.x, controlsState.bField.y, controlsState.bField.z)
+      // Step test particles with Lorentz integrator using live propsRef
+      const liveControls = propsRef.current.controlsState;
+      const liveTracer = propsRef.current.tracerSettings;
+
+      const bVec = liveControls.bField.enabled
+        ? new THREE.Vector3(liveControls.bField.x, liveControls.bField.y, liveControls.bField.z)
         : new THREE.Vector3(0, 0, 0);
 
-      const simSpeed = tracerSettings.simSpeed ?? 1.0;
-      const damping = tracerSettings.damping ?? 0.12;
-      const lockToPlane = tracerSettings.lockToPlane ?? true;
+      const simSpeed = liveTracer.simSpeed ?? 1.0;
+      const damping = liveTracer.damping ?? 0.28;
+      const lockToPlane = liveTracer.lockToPlane ?? true;
 
       for (let i = state.particles.length - 1; i >= 0; i--) {
         const p = state.particles[i];
@@ -639,7 +655,7 @@ export const FieldSandbox: React.FC<FieldSandboxProps> = ({
       }
 
       // Active camera selection based on viewMode
-      const activeCamera = controlsState.viewMode === '3d' ? state.camera : state.orthoCamera;
+      const activeCamera = liveControls.viewMode === '3d' ? state.camera : state.orthoCamera;
       renderer.render(state.scene, activeCamera);
     };
 
@@ -853,22 +869,24 @@ export const FieldSandbox: React.FC<FieldSandboxProps> = ({
     const state = threeRef.current;
     if (!state) return;
 
-    const qVal = tracerSettings.qMicro * 1e-6;
+    const liveTracer = propsRef.current.tracerSettings;
+    const qVal = liveTracer.qMicro * 1e-6;
     // massMicro in milligrams -> 1 mg = 1e-6 kg
-    const mVal = Math.max(tracerSettings.massMicro * 1e-6, 1e-9);
+    const mVal = Math.max(liveTracer.massMicro * 1e-6, 1e-9);
     const isPos = qVal >= 0;
     const color = isPos ? 0xff2b56 : 0x0ea5e9;
 
     const cx = Math.max(-29.5, Math.min(29.5, x));
     const cz = Math.max(-29.5, Math.min(29.5, z));
     const startPos = new THREE.Vector3(cx, 0.65, cz);
-    const startVel = new THREE.Vector3(tracerSettings.vx, 0, tracerSettings.vz);
+    // Test charge is always placed at rest (zero initial velocity) so trajectory depends purely on the field
+    const startVel = new THREE.Vector3(0, 0, 0);
 
     const sphereGeo = new THREE.SphereGeometry(0.38, 24, 24);
     const sphereMat = new THREE.MeshStandardMaterial({
       color,
       emissive: color,
-      emissiveIntensity: 0.8,
+      emissiveIntensity: 0.85,
       roughness: 0.2,
     });
     const pMesh = new THREE.Mesh(sphereGeo, sphereMat);
@@ -882,7 +900,7 @@ export const FieldSandbox: React.FC<FieldSandboxProps> = ({
     const trailMat = new THREE.LineBasicMaterial({
       color,
       transparent: true,
-      opacity: 0.85,
+      opacity: 0.9,
     });
     const trailLine = new THREE.Line(trailGeo, trailMat);
     state.scene.add(trailLine);
@@ -897,11 +915,12 @@ export const FieldSandbox: React.FC<FieldSandboxProps> = ({
       acc: new THREE.Vector3(0, 0, 0),
       color,
       trail: [startPos.clone()],
-      maxTrail: 240,
+      maxTrail: 600,
       initialEnergy: 0,
       currentEnergy: { kinetic: 0, potential: 0, total: 0 },
       workDone: 0,
       active: true,
+      timeAccumulator: 0,
     };
 
     state.particles.push(particle);
@@ -976,6 +995,19 @@ export const FieldSandbox: React.FC<FieldSandboxProps> = ({
         state.particles = [];
         state.particleMeshes.clear();
       },
+      clearParticles: () => {
+        const state = threeRef.current;
+        if (!state) return;
+        state.particles.forEach(p => {
+          const v = state.particleMeshes.get(p.id);
+          if (v) {
+            state.scene.remove(v.mesh);
+            state.scene.remove(v.line);
+          }
+        });
+        state.particles = [];
+        state.particleMeshes.clear();
+      },
       updateSelectedCharge: (updated: SourceCharge) => {
         const state = threeRef.current;
         if (!state) return;
@@ -1001,8 +1033,8 @@ export const FieldSandbox: React.FC<FieldSandboxProps> = ({
         const state = threeRef.current;
         return {
           charges: state ? state.charges.map(c => ({ ...c })) : [],
-          controlsState,
-          tracerSettings,
+          controlsState: propsRef.current.controlsState,
+          tracerSettings: propsRef.current.tracerSettings,
         };
       },
       restoreSnapshot: (fieldData: any, cameraState?: any) => {

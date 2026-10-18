@@ -153,6 +153,8 @@ export const CircuitWorkbench: React.FC<CircuitWorkbenchProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const controlsRef = useRef(controlsState);
+  controlsRef.current = controlsState;
 
   const threeRef = useRef<{
     scene: THREE.Scene;
@@ -241,7 +243,7 @@ export const CircuitWorkbench: React.FC<CircuitWorkbenchProps> = ({
     } else if (comp.type === 'bulb') {
       const socket = new THREE.Mesh(
         new THREE.CylinderGeometry(0.68, 0.78, 0.5, 24),
-        new THREE.MeshStandardMaterial({ color: 0xf1f5f9, metalness: 0.15, roughness: 0.35 })
+        new THREE.MeshStandardMaterial({ color: 0xf8fafc, metalness: 0.25, roughness: 0.28 })
       );
       socket.position.y = 0.25;
       group.add(socket);
@@ -249,20 +251,21 @@ export const CircuitWorkbench: React.FC<CircuitWorkbenchProps> = ({
       const glass = new THREE.Mesh(
         new THREE.SphereGeometry(0.85, 32, 32),
         new THREE.MeshStandardMaterial({
-          color: 0xfff7ed,
+          color: 0xfffbeb,
           emissive: 0xfbbf24,
-          emissiveIntensity: 0.0,
+          emissiveIntensity: 0.15,
           transparent: true,
-          opacity: 0.45,
-          roughness: 0.15,
+          opacity: 0.52,
+          roughness: 0.1,
         })
       );
+      glass.name = 'bulbGlass';
       glass.position.set(0, 1.35, 0);
       group.add(glass);
 
       const filament = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.045, 0.045, 0.36, 12),
-        new THREE.MeshStandardMaterial({ color: 0xfbbf24, emissive: 0xf59e0b, emissiveIntensity: 0.0 })
+        new THREE.CylinderGeometry(0.055, 0.055, 0.42, 12),
+        new THREE.MeshStandardMaterial({ color: 0xfef08a, emissive: 0xfbbf24, emissiveIntensity: 0.3 })
       );
       filament.name = 'filament';
       filament.rotation.z = Math.PI / 2;
@@ -270,16 +273,24 @@ export const CircuitWorkbench: React.FC<CircuitWorkbenchProps> = ({
       group.add(filament);
 
       const corona = new THREE.Mesh(
-        new THREE.SphereGeometry(0.55, 24, 24),
-        new THREE.MeshBasicMaterial({ color: 0xfbbf24, transparent: true, opacity: 0.0, side: THREE.BackSide })
+        new THREE.SphereGeometry(0.62, 24, 24),
+        new THREE.MeshBasicMaterial({ color: 0xfef08a, transparent: true, opacity: 0.0, side: THREE.BackSide })
       );
       corona.name = 'corona';
       corona.position.set(0, 1.35, 0);
       group.add(corona);
 
-      const pLight = new THREE.PointLight(0xfbbf24, 0, 10, 1.2);
+      const outerHalo = new THREE.Mesh(
+        new THREE.SphereGeometry(1.18, 24, 24),
+        new THREE.MeshBasicMaterial({ color: 0xfbbf24, transparent: true, opacity: 0.0, side: THREE.BackSide })
+      );
+      outerHalo.name = 'outerHalo';
+      outerHalo.position.set(0, 1.35, 0);
+      group.add(outerHalo);
+
+      const pLight = new THREE.PointLight(0xfde047, 0, 18, 1.0);
       pLight.name = 'pointLight';
-      pLight.position.set(0, 1.35, 0);
+      pLight.position.set(0, 1.45, 0);
       group.add(pLight);
 
       group.add(createTerminalPost(new THREE.Vector3(-0.8, 0.25, 0), 'term1'));
@@ -596,7 +607,7 @@ export const CircuitWorkbench: React.FC<CircuitWorkbenchProps> = ({
     const height = container.clientHeight;
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x060c18);
+    scene.background = new THREE.Color(0x0d1526);
 
     const aspect = width / height;
     const camera = new THREE.PerspectiveCamera(45, aspect, 0.1, 1000);
@@ -622,6 +633,8 @@ export const CircuitWorkbench: React.FC<CircuitWorkbenchProps> = ({
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.35;
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
@@ -630,30 +643,38 @@ export const CircuitWorkbench: React.FC<CircuitWorkbenchProps> = ({
     controls.minDistance = 6;
     controls.maxDistance = 75;
 
-    // Lighting
-    const ambient = new THREE.AmbientLight(0xffffff, 0.85);
+    // Bright Multi-Source Laboratory Workbench Illumination
+    const ambient = new THREE.AmbientLight(0xffffff, 1.75);
     scene.add(ambient);
 
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.95);
-    dirLight.position.set(14, 26, 14);
+    const hemiLight = new THREE.HemisphereLight(0xe0f2fe, 0x334155, 1.35);
+    hemiLight.position.set(0, 30, 0);
+    scene.add(hemiLight);
+
+    const dirLight = new THREE.DirectionalLight(0xffffff, 2.2);
+    dirLight.position.set(14, 28, 14);
     dirLight.castShadow = true;
     scene.add(dirLight);
 
-    const fillLight = new THREE.DirectionalLight(0x94a3b8, 0.4);
-    fillLight.position.set(-14, 18, -14);
+    const fillLight = new THREE.DirectionalLight(0xe2e8f0, 1.45);
+    fillLight.position.set(-14, 22, -12);
     scene.add(fillLight);
 
-    // Lab Tabletop with textbook coordinate grid
+    const overheadBenchLight = new THREE.PointLight(0xf8fafc, 2.0, 65, 0.7);
+    overheadBenchLight.position.set(0, 16, 2);
+    scene.add(overheadBenchLight);
+
+    // Well-lit Lab Tabletop with crisp coordinate grid
     const tableGroup = new THREE.Group();
     const tableTop = new THREE.Mesh(
       new THREE.BoxGeometry(32, 0.8, 22),
-      new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.95, metalness: 0.05 })
+      new THREE.MeshStandardMaterial({ color: 0x293b56, roughness: 0.65, metalness: 0.08 })
     );
     tableTop.position.y = -0.4;
     tableTop.receiveShadow = true;
     tableGroup.add(tableTop);
 
-    const lineMat = new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.2 });
+    const lineMat = new THREE.LineBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.32 });
     const points: THREE.Vector3[] = [];
     for (let x = -15; x <= 15; x += 1.5) {
       points.push(new THREE.Vector3(x, 0.01, -10));
@@ -761,24 +782,39 @@ export const CircuitWorkbench: React.FC<CircuitWorkbenchProps> = ({
 
         if (c.type === 'bulb') {
           const power = c.power || 0;
-          const glow = Math.min(power / 8.0, 2.0);
+          // Brighter perceptual response curve for the incandescent bulb
+          const glow = power > 0.005 ? Math.min(Math.pow(power / 4.2, 0.62) * 1.6, 3.2) : 0;
+          const bulbGlass = grp.getObjectByName('bulbGlass') as THREE.Mesh;
           const filament = grp.getObjectByName('filament') as THREE.Mesh;
           const corona = grp.getObjectByName('corona') as THREE.Mesh;
+          const outerHalo = grp.getObjectByName('outerHalo') as THREE.Mesh;
           const pLight = grp.getObjectByName('pointLight') as THREE.PointLight;
 
+          if (bulbGlass) {
+            const gMat = bulbGlass.material as THREE.MeshStandardMaterial;
+            gMat.emissiveIntensity = glow > 0 ? 0.35 + glow * 1.45 : 0.08;
+            gMat.opacity = glow > 0 ? Math.min(0.55 + glow * 0.22, 0.92) : 0.48;
+          }
           if (filament) {
-            (filament.material as THREE.MeshStandardMaterial).emissiveIntensity = glow * 2.8;
+            (filament.material as THREE.MeshStandardMaterial).emissiveIntensity = glow > 0 ? 1.2 + glow * 4.5 : 0.15;
           }
           if (corona) {
-            (corona.material as THREE.MeshBasicMaterial).opacity = Math.min(glow * 0.45, 0.5);
+            (corona.material as THREE.MeshBasicMaterial).opacity = Math.min(glow * 0.68, 0.85);
+            const s = 1.0 + Math.min(glow * 0.16, 0.35);
+            corona.scale.set(s, s, s);
+          }
+          if (outerHalo) {
+            (outerHalo.material as THREE.MeshBasicMaterial).opacity = Math.min(glow * 0.32, 0.48);
+            const hs = 1.0 + Math.min(glow * 0.2, 0.45);
+            outerHalo.scale.set(hs, hs, hs);
           }
           if (pLight) {
-            pLight.intensity = glow * 2.5;
+            pLight.intensity = glow * 4.8;
           }
         } else if (c.type === 'switch') {
           const blade = grp.getObjectByName('blade') as THREE.Group;
           if (blade) {
-            // FIX: Opens UPWARDS (+Y direction) into the air above the breadboard plane!
+            // Opens UPWARDS (+Y direction) into the air above the breadboard plane
             const targetAngle = c.closed ? 0 : Math.PI / 4.2;
             blade.rotation.z = THREE.MathUtils.lerp(blade.rotation.z, targetAngle, 0.25);
           }
@@ -806,14 +842,15 @@ export const CircuitWorkbench: React.FC<CircuitWorkbenchProps> = ({
       });
 
       // Update Carrier Drift Arrows along wires
-      const isConventional = controlsState.flowConvention === 'conventional';
+      const liveControls = controlsRef.current;
+      const isConventional = liveControls.flowConvention === 'conventional';
       const colorHex = isConventional ? 0xf59e0b : 0x38bdf8;
       const emissiveHex = isConventional ? 0xd97706 : 0x0284c7;
-      const baseSpeed = mnaResult.totalSupplyCurrent * 0.4 * controlsState.driftSpeed;
+      const baseSpeed = mnaResult.totalSupplyCurrent * 0.4 * liveControls.driftSpeed;
 
       state.wireMeshes.forEach((wData, wireId) => {
         const wire = state.wires.find(w => w.id === wireId);
-        wData.arrowGroup.visible = controlsState.showArrows;
+        wData.arrowGroup.visible = liveControls.showArrows;
         if (!wData.arrowGroup.visible || !wire) return;
 
         let dir = wire.current >= 0 ? 1 : -1;
@@ -855,7 +892,7 @@ export const CircuitWorkbench: React.FC<CircuitWorkbenchProps> = ({
         state.selectionIndicator.children[0].rotation.z += 0.015;
       }
 
-      const activeCamera = controlsState.viewMode === '3d' ? state.camera : state.orthoCamera;
+      const activeCamera = liveControls.viewMode === '3d' ? state.camera : state.orthoCamera;
       renderer.render(state.scene, activeCamera);
     };
 

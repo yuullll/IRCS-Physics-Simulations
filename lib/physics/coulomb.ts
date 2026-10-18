@@ -34,6 +34,7 @@ export interface TestParticle {
   active: boolean;
   absorbing?: boolean;
   scale?: number;
+  timeAccumulator?: number;
 }
 
 /**
@@ -103,50 +104,64 @@ export function calculateLorentzForce(
 }
 
 export const SIMULATION_KINEMATIC_SCALE = 0.00035;
+const FIXED_PHYSICS_DT = 0.002; // 2ms invariant integration micro-step
+const ELECTRODE_CAPTURE_RADIUS = 0.85;
 
 /**
- * 4th-Order Runge-Kutta (RK4) Step for Lorentz Trajectory Integration
+ * Distance from point C to line segment AB for continuous collision detection
  */
-export function stepParticleRK4(
+function distPointToSegment(c: THREE.Vector3, a: THREE.Vector3, b: THREE.Vector3): number {
+  const ab = new THREE.Vector3().subVectors(b, a);
+  const ac = new THREE.Vector3().subVectors(c, a);
+  const abLenSq = ab.lengthSq();
+  if (abLenSq < 1e-10) return ac.length();
+  const t = Math.max(0, Math.min(1, ac.dot(ab) / abLenSq));
+  const closest = a.clone().addScaledVector(ab, t);
+  return c.distanceTo(closest);
+}
+
+/**
+ * Single fixed-dt RK4 micro-step so trajectory is 100% independent of simulation speed
+ */
+function stepSingleRK4Micro(
   particle: TestParticle,
   charges: SourceCharge[],
   bField: THREE.Vector3,
-  dt: number,
-  damping: number = 0.0,
-  lockToPlane: boolean = true,
-  planeY: number = 0.65
+  h: number,
+  damping: number,
+  lockToPlane: boolean,
+  planeY: number
 ): void {
   if (!particle.active) return;
 
   const m = particle.mass;
   const q = particle.q;
 
-  // Collision / Absorption check with oppositely charged source electrodes
+  // Immediate check before stepping
   for (let i = 0; i < charges.length; i++) {
     const ch = charges[i];
-    const chPos = new THREE.Vector3(ch.x, ch.y, ch.z);
+    const chPos = new THREE.Vector3(ch.x, lockToPlane ? planeY : ch.y, ch.z);
     const dist = particle.pos.distanceTo(chPos);
-    // Source charge sphere radius is ~0.65; opposite charges attract and absorb
-    if (dist <= 0.75 && q * ch.q < 0) {
+    if (dist <= ELECTRODE_CAPTURE_RADIUS && q * ch.q < 0) {
       particle.active = false;
       particle.absorbing = true;
       particle.pos.copy(chPos);
       particle.vel.set(0, 0, 0);
+      particle.trail.unshift(chPos.clone());
       return;
     }
   }
 
   // Derivation state function: given (pos, vel), return [vel, acc]
   const evalDerivative = (p: THREE.Vector3, v: THREE.Vector3) => {
-    // Calculate real Lorentz force with softening to avoid singularity
-    const F = calculateLorentzForce(p, v, q, charges, bField, 0.75);
+    // Low softening (0.18) preserves true radial 1/r^2 central pull up to the electrode surface
+    const F = calculateLorentzForce(p, v, q, charges, bField, 0.18);
 
-    // Apply viscous damping / fluid resistance if configured
+    // Apply viscous damping / fluid resistance
     if (damping > 0) {
-      F.addScaledVector(v, -damping * Math.max(m, 1e-6) * 12.0);
+      F.addScaledVector(v, -damping * Math.max(m, 1e-6) * 14.0);
     }
 
-    // Kinematic acceleration scaled for human-observable, smooth 60fps dynamics
     const realAcc = F.divideScalar(m);
     const scaledAcc = realAcc.multiplyScalar(SIMULATION_KINEMATIC_SCALE);
 
@@ -165,39 +180,34 @@ export function stepParticleRK4(
     v0.y = 0;
   }
 
-  // k1
+  // RK4 stages with fixed timestep h
   const k1 = evalDerivative(p0, v0);
 
-  // k2
-  const p1 = p0.clone().addScaledVector(k1.vel, dt * 0.5);
-  const v1 = v0.clone().addScaledVector(k1.acc, dt * 0.5);
+  const p1 = p0.clone().addScaledVector(k1.vel, h * 0.5);
+  const v1 = v0.clone().addScaledVector(k1.acc, h * 0.5);
   const k2 = evalDerivative(p1, v1);
 
-  // k3
-  const p2 = p0.clone().addScaledVector(k2.vel, dt * 0.5);
-  const v2 = v0.clone().addScaledVector(k2.acc, dt * 0.5);
+  const p2 = p0.clone().addScaledVector(k2.vel, h * 0.5);
+  const v2 = v0.clone().addScaledVector(k2.acc, h * 0.5);
   const k3 = evalDerivative(p2, v2);
 
-  // k4
-  const p3 = p0.clone().addScaledVector(k3.vel, dt);
-  const v3 = v0.clone().addScaledVector(k3.acc, dt);
+  const p3 = p0.clone().addScaledVector(k3.vel, h);
+  const v3 = v0.clone().addScaledVector(k3.acc, h);
   const k4 = evalDerivative(p3, v3);
 
-  // Update position: p += dt/6 * (k1.v + 2*k2.v + 2*k3.v + k4.v)
   const dPos = k1.vel
     .clone()
     .addScaledVector(k2.vel, 2)
     .addScaledVector(k3.vel, 2)
     .add(k4.vel)
-    .multiplyScalar(dt / 6);
+    .multiplyScalar(h / 6);
 
-  // Update velocity: v += dt/6 * (k1.a + 2*k2.a + 2*k3.a + k4.a)
   const dVel = k1.acc
     .clone()
     .addScaledVector(k2.acc, 2)
     .addScaledVector(k3.acc, 2)
     .add(k4.acc)
-    .multiplyScalar(dt / 6);
+    .multiplyScalar(h / 6);
 
   particle.pos.add(dPos);
   particle.vel.add(dVel);
@@ -209,11 +219,104 @@ export function stepParticleRK4(
     particle.acc.y = 0;
   }
 
-  // Velocity ceiling clamp to guarantee numerical stability
-  const maxSpeed = 32.0;
+  // Anti-spiral & continuous electrode capture check for attracting source charges
+  for (let i = 0; i < charges.length; i++) {
+    const ch = charges[i];
+    const chPos = new THREE.Vector3(ch.x, lockToPlane ? planeY : ch.y, ch.z);
+    const segDist = distPointToSegment(chPos, p0, particle.pos);
+
+    if (q * ch.q < 0) {
+      // Opposite polarity: attract and absorb without orbiting
+      if (segDist <= ELECTRODE_CAPTURE_RADIUS) {
+        particle.active = false;
+        particle.absorbing = true;
+        particle.pos.copy(chPos);
+        particle.vel.set(0, 0, 0);
+        particle.trail.unshift(chPos.clone());
+        return;
+      }
+
+      // Near-field tangential (angular momentum) damping within r < 3.0m
+      // Prevents slingshot/spiraling when a particle approaches an attracting charge along a curved field line
+      const toCharge = new THREE.Vector3().subVectors(chPos, particle.pos);
+      const dist = toCharge.length();
+      if (dist < 3.0 && dist > 1e-5) {
+        const rHat = toCharge.divideScalar(dist);
+        const radialSpeed = particle.vel.dot(rHat);
+        const vRadial = rHat.clone().multiplyScalar(radialSpeed);
+        const vTangential = particle.vel.clone().sub(vRadial);
+        const proximityFactor = 1.0 - dist / 3.0;
+        const angularDamp = Math.exp(-28.0 * proximityFactor * proximityFactor * h);
+        vTangential.multiplyScalar(angularDamp);
+        // Ensure radial motion stays inward when very close
+        if (dist < 1.8 && radialSpeed < 0) {
+          vRadial.multiplyScalar(0.2);
+        }
+        particle.vel.copy(vRadial).add(vTangential);
+      }
+    } else if (q * ch.q > 0 && segDist < 0.72) {
+      // Like polarity: prevent penetrating inside the repulsive source core
+      const away = new THREE.Vector3().subVectors(particle.pos, chPos);
+      if (lockToPlane) away.y = 0;
+      if (away.lengthSq() > 1e-6) {
+        away.normalize();
+        particle.pos.copy(chPos).addScaledVector(away, 0.72);
+        const radialIn = particle.vel.dot(away);
+        if (radialIn < 0) {
+          particle.vel.addScaledVector(away, -radialIn * 1.2);
+        }
+      }
+    }
+  }
+
+  // Velocity ceiling clamp
+  const maxSpeed = 28.0;
   if (particle.vel.length() > maxSpeed) {
     particle.vel.setLength(maxSpeed);
   }
+
+  // Distance-based trail sampling so trail curve is identical at any simulation speed
+  const lastTrailPt = particle.trail[0];
+  if (!lastTrailPt || particle.pos.distanceTo(lastTrailPt) >= 0.12) {
+    particle.trail.unshift(particle.pos.clone());
+    if (particle.trail.length > particle.maxTrail) {
+      particle.trail.pop();
+    }
+  }
+}
+
+/**
+ * 4th-Order Runge-Kutta (RK4) Step for Lorentz Trajectory Integration
+ * Uses fixed-timestep sub-stepping so changing simulation speed NEVER alters the trajectory.
+ */
+export function stepParticleRK4(
+  particle: TestParticle,
+  charges: SourceCharge[],
+  bField: THREE.Vector3,
+  dt: number,
+  damping: number = 0.0,
+  lockToPlane: boolean = true,
+  planeY: number = 0.65
+): void {
+  if (!particle.active) return;
+
+  const prevSpeedSq = particle.vel.lengthSq();
+  const m = particle.mass;
+  const q = particle.q;
+
+  // Accumulate elapsed scaled time and advance in strictly constant FIXED_PHYSICS_DT steps
+  const totalTime = (particle.timeAccumulator ?? 0) + Math.min(dt, 0.25);
+  const maxSubSteps = 140;
+  let steps = 0;
+  let remaining = totalTime;
+
+  while (remaining >= FIXED_PHYSICS_DT && steps < maxSubSteps && particle.active) {
+    stepSingleRK4Micro(particle, charges, bField, FIXED_PHYSICS_DT, damping, lockToPlane, planeY);
+    remaining -= FIXED_PHYSICS_DT;
+    steps++;
+  }
+
+  particle.timeAccumulator = particle.active ? remaining : 0;
 
   // Mechanical Energy computation in real SI units
   const speed = particle.vel.length();
@@ -221,18 +324,12 @@ export function stepParticleRK4(
   const potential = q * calculateElectricPotential(particle.pos, charges);
   const total = kinetic + potential;
 
-  particle.workDone = kinetic - (0.5 * m * v0.lengthSq());
+  particle.workDone = kinetic - 0.5 * m * prevSpeedSq;
   particle.currentEnergy = {
     kinetic,
     potential,
     total,
   };
-
-  // Append trail
-  particle.trail.unshift(particle.pos.clone());
-  if (particle.trail.length > particle.maxTrail) {
-    particle.trail.pop();
-  }
 }
 
 /**
