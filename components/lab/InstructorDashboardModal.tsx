@@ -19,6 +19,7 @@ import {
   ClipboardList,
   RefreshCw,
   Eye,
+  ShieldAlert,
 } from 'lucide-react';
 
 interface InstructorDashboardModalProps {
@@ -92,6 +93,33 @@ export const InstructorDashboardModal: React.FC<InstructorDashboardModalProps> =
   }
 
   if (!isOpen) return null;
+
+  if (currentUser.role !== 'instructor') {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn select-none">
+        <div className="relative w-full max-w-md bg-[#080e1e] border border-rose-500/30 rounded-3xl p-6 shadow-2xl text-center space-y-4">
+          <div className="w-14 h-14 rounded-2xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center mx-auto text-rose-400">
+            <ShieldAlert className="w-7 h-7" />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-white tracking-tight">Access Denied: Instructor Only</h3>
+            <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+              Student accounts do not have administrative authorization to access the class portal, view student rosters, or manage submissions.
+            </p>
+          </div>
+          <div className="p-3 bg-white/[0.03] border border-white/10 rounded-2xl text-[11px] text-slate-400">
+            Currently logged in as student: <span className="text-white font-semibold">{currentUser.name}</span> ({currentUser.email})
+          </div>
+          <button
+            onClick={onClose}
+            className="w-full py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-semibold text-xs transition"
+          >
+            Close &amp; Return to Simulation
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const filteredSubmissions = submissions.filter(s => {
     if (filterStatus === 'submitted' && s.status !== 'submitted') return false;

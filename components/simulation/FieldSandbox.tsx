@@ -73,12 +73,14 @@ export const FieldSandbox: React.FC<FieldSandboxProps> = ({
     placementMode,
     defaultSourceQ,
   });
-  propsRef.current = {
-    controlsState,
-    tracerSettings,
-    placementMode,
-    defaultSourceQ,
-  };
+  useEffect(() => {
+    propsRef.current = {
+      controlsState,
+      tracerSettings,
+      placementMode,
+      defaultSourceQ,
+    };
+  }, [controlsState, tracerSettings, placementMode, defaultSourceQ]);
 
   // Three.js instances ref
   const threeRef = useRef<{

@@ -19,20 +19,32 @@ export interface CircuitWorkbenchControls {
   wireRouting?: 'orthogonal' | 'curved';
 }
 
+export interface CircuitMeterReading {
+  id: string;
+  type: 'voltmeter' | 'ammeter';
+  value: number;
+  formatted: string;
+  label: string;
+}
+
+export interface CircuitWorkbenchTelemetry {
+  supplyEmf: number;
+  totalCurrent: number;
+  activeComponents: number;
+  wireCount: number;
+  kclMaxResidual: number;
+  kvlVerified: boolean;
+  probeVoltage?: number;
+  meterReadings?: CircuitMeterReading[];
+}
+
 interface CircuitWorkbenchProps {
   controlsState: CircuitWorkbenchControls;
   onSelectComponent: (comp: CircuitComponentData | null) => void;
   selectedComponentId: string | null;
-  onUpdateTelemetry: (data: {
-    supplyEmf: number;
-    totalCurrent: number;
-    activeComponents: number;
-    wireCount: number;
-    kclMaxResidual: number;
-    kvlVerified: boolean;
-    probeVoltage?: number;
-  }) => void;
+  onUpdateTelemetry: (data: CircuitWorkbenchTelemetry) => void;
   onOscilloscopeSample?: (v: number, i: number) => void;
+  onToast?: (msg: string) => void;
 }
 
 let compCounter = 1;
@@ -57,6 +69,21 @@ function createTerminalPost(pos: THREE.Vector3, name: string): THREE.Group {
 
   group.position.copy(pos);
   return group;
+}
+
+// Get the two active connection terminals for any component type
+export function getComponentTerminals(type: ComponentType): [string, string] {
+  switch (type) {
+    case 'switch':
+      return ['hinge', 'contact'];
+    case 'ammeter':
+      return ['in', 'out'];
+    case 'voltmeter':
+    case 'battery':
+      return ['pos', 'neg'];
+    default:
+      return ['term1', 'term2'];
+  }
 }
 
 // Pure Preset circuit data definitions
@@ -150,11 +177,15 @@ export const CircuitWorkbench: React.FC<CircuitWorkbenchProps> = ({
   selectedComponentId,
   onUpdateTelemetry,
   onOscilloscopeSample,
+  onToast,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const controlsRef = useRef(controlsState);
-  controlsRef.current = controlsState;
+  useEffect(() => {
+    controlsRef.current = controlsState;
+  }, [controlsState]);
+  const lastTelemetryTimeRef = useRef(0);
 
   const threeRef = useRef<{
     scene: THREE.Scene;
@@ -165,6 +196,7 @@ export const CircuitWorkbench: React.FC<CircuitWorkbenchProps> = ({
     components: CircuitComponentData[];
     componentMeshes: Map<string, THREE.Group>;
     meterScreens: Map<string, { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D; texture: THREE.CanvasTexture }>;
+    meterBillboards: Map<string, { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D; texture: THREE.CanvasTexture; sprite: THREE.Sprite }>;
     wires: CircuitWireData[];
     wireMeshes: Map<
       string,
@@ -177,6 +209,8 @@ export const CircuitWorkbench: React.FC<CircuitWorkbenchProps> = ({
     >;
     selectionIndicator: THREE.Group;
     terminalHighlightRing: THREE.Mesh;
+    snapHighlightIndicator: THREE.Group;
+    snapCandidate: { wire: CircuitWireData; point: THREE.Vector3 } | null;
     wireStartTerminal: { compId: string; termId: string } | null;
     raycaster: THREE.Raycaster;
     mouse: THREE.Vector2;
@@ -186,21 +220,106 @@ export const CircuitWorkbench: React.FC<CircuitWorkbenchProps> = ({
     draggedCompId: string | null;
   } | null>(null);
 
-  // Digital Meter Screen Canvas Generator
+  // Digital Meter Casing LCD Texture (High resolution 512x256)
   const createMeterTexture = (type: 'voltmeter' | 'ammeter') => {
     const canvas = document.createElement('canvas');
-    canvas.width = 256;
-    canvas.height = 128;
+    canvas.width = 512;
+    canvas.height = 256;
     const ctx = canvas.getContext('2d')!;
     ctx.fillStyle = '#060a14';
-    ctx.fillRect(0, 0, 256, 128);
+    ctx.fillRect(0, 0, 512, 256);
     ctx.fillStyle = type === 'voltmeter' ? '#10b981' : '#38bdf8';
-    ctx.font = 'bold 22px "JetBrains Mono", monospace';
-    ctx.fillText(type === 'voltmeter' ? 'DIGITAL VOLTMETER' : 'DIGITAL AMMETER', 16, 32);
-    ctx.font = 'bold 44px "JetBrains Mono", monospace';
-    ctx.fillText('0.00 ' + (type === 'voltmeter' ? 'V' : 'A'), 16, 92);
+    ctx.font = 'bold 36px "JetBrains Mono", monospace';
+    ctx.fillText(type === 'voltmeter' ? 'DIGITAL VOLTMETER' : 'DIGITAL AMMETER', 24, 60);
+    ctx.font = 'bold 80px "JetBrains Mono", monospace';
+    ctx.fillText('0.00 ' + (type === 'voltmeter' ? 'V' : 'A'), 24, 180);
     const texture = new THREE.CanvasTexture(canvas);
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
     return { canvas, ctx, texture };
+  };
+
+  // High-Clarity Camera-Facing Billboard Sprite for Meters
+  // Eliminates all angle glitching, z-fighting, and perspective distortion
+  const createMeterBillboard = (type: 'voltmeter' | 'ammeter', compId: string) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 200;
+    const ctx = canvas.getContext('2d')!;
+
+    renderMeterBillboardCanvas(ctx, type, compId, 0);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+
+    const spriteMat = new THREE.SpriteMaterial({
+      map: texture,
+      transparent: true,
+      depthTest: true,
+      depthWrite: false,
+    });
+    const sprite = new THREE.Sprite(spriteMat);
+    sprite.name = 'meterBillboardSprite';
+    sprite.scale.set(3.2, 1.25, 1.0);
+    sprite.position.set(0, 2.35, 0); // floats stably above instrument
+    sprite.renderOrder = 999;
+    return { canvas, ctx, texture, sprite };
+  };
+
+  const renderMeterBillboardCanvas = (
+    ctx: CanvasRenderingContext2D,
+    type: 'voltmeter' | 'ammeter',
+    id: string,
+    val: number
+  ) => {
+    ctx.clearRect(0, 0, 512, 200);
+
+    const isVolt = type === 'voltmeter';
+    const mainColor = isVolt ? '#10b981' : '#38bdf8';
+    const borderColor = isVolt ? 'rgba(16, 185, 129, 0.85)' : 'rgba(56, 189, 248, 0.85)';
+    const glowColor = isVolt ? 'rgba(16, 185, 129, 0.25)' : 'rgba(56, 189, 248, 0.25)';
+
+    // Rounded Glassmorphic Card Background
+    ctx.fillStyle = 'rgba(6, 10, 24, 0.95)';
+    ctx.beginPath();
+    ctx.roundRect(8, 8, 496, 184, 20);
+    ctx.fill();
+
+    // Outer Glow Border
+    ctx.strokeStyle = borderColor;
+    ctx.lineWidth = 4;
+    ctx.stroke();
+
+    // Header Badge Pill
+    ctx.fillStyle = glowColor;
+    ctx.beginPath();
+    ctx.roundRect(24, 20, 290, 36, 10);
+    ctx.fill();
+
+    ctx.fillStyle = mainColor;
+    ctx.font = 'bold 20px "JetBrains Mono", monospace';
+    ctx.fillText(isVolt ? `DIGITAL VOLTMETER · ${id}` : `DIGITAL AMMETER · ${id}`, 36, 45);
+
+    // Indicator Dot
+    ctx.beginPath();
+    ctx.arc(460, 38, 8, 0, Math.PI * 2);
+    ctx.fillStyle = mainColor;
+    ctx.fill();
+
+    // Huge Crisp Digital 7-Segment/Monospace Readout
+    ctx.font = 'bold 64px "JetBrains Mono", monospace';
+    ctx.fillStyle = '#ffffff';
+    const unit = isVolt ? 'V' : 'A';
+    const numDigits = isVolt ? 2 : 3;
+    const sign = val >= 0 ? '+' : '';
+    const valStr = `${sign}${val.toFixed(numDigits)} ${unit}`;
+    ctx.fillText(valStr, 32, 125);
+
+    // Subtitle label
+    ctx.font = '500 18px sans-serif';
+    ctx.fillStyle = '#94a3b8';
+    ctx.fillText(isVolt ? 'Potential Difference (V+ - V-)' : 'Branch DC Loop Current', 36, 165);
   };
 
   // Component 3D Mesh Builders
@@ -325,7 +444,6 @@ export const CircuitWorkbench: React.FC<CircuitWorkbenchProps> = ({
       base.position.y = 0.11;
       group.add(base);
 
-      // Knife switch blade assembly (rotates UPWARDS into +Y when open)
       const bladeAssembly = new THREE.Group();
       bladeAssembly.name = 'blade';
       bladeAssembly.position.set(-0.7, 0.35, 0);
@@ -389,27 +507,40 @@ export const CircuitWorkbench: React.FC<CircuitWorkbenchProps> = ({
       body.castShadow = true;
       group.add(body);
 
-      // Bezel ring
+      // Bezel ring - raised and crisp
       const bezel = new THREE.Mesh(
-        new THREE.BoxGeometry(1.82, 0.92, 0.08),
-        new THREE.MeshStandardMaterial({ color: isVolt ? 0x10b981 : 0x0284c7, metalness: 0.8, roughness: 0.2 })
+        new THREE.BoxGeometry(1.86, 0.96, 0.12),
+        new THREE.MeshStandardMaterial({ color: isVolt ? 0x059669 : 0x0284c7, metalness: 0.85, roughness: 0.2 })
       );
       bezel.rotation.x = -Math.PI / 3.6;
       bezel.position.set(0, 1.05, 0.08);
       group.add(bezel);
 
-      // Digital screen with live canvas texture
+      // Physical LCD screen on casing with anti-z-fighting offset
       const meterTex = createMeterTexture(comp.type);
       if (threeRef.current) {
         threeRef.current.meterScreens.set(comp.id, meterTex);
       }
 
-      const screenMat = new THREE.MeshBasicMaterial({ map: meterTex.texture });
-      const screen = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 0.8), screenMat);
+      const screenMat = new THREE.MeshBasicMaterial({
+        map: meterTex.texture,
+        polygonOffset: true,
+        polygonOffsetFactor: -4,
+        polygonOffsetUnits: -4,
+      });
+      const screen = new THREE.Mesh(new THREE.PlaneGeometry(1.72, 0.82), screenMat);
       screen.name = 'meterScreen';
       screen.rotation.x = -Math.PI / 3.6;
-      screen.position.set(0, 1.06, 0.13);
+      screen.position.set(0, 1.07, 0.16); // physically elevated in front of bezel to prevent flickering
       group.add(screen);
+
+      // Camera-Facing 3D Floating Billboard Sprite
+      // ALWAYS faces the camera directly at ANY angle (360° rotation and top-down views)
+      const billboard = createMeterBillboard(comp.type, comp.id);
+      if (threeRef.current) {
+        threeRef.current.meterBillboards.set(comp.id, billboard);
+      }
+      group.add(billboard.sprite);
 
       // Color-coded terminal posts
       const posCollar = new THREE.Mesh(
@@ -475,12 +606,10 @@ export const CircuitWorkbench: React.FC<CircuitWorkbenchProps> = ({
     }
 
     // Textbook Orthogonal Manhattan Routing:
-    // Drop to breadboard surface (y ~ 0.12), travel along right angles, rise to terminal
     const yFloor = 0.12;
     const corner1 = new THREE.Vector3(p1.x, yFloor, p1.z);
     const corner2 = new THREE.Vector3(p2.x, yFloor, p2.z);
 
-    // Pick orthogonal intermediate elbow
     const elbow =
       Math.abs(p1.x - p2.x) > Math.abs(p1.z - p2.z)
         ? new THREE.Vector3(p2.x, yFloor, p1.z)
@@ -566,6 +695,7 @@ export const CircuitWorkbench: React.FC<CircuitWorkbenchProps> = ({
     state.componentMeshes.forEach(grp => state.scene.remove(grp));
     state.componentMeshes.clear();
     state.meterScreens.clear();
+    state.meterBillboards.clear();
 
     state.wireMeshes.forEach(w => {
       state.scene.remove(w.tube);
@@ -597,23 +727,109 @@ export const CircuitWorkbench: React.FC<CircuitWorkbenchProps> = ({
     onSelectComponent(null);
   };
 
+  // Helper to auto-connect any component to the nearest wire in the circuit
+  const autoConnectComponentToCircuit = (compId: string): boolean => {
+    const state = threeRef.current;
+    if (!state) return false;
+
+    const comp = state.components.find(c => c.id === compId);
+    if (!comp) return false;
+
+    // Find nearest wire that isn't connected to this component
+    let bestWire: CircuitWireData | null = null;
+    let minDistance = 999;
+    let bestSnapPoint = new THREE.Vector3(comp.x, 0.15, comp.z);
+
+    state.wires.forEach(w => {
+      if (w.fromCompId === comp.id || w.toCompId === comp.id) return;
+      const fromC = state.components.find(c => c.id === w.fromCompId);
+      const toC = state.components.find(c => c.id === w.toCompId);
+      if (!fromC || !toC) return;
+
+      const p1 = getTerminalWorldPos(fromC, w.fromTermId);
+      const p2 = getTerminalWorldPos(toC, w.toTermId);
+      const vx = p2.x - p1.x;
+      const vz = p2.z - p1.z;
+      const lenSq = vx * vx + vz * vz;
+      if (lenSq < 0.1) return;
+
+      let t = ((comp.x - p1.x) * vx + (comp.z - p1.z) * vz) / lenSq;
+      t = Math.max(0.1, Math.min(0.9, t));
+      const projX = p1.x + t * vx;
+      const projZ = p1.z + t * vz;
+      const dist = Math.hypot(comp.x - projX, comp.z - projZ);
+
+      if (dist < minDistance) {
+        minDistance = dist;
+        bestWire = w;
+        bestSnapPoint.set(projX, 0.15, projZ);
+      }
+    });
+
+    if (bestWire) {
+      const snapWire = bestWire as CircuitWireData;
+      const [t1, t2] = getComponentTerminals(comp.type);
+
+      // Remove old wire
+      const oldWData = state.wireMeshes.get(snapWire.id);
+      if (oldWData) {
+        state.scene.remove(oldWData.tube);
+        state.scene.remove(oldWData.arrowGroup);
+        oldWData.tube.geometry.dispose();
+        state.wireMeshes.delete(snapWire.id);
+      }
+      state.wires = state.wires.filter(w => w.id !== snapWire.id);
+
+      // Connect two new wires
+      const newW1: CircuitWireData = {
+        id: `wire_${wireCounter++}`,
+        fromCompId: snapWire.fromCompId,
+        fromTermId: snapWire.fromTermId,
+        toCompId: comp.id,
+        toTermId: t1,
+        current: 0,
+        routingStyle: controlsState.wireRouting || 'orthogonal',
+      };
+
+      const newW2: CircuitWireData = {
+        id: `wire_${wireCounter++}`,
+        fromCompId: comp.id,
+        fromTermId: t2,
+        toCompId: snapWire.toCompId,
+        toTermId: snapWire.toTermId,
+        current: 0,
+        routingStyle: controlsState.wireRouting || 'orthogonal',
+      };
+
+      state.wires.push(newW1, newW2);
+      createWireMesh(newW1);
+      createWireMesh(newW2);
+
+      if (onToast) {
+        onToast(`Auto-connected ${comp.type.toUpperCase()} into branch and rerouted wires!`);
+      }
+      return true;
+    }
+    return false;
+  };
+
   // Initialize Three.js scene
   useEffect(() => {
-    const container = containerRef.current;
+    if (!containerRef.current || !canvasRef.current) return;
     const canvas = canvasRef.current;
-    if (!container || !canvas) return;
+    const container = containerRef.current;
 
-    const width = container.clientWidth;
-    const height = container.clientHeight;
+    const width = container.clientWidth || 800;
+    const height = container.clientHeight || 600;
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0d1526);
+    scene.background = new THREE.Color(0x060c18);
 
-    const aspect = width / height;
-    const camera = new THREE.PerspectiveCamera(45, aspect, 0.1, 1000);
+    const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
     camera.position.set(0, 18, 22);
 
-    const frustumSize = 32;
+    const frustumSize = 24;
+    const aspect = width / height;
     const orthoCamera = new THREE.OrthographicCamera(
       (-frustumSize * aspect) / 2,
       (frustumSize * aspect) / 2,
@@ -710,6 +926,26 @@ export const CircuitWorkbench: React.FC<CircuitWorkbenchProps> = ({
     terminalHighlightRing.visible = false;
     scene.add(terminalHighlightRing);
 
+    // Auto-Connect Snap Highlight Indicator Group
+    const snapHighlightIndicator = new THREE.Group();
+    const snapRingInner = new THREE.Mesh(
+      new THREE.RingGeometry(0.4, 0.6, 32),
+      new THREE.MeshBasicMaterial({ color: 0x10b981, side: THREE.DoubleSide, transparent: true, opacity: 0.9 })
+    );
+    snapRingInner.rotation.x = -Math.PI / 2;
+    snapHighlightIndicator.add(snapRingInner);
+
+    const snapRingOuter = new THREE.Mesh(
+      new THREE.RingGeometry(0.85, 1.05, 32),
+      new THREE.MeshBasicMaterial({ color: 0x38bdf8, side: THREE.DoubleSide, transparent: true, opacity: 0.65 })
+    );
+    snapRingOuter.rotation.x = -Math.PI / 2;
+    snapHighlightIndicator.add(snapRingOuter);
+
+    snapHighlightIndicator.position.y = 0.2;
+    snapHighlightIndicator.visible = false;
+    scene.add(snapHighlightIndicator);
+
     threeRef.current = {
       scene,
       camera,
@@ -719,10 +955,13 @@ export const CircuitWorkbench: React.FC<CircuitWorkbenchProps> = ({
       components: [],
       componentMeshes: new Map(),
       meterScreens: new Map(),
+      meterBillboards: new Map(),
       wires: [],
       wireMeshes: new Map(),
       selectionIndicator,
       terminalHighlightRing,
+      snapHighlightIndicator,
+      snapCandidate: null,
       wireStartTerminal: null,
       raycaster: new THREE.Raycaster(),
       mouse: new THREE.Vector2(),
@@ -755,6 +994,7 @@ export const CircuitWorkbench: React.FC<CircuitWorkbenchProps> = ({
 
       renderer.setSize(w, h);
     };
+
     window.addEventListener('resize', handleResize);
 
     // Render & Physics Loop
@@ -775,6 +1015,15 @@ export const CircuitWorkbench: React.FC<CircuitWorkbenchProps> = ({
       // Solve MNA Circuit System
       const mnaResult = solveCircuitMNA(state.components, state.wires, dt);
 
+      // Pulse the snap indicator if active
+      if (state.snapHighlightIndicator.visible) {
+        const pulse = 1.0 + 0.15 * Math.sin(now * 0.008);
+        state.snapHighlightIndicator.scale.set(pulse, 1.0, pulse);
+      }
+
+      // Collect live meter readings for UI telemetry
+      const currentMeterReadings: CircuitMeterReading[] = [];
+
       // Update component visuals based on MNA results
       state.components.forEach(c => {
         const grp = state.componentMeshes.get(c.id);
@@ -782,7 +1031,6 @@ export const CircuitWorkbench: React.FC<CircuitWorkbenchProps> = ({
 
         if (c.type === 'bulb') {
           const power = c.power || 0;
-          // Brighter perceptual response curve for the incandescent bulb
           const glow = power > 0.005 ? Math.min(Math.pow(power / 4.2, 0.62) * 1.6, 3.2) : 0;
           const bulbGlass = grp.getObjectByName('bulbGlass') as THREE.Mesh;
           const filament = grp.getObjectByName('filament') as THREE.Mesh;
@@ -814,32 +1062,64 @@ export const CircuitWorkbench: React.FC<CircuitWorkbenchProps> = ({
         } else if (c.type === 'switch') {
           const blade = grp.getObjectByName('blade') as THREE.Group;
           if (blade) {
-            // Opens UPWARDS (+Y direction) into the air above the breadboard plane
             const targetAngle = c.closed ? 0 : Math.PI / 4.2;
             blade.rotation.z = THREE.MathUtils.lerp(blade.rotation.z, targetAngle, 0.25);
           }
         } else if (c.type === 'voltmeter' || c.type === 'ammeter') {
-          // Dynamic LCD display text update on meter body
+          const isVolt = c.type === 'voltmeter';
+          const val = c.measuredValue ?? 0;
+          const unit = isVolt ? 'V' : 'A';
+          const digits = isVolt ? 2 : 3;
+          const formatted = `${val >= 0 ? '+' : ''}${val.toFixed(digits)} ${unit}`;
+
+          currentMeterReadings.push({
+            id: c.id,
+            type: c.type,
+            value: val,
+            formatted,
+            label: isVolt ? `Voltmeter (${c.id})` : `Ammeter (${c.id})`,
+          });
+
+          // 1. Dynamic LCD display update on physical meter casing
           const screenData = state.meterScreens.get(c.id);
           if (screenData) {
-            const isVolt = c.type === 'voltmeter';
-            const val = c.measuredValue ?? 0;
             const ctx = screenData.ctx;
             ctx.fillStyle = '#060a14';
-            ctx.fillRect(0, 0, 256, 128);
+            ctx.fillRect(0, 0, 512, 256);
 
             ctx.fillStyle = isVolt ? '#10b981' : '#38bdf8';
-            ctx.font = 'bold 22px "JetBrains Mono", monospace';
-            ctx.fillText(isVolt ? 'DIGITAL VOLTMETER' : 'DIGITAL AMMETER', 16, 32);
+            ctx.font = 'bold 36px "JetBrains Mono", monospace';
+            ctx.fillText(isVolt ? `DIGITAL VOLTMETER · ${c.id}` : `DIGITAL AMMETER · ${c.id}`, 24, 60);
 
-            ctx.font = 'bold 44px "JetBrains Mono", monospace';
-            const unit = isVolt ? 'V' : 'A';
-            const displayStr = `${val >= 0 ? '+' : ''}${val.toFixed(2)} ${unit}`;
-            ctx.fillText(displayStr, 16, 92);
+            ctx.font = 'bold 80px "JetBrains Mono", monospace';
+            ctx.fillText(formatted, 24, 180);
             screenData.texture.needsUpdate = true;
+          }
+
+          // 2. Camera-Facing Floating Billboard Sprite update
+          // Crystal-clear at ANY angle, never glitches
+          const billboardData = state.meterBillboards.get(c.id);
+          if (billboardData) {
+            renderMeterBillboardCanvas(billboardData.ctx, c.type, c.id, val);
+            billboardData.texture.needsUpdate = true;
           }
         }
       });
+
+      // Emit Live Telemetry to parent application every ~120ms
+      if (onUpdateTelemetry && now - lastTelemetryTimeRef.current > 120) {
+        lastTelemetryTimeRef.current = now;
+        const batt = state.components.find(c => c.type === 'battery');
+        onUpdateTelemetry({
+          supplyEmf: batt?.value ?? 0,
+          totalCurrent: mnaResult.totalSupplyCurrent,
+          activeComponents: state.components.length,
+          wireCount: state.wires.length,
+          kclMaxResidual: mnaResult.kclMaxResidual,
+          kvlVerified: mnaResult.kvlVerified,
+          meterReadings: currentMeterReadings,
+        });
+      }
 
       // Update Carrier Drift Arrows along wires
       const liveControls = controlsRef.current;
@@ -1030,7 +1310,14 @@ export const CircuitWorkbench: React.FC<CircuitWorkbenchProps> = ({
 
     // 4. Component Drag & Select
     const allMeshes: THREE.Object3D[] = [];
-    state.componentMeshes.forEach(grp => allMeshes.push(...grp.children));
+    state.componentMeshes.forEach(grp => {
+      // Exclude billboard sprite from drag raycast to prevent blocking component clicks
+      grp.children.forEach(child => {
+        if (child.name !== 'meterBillboardSprite') {
+          allMeshes.push(child);
+        }
+      });
+    });
 
     const hits = state.raycaster.intersectObjects(allMeshes, true);
     if (hits.length > 0) {
@@ -1107,6 +1394,7 @@ export const CircuitWorkbench: React.FC<CircuitWorkbenchProps> = ({
       }
     }
 
+    // Dragging & Auto-Connect Detection
     if (state.isDragging && state.draggedCompId && hitTable) {
       const comp = state.components.find(c => c.id === state.draggedCompId);
       if (comp && !comp.pinned) {
@@ -1116,6 +1404,7 @@ export const CircuitWorkbench: React.FC<CircuitWorkbenchProps> = ({
         const grp = state.componentMeshes.get(comp.id);
         if (grp) grp.position.set(comp.x, 0, comp.z);
 
+        // Update wires already attached to this component
         state.wires.forEach(w => {
           if (w.fromCompId === comp.id || w.toCompId === comp.id) {
             const wData = state.wireMeshes.get(w.id);
@@ -1130,6 +1419,51 @@ export const CircuitWorkbench: React.FC<CircuitWorkbenchProps> = ({
             }
           }
         });
+
+        // AUTO-CONNECT DETECTION:
+        // Detect closest unattached wire segment on the circuit board
+        let bestSnap: { wire: CircuitWireData; point: THREE.Vector3 } | null = null;
+        let minDistance = 2.4; // snap threshold in units
+
+        state.wires.forEach(w => {
+          if (w.fromCompId === comp.id || w.toCompId === comp.id) return;
+
+          const fromC = state.components.find(c => c.id === w.fromCompId);
+          const toC = state.components.find(c => c.id === w.toCompId);
+          if (!fromC || !toC) return;
+
+          const p1 = getTerminalWorldPos(fromC, w.fromTermId);
+          const p2 = getTerminalWorldPos(toC, w.toTermId);
+
+          const vx = p2.x - p1.x;
+          const vz = p2.z - p1.z;
+          const lenSq = vx * vx + vz * vz;
+          if (lenSq < 0.1) return;
+
+          // Project dragged component position onto wire line segment
+          let t = ((comp.x - p1.x) * vx + (comp.z - p1.z) * vz) / lenSq;
+          t = Math.max(0.12, Math.min(0.88, t));
+
+          const projX = p1.x + t * vx;
+          const projZ = p1.z + t * vz;
+          const dist = Math.hypot(comp.x - projX, comp.z - projZ);
+
+          if (dist < minDistance) {
+            minDistance = dist;
+            bestSnap = {
+              wire: w,
+              point: new THREE.Vector3(projX, 0.2, projZ),
+            };
+          }
+        });
+
+        state.snapCandidate = bestSnap;
+        if (bestSnap) {
+          state.snapHighlightIndicator.visible = true;
+          state.snapHighlightIndicator.position.copy((bestSnap as { wire: CircuitWireData; point: THREE.Vector3 }).point);
+        } else {
+          state.snapHighlightIndicator.visible = false;
+        }
 
         updateSelectionIndicator();
       }
@@ -1140,15 +1474,67 @@ export const CircuitWorkbench: React.FC<CircuitWorkbenchProps> = ({
     const state = threeRef.current;
     if (!state) return;
 
-    // Optional snapping to breadboard grid on release for neat textbook alignment
     if (state.isDragging && state.draggedCompId) {
       const comp = state.components.find(c => c.id === state.draggedCompId);
       if (comp && !comp.pinned) {
-        comp.x = Math.round(comp.x / 1.5) * 1.5;
-        comp.z = Math.round(comp.z / 1.5) * 1.5;
-        const grp = state.componentMeshes.get(comp.id);
-        if (grp) grp.position.set(comp.x, 0, comp.z);
+        // 1. AUTO-CONNECT: Splice component directly into circuit branch
+        if (state.snapCandidate) {
+          const snapWire = state.snapCandidate.wire;
+          const [t1, t2] = getComponentTerminals(comp.type);
 
+          // Remove the spliced wire
+          const oldWData = state.wireMeshes.get(snapWire.id);
+          if (oldWData) {
+            state.scene.remove(oldWData.tube);
+            state.scene.remove(oldWData.arrowGroup);
+            oldWData.tube.geometry.dispose();
+            state.wireMeshes.delete(snapWire.id);
+          }
+          state.wires = state.wires.filter(w => w.id !== snapWire.id);
+
+          // Place component at the snap position with grid quantization
+          comp.x = Math.round(state.snapCandidate.point.x / 1.5) * 1.5;
+          comp.z = Math.round(state.snapCandidate.point.z / 1.5) * 1.5;
+          const grp = state.componentMeshes.get(comp.id);
+          if (grp) grp.position.set(comp.x, 0, comp.z);
+
+          // Insert two connecting wires
+          const newW1: CircuitWireData = {
+            id: `wire_${wireCounter++}`,
+            fromCompId: snapWire.fromCompId,
+            fromTermId: snapWire.fromTermId,
+            toCompId: comp.id,
+            toTermId: t1,
+            current: 0,
+            routingStyle: controlsState.wireRouting || 'orthogonal',
+          };
+
+          const newW2: CircuitWireData = {
+            id: `wire_${wireCounter++}`,
+            fromCompId: comp.id,
+            fromTermId: t2,
+            toCompId: snapWire.toCompId,
+            toTermId: snapWire.toTermId,
+            current: 0,
+            routingStyle: controlsState.wireRouting || 'orthogonal',
+          };
+
+          state.wires.push(newW1, newW2);
+          createWireMesh(newW1);
+          createWireMesh(newW2);
+
+          if (onToast) {
+            onToast(`Auto-connected ${comp.type.toUpperCase()} into circuit & adjusted wire routing!`);
+          }
+        } else {
+          // Standard snapping to breadboard grid
+          comp.x = Math.round(comp.x / 1.5) * 1.5;
+          comp.z = Math.round(comp.z / 1.5) * 1.5;
+          const grp = state.componentMeshes.get(comp.id);
+          if (grp) grp.position.set(comp.x, 0, comp.z);
+        }
+
+        // Re-adjust all attached wires
         state.wires.forEach(w => {
           if (w.fromCompId === comp.id || w.toCompId === comp.id) {
             const wData = state.wireMeshes.get(w.id);
@@ -1167,6 +1553,8 @@ export const CircuitWorkbench: React.FC<CircuitWorkbenchProps> = ({
       }
     }
 
+    state.snapCandidate = null;
+    state.snapHighlightIndicator.visible = false;
     state.controls.enabled = true;
     state.isDragging = false;
     state.draggedCompId = null;
@@ -1176,7 +1564,7 @@ export const CircuitWorkbench: React.FC<CircuitWorkbenchProps> = ({
   useEffect(() => {
     (window as any).__circuitWorkbench = {
       loadPreset: loadPresetCircuit,
-      addComponent: (type: ComponentType) => {
+      addComponent: (type: ComponentType, autoConnect: boolean = false) => {
         const state = threeRef.current;
         if (!state) return;
 
@@ -1202,6 +1590,13 @@ export const CircuitWorkbench: React.FC<CircuitWorkbenchProps> = ({
         state.components.push(newComp);
         rebuildCircuitScene();
         onSelectComponent(newComp);
+
+        if (autoConnect) {
+          autoConnectComponentToCircuit(newComp.id);
+        }
+      },
+      autoConnectSelectedComponent: (compId: string) => {
+        return autoConnectComponentToCircuit(compId);
       },
       updateSelectedComponent: (updated: CircuitComponentData) => {
         const state = threeRef.current;
@@ -1309,7 +1704,7 @@ export const CircuitWorkbench: React.FC<CircuitWorkbenchProps> = ({
         };
       },
     };
-  }, [onSelectComponent, controlsState]);
+  }, [onSelectComponent, controlsState, onToast]);
 
   return (
     <div ref={containerRef} className="relative w-full h-full overflow-hidden select-none">

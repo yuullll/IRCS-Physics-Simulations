@@ -146,6 +146,7 @@ export const PHYSICS_MODEL_SLOTS: PhysicsModelSlot[] = [
 interface ModelCatalogPortalProps {
   onSelectModel: (slot: PhysicsModelSlot) => void;
   onOpenClassroom: () => void;
+  onOpenStudentAccount?: () => void;
   onOpenSavedScenes: () => void;
   onOpenGuidedLab: () => void;
   onOpenTheory: () => void;
@@ -157,6 +158,7 @@ interface ModelCatalogPortalProps {
 export const ModelCatalogPortal: React.FC<ModelCatalogPortalProps> = ({
   onSelectModel,
   onOpenClassroom,
+  onOpenStudentAccount,
   onOpenSavedScenes,
   onOpenGuidedLab,
   onOpenTheory,
@@ -636,36 +638,67 @@ export const ModelCatalogPortal: React.FC<ModelCatalogPortalProps> = ({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Teacher Class Roster & Admin Card */}
-            <div
-              onClick={onOpenClassroom}
-              className="group cursor-pointer rounded-2xl bg-[#0a1224]/90 border border-white/15 hover:border-amber-400/50 p-6 transition-all duration-200 flex flex-col justify-between shadow-xl"
-            >
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-mono text-amber-400">
-                    INSTRUCTOR ADMINISTRATION
-                  </span>
-                  <Users className="w-5 h-5 text-amber-400" />
+            {/* Teacher Class Roster vs Student Academic Enrollment Card */}
+            {currentUser.role === 'instructor' ? (
+              <div
+                onClick={onOpenClassroom}
+                className="group cursor-pointer rounded-2xl bg-[#0a1224]/90 border border-white/15 hover:border-amber-400/50 p-6 transition-all duration-200 flex flex-col justify-between shadow-xl"
+              >
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-mono text-amber-400">
+                      INSTRUCTOR ADMINISTRATION
+                    </span>
+                    <Users className="w-5 h-5 text-amber-400" />
+                  </div>
+                  <h3 className="text-lg font-bold text-white group-hover:text-amber-300 transition-colors">
+                    Class Roster &amp; Student Management
+                  </h3>
+                  <p className="text-xs text-slate-300/85 leading-relaxed">
+                    View all enrolled students in {currentUser.className}, enroll new students, remove
+                    students from the roster, reset submissions, and grade 3D lab reports.
+                  </p>
                 </div>
-                <h3 className="text-lg font-bold text-white group-hover:text-amber-300 transition-colors">
-                  Class Roster &amp; Student Management
-                </h3>
-                <p className="text-xs text-slate-300/85 leading-relaxed">
-                  View all enrolled students in {currentUser.className}, enroll new students, remove
-                  students from the roster, reset submissions, and grade 3D lab reports.
-                </p>
+                <div className="pt-5 mt-5 border-t border-white/10 flex items-center justify-between text-xs font-mono">
+                  <span className="text-slate-400">
+                    {studentCount} Students · {submissionCount} Submissions
+                  </span>
+                  <span className="text-amber-400 font-sans font-bold flex items-center gap-1">
+                    <span>Manage Class</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </span>
+                </div>
               </div>
-              <div className="pt-5 mt-5 border-t border-white/10 flex items-center justify-between text-xs font-mono">
-                <span className="text-slate-400">
-                  {studentCount} Students · {submissionCount} Submissions
-                </span>
-                <span className="text-amber-400 font-sans font-bold flex items-center gap-1">
-                  <span>Manage Class</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </span>
+            ) : (
+              <div
+                onClick={onOpenStudentAccount}
+                className="group cursor-pointer rounded-2xl bg-[#0a1224]/90 border border-white/15 hover:border-cyan-400/50 p-6 transition-all duration-200 flex flex-col justify-between shadow-xl"
+              >
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-mono text-cyan-400">
+                      STUDENT ACADEMIC ENROLLMENT
+                    </span>
+                    <GraduationCap className="w-5 h-5 text-cyan-400" />
+                  </div>
+                  <h3 className="text-lg font-bold text-white group-hover:text-cyan-300 transition-colors">
+                    My Course &amp; Account Choices
+                  </h3>
+                  <p className="text-xs text-slate-300/85 leading-relaxed">
+                    Enrolled as student {currentUser.name} in {currentUser.className}. Instructor: Dr. Robert Vance. Manage your account choices, reset progress, or manage device logins.
+                  </p>
+                </div>
+                <div className="pt-5 mt-5 border-t border-white/10 flex items-center justify-between text-xs font-mono">
+                  <span className="text-slate-400">
+                    Student Profile · Active
+                  </span>
+                  <span className="text-cyan-400 font-sans font-bold flex items-center gap-1">
+                    <span>Account Choices</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </span>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Guided Lab Report Card */}
             <div

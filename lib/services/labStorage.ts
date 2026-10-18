@@ -79,6 +79,7 @@ const STORAGE_KEYS = {
   SAVED_SCENES: 'app_ap_physics_saved_scenes',
   AUTO_SAVES: 'app_ap_physics_auto_saves',
   SUBMISSIONS: 'app_ap_physics_lab_submissions',
+  HIDDEN_DEVICE_ACCOUNTS: 'app_ap_physics_hidden_device_accounts',
 };
 
 // Seed initial student sample submissions for teacher evaluation
@@ -203,7 +204,16 @@ class LabStorageService {
   private memoryAutoSaves: Record<string, SceneSnapshot> = {};
   private memoryUsers: UserProfile[] = [...MOCK_USERS];
   private currentUserId: string = 'user_student_1'; // Alex Chen default
+  private hiddenAccountIds: Set<string> = new Set();
+  private cachedVisibleUsers: UserProfile[] = [];
+  private cachedHiddenUsers: UserProfile[] = [];
   private listeners: Set<() => void> = new Set();
+
+  private updateUserCaches(): void {
+    const visible = this.memoryUsers.filter(u => !this.hiddenAccountIds.has(u.id));
+    this.cachedVisibleUsers = visible.length > 0 ? visible : this.memoryUsers.slice(0, 1);
+    this.cachedHiddenUsers = this.memoryUsers.filter(u => this.hiddenAccountIds.has(u.id));
+  }
 
   public subscribe = (listener: () => void): (() => void) => {
     this.listeners.add(listener);
@@ -236,6 +246,16 @@ class LabStorageService {
           this.currentUserId = storedUserId;
         }
 
+        const storedHidden = localStorage.getItem(STORAGE_KEYS.HIDDEN_DEVICE_ACCOUNTS);
+        if (storedHidden) {
+          try {
+            const arr = JSON.parse(storedHidden);
+            if (Array.isArray(arr)) {
+              this.hiddenAccountIds = new Set(arr);
+            }
+          } catch (e) {}
+        }
+
         const storedSubs = localStorage.getItem(STORAGE_KEYS.SUBMISSIONS);
         if (storedSubs) {
           this.memorySubmissions = JSON.parse(storedSubs);
@@ -260,6 +280,7 @@ class LabStorageService {
     } else {
       this.memorySubmissions = getInitialSubmissions();
     }
+    this.updateUserCaches();
   }
 
   // Auth & Profile
@@ -283,6 +304,93 @@ class LabStorageService {
 
   public getAllUsers(): UserProfile[] {
     return this.memoryUsers;
+  }
+
+  // Get only accounts that are allowed to show on this device/laptop (cached reference)
+  public getVisibleUsersOnDevice(): UserProfile[] {
+    return this.cachedVisibleUsers;
+  }
+
+  // Hide/Forget an account from this laptop screen WITHOUT deleting it from database
+  public forgetAccountOnDevice(userId: string): void {
+    this.hiddenAccountIds.add(userId);
+    this.persistHiddenAccounts();
+    this.updateUserCaches();
+
+    // If active user was forgotten from this device, switch to first visible account
+    if (this.currentUserId === userId) {
+      const fallback = this.cachedVisibleUsers[0] || MOCK_USERS[1];
+      this.currentUserId = fallback.id;
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(STORAGE_KEYS.CURRENT_USER, fallback.id);
+        } catch (e) {}
+      }
+    }
+    this.notify();
+  }
+
+  // Restore/unhide an account on this laptop
+  public restoreAccountOnDevice(userId: string): void {
+    this.hiddenAccountIds.delete(userId);
+    this.persistHiddenAccounts();
+    this.updateUserCaches();
+    this.notify();
+  }
+
+  // Restore all hidden accounts on this laptop
+  public restoreAllAccountsOnDevice(): void {
+    this.hiddenAccountIds.clear();
+    this.persistHiddenAccounts();
+    this.updateUserCaches();
+    this.notify();
+  }
+
+  public getHiddenAccountsOnDevice(): UserProfile[] {
+    return this.cachedHiddenUsers;
+  }
+
+  private persistHiddenAccounts(): void {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(
+          STORAGE_KEYS.HIDDEN_DEVICE_ACCOUNTS,
+          JSON.stringify(Array.from(this.hiddenAccountIds))
+        );
+      } catch (e) {}
+    }
+  }
+
+  // Student Account Choices: Permanently delete account and all data
+  public deleteStudentAccount(studentId: string): void {
+    this.memoryUsers = this.memoryUsers.filter(u => u.id !== studentId);
+    this.memorySubmissions = this.memorySubmissions.filter(s => s.studentId !== studentId);
+    this.memorySavedScenes = this.memorySavedScenes.filter(e => e.userId !== studentId);
+    this.hiddenAccountIds.delete(studentId);
+
+    if (this.currentUserId === studentId) {
+      const remaining = this.getVisibleUsersOnDevice();
+      const fallback = remaining[0] || MOCK_USERS[1];
+      this.currentUserId = fallback.id;
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(STORAGE_KEYS.CURRENT_USER, fallback.id);
+        } catch (e) {}
+      }
+    }
+
+    this.persistUsers();
+    this.persistSubmissions();
+    this.persistSavedScenes();
+    this.persistHiddenAccounts();
+    this.notify();
+  }
+
+  // Student Account Choices: Reset personal lab progress
+  public resetStudentProgress(studentId: string): void {
+    this.memorySubmissions = this.memorySubmissions.filter(s => s.studentId !== studentId);
+    this.persistSubmissions();
+    this.notify();
   }
 
   public registerUser(data: {
@@ -319,14 +427,11 @@ class LabStorageService {
 
     if (typeof window !== 'undefined') {
       try {
-        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(this.memoryUsers));
         localStorage.setItem(STORAGE_KEYS.CURRENT_USER, newUser.id);
-      } catch (e) {
-        console.warn('Failed saving new user to localStorage:', e);
-      }
+      } catch (e) {}
     }
 
-    this.notify();
+    this.persistUsers();
     return newUser;
   }
 
@@ -456,6 +561,7 @@ class LabStorageService {
   }
 
   private persistUsers(): void {
+    this.updateUserCaches();
     if (typeof window !== 'undefined') {
       try {
         localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(this.memoryUsers));

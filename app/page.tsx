@@ -24,13 +24,22 @@ import {
   Users,
   Compass,
   Sliders,
+  User,
+  Activity,
+  Gauge,
 } from 'lucide-react';
 import { FieldSandbox, FieldSandboxControls } from '@/components/simulation/FieldSandbox';
-import { CircuitWorkbench, CircuitWorkbenchControls } from '@/components/simulation/CircuitWorkbench';
+import {
+  CircuitWorkbench,
+  CircuitWorkbenchControls,
+  CircuitWorkbenchTelemetry,
+  CircuitMeterReading,
+} from '@/components/simulation/CircuitWorkbench';
 import { Oscilloscope, DataPoint } from '@/components/ui/Oscilloscope';
 import { CalculusTheoryModal } from '@/components/ui/CalculusTheoryModal';
 import { UserRoleBar } from '@/components/auth/UserRoleBar';
 import { AuthModal } from '@/components/auth/AuthModal';
+import { StudentAccountModal } from '@/components/auth/StudentAccountModal';
 import { SavedScenesDrawer } from '@/components/lab/SavedScenesDrawer';
 import { GuidedLabModal } from '@/components/lab/GuidedLabModal';
 import { InstructorDashboardModal } from '@/components/lab/InstructorDashboardModal';
@@ -43,6 +52,7 @@ import { SourceCharge, COULOMB_K } from '@/lib/physics/coulomb';
 import { CircuitComponentData } from '@/lib/physics/mna-solver';
 import { labStorage, MOCK_USERS } from '@/lib/services/labStorage';
 import {
+  UserProfile,
   UserRole,
   SceneSnapshot,
   LabSubmission,
@@ -52,6 +62,10 @@ type LayerRoute =
   | { layer: 'catalog' }
   | { layer: 'workspace'; mode: 'field' | 'circuit'; modelTitle: string }
   | { layer: 'slot-detail'; slot: PhysicsModelSlot };
+
+const STATIC_DEFAULT_USER = MOCK_USERS[1];
+const STATIC_USER_LIST = MOCK_USERS;
+const STATIC_EMPTY_USER_LIST: UserProfile[] = [];
 
 export default function SimulationCockpit() {
   // Multi-Layer Hierarchy & History Stack (No Top Bar — Back/Forward Layer Navigation)
@@ -103,22 +117,27 @@ export default function SimulationCockpit() {
   const currentUser = useSyncExternalStore(
     labStorage.subscribe,
     () => labStorage.getCurrentUser(),
-    () => MOCK_USERS[1]
+    () => STATIC_DEFAULT_USER
+  );
+  const visibleUsers = useSyncExternalStore(
+    labStorage.subscribe,
+    () => labStorage.getVisibleUsersOnDevice(),
+    () => STATIC_USER_LIST
   );
   const allUsers = useSyncExternalStore(
     labStorage.subscribe,
     () => labStorage.getAllUsers(),
-    () => MOCK_USERS
+    () => STATIC_USER_LIST
   );
-
-  // Trigger re-render on lab storage mutations
-  const [, setStorageVersion] = useState(0);
-  useEffect(() => {
-    return labStorage.subscribe(() => setStorageVersion(v => v + 1));
-  }, []);
+  const hiddenAccounts = useSyncExternalStore(
+    labStorage.subscribe,
+    () => labStorage.getHiddenAccountsOnDevice(),
+    () => STATIC_EMPTY_USER_LIST
+  );
 
   const [isAutoSaving, setIsAutoSaving] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isStudentAccountModalOpen, setIsStudentAccountModalOpen] = useState(false);
 
   // Workflow Dialogs State
   const [isSavedScenesOpen, setIsSavedScenesOpen] = useState(false);
@@ -186,13 +205,14 @@ export default function SimulationCockpit() {
   });
 
   const [selectedComponent, setSelectedComponent] = useState<CircuitComponentData | null>(null);
-  const [circuitTelemetry, setCircuitTelemetry] = useState({
+  const [circuitTelemetry, setCircuitTelemetry] = useState<CircuitWorkbenchTelemetry>({
     supplyEmf: 9.0,
     totalCurrent: 0.0,
     activeComponents: 4,
     wireCount: 5,
     kclMaxResidual: 0.0,
     kvlVerified: true,
+    meterReadings: [],
   });
 
   // Oscilloscope History Buffers
@@ -422,8 +442,12 @@ export default function SimulationCockpit() {
     showToast('Lab 01 report submitted with 3D scene snapshot for instructor grading!');
   };
 
-  // Instructor Administrative & Grading Actions
+  // Instructor Administrative & Grading Actions (Gated by instructor role)
   const handleGradeSubmission = (submissionId: string, grade: number, feedback: string) => {
+    if (currentUser.role !== 'instructor') {
+      showToast('Access Denied: Only instructors can grade submissions.');
+      return;
+    }
     const graded = labStorage.gradeSubmission(submissionId, grade, feedback, currentUser.name);
     if (graded) {
       showToast(`Grade (${grade}/100) and feedback saved for ${graded.studentName}`);
@@ -431,11 +455,19 @@ export default function SimulationCockpit() {
   };
 
   const handleEnrollStudent = (data: { name: string; email: string; className?: string }) => {
+    if (currentUser.role !== 'instructor') {
+      showToast('Access Denied: Only instructors can enroll students.');
+      return;
+    }
     const stu = labStorage.enrollStudentInClass(data);
     showToast(`Enrolled ${stu.name} (${stu.email}) into ${stu.className}`);
   };
 
   const handleRemoveStudent = (studentId: string, studentName: string) => {
+    if (currentUser.role !== 'instructor') {
+      showToast('Access Denied: Only instructors can remove students.');
+      return;
+    }
     labStorage.removeStudentFromClass(studentId);
     showToast(`Removed ${studentName} from class roster`);
   };
@@ -444,6 +476,10 @@ export default function SimulationCockpit() {
     studentId: string,
     updates: { name?: string; email?: string; className?: string }
   ) => {
+    if (currentUser.role !== 'instructor') {
+      showToast('Access Denied: Only instructors can modify student records.');
+      return;
+    }
     const updated = labStorage.updateStudentInfo(studentId, updates);
     if (updated) {
       showToast(`Updated student record for ${updated.name}`);
@@ -451,8 +487,39 @@ export default function SimulationCockpit() {
   };
 
   const handleResetStudentSubmission = (studentId: string, studentName: string) => {
+    if (currentUser.role !== 'instructor') {
+      showToast('Access Denied: Only instructors can reset student work.');
+      return;
+    }
     labStorage.resetStudentSubmission(studentId);
     showToast(`Reset Lab 01 submission for ${studentName}`);
+  };
+
+  // Student Account Choices & Device Privacy Actions
+  const handleDeleteMyAccount = () => {
+    const studentName = currentUser.name;
+    labStorage.deleteStudentAccount(currentUser.id);
+    showToast(`Account for ${studentName} was permanently deleted.`);
+  };
+
+  const handleResetMyProgress = () => {
+    labStorage.resetStudentProgress(currentUser.id);
+    showToast('Reset personal Lab 01 progress and submission.');
+  };
+
+  const handleForgetAccountOnDevice = (userId: string, userName: string) => {
+    labStorage.forgetAccountOnDevice(userId);
+    showToast(`Removed access for ${userName} from this laptop screen.`);
+  };
+
+  const handleRestoreAllAccounts = () => {
+    labStorage.restoreAllAccountsOnDevice();
+    showToast('Restored all hidden accounts on this laptop screen.');
+  };
+
+  const handleUpdateStudentProfile = (name: string, avatar: string) => {
+    labStorage.updateStudentInfo(currentUser.id, { name });
+    showToast('Student profile updated.');
   };
 
   const handleRestoreStudentSnapshot = (snapshot: SceneSnapshot, studentName: string) => {
@@ -502,16 +569,20 @@ export default function SimulationCockpit() {
   const liveForce = (COULOMB_K * 25e-12) / (liveDistance * liveDistance);
 
   // Oscilloscope sampler for Circuit Workbench
-  const handleCircuitScopeSample = (v: number, i: number) => {
+  const handleCircuitScopeSample = useCallback((v: number, i: number) => {
     setCircuitScopeHistory(prev => {
       const now = performance.now() * 0.001;
       const next = [...prev, { t: now, val1: v, val2: i }];
       if (next.length > 120) next.shift();
       return next;
     });
-  };
+  }, []);
 
-  const handleFieldTelemetryUpdate = (data: {
+  const handleCircuitTelemetryUpdate = useCallback((data: CircuitWorkbenchTelemetry) => {
+    setCircuitTelemetry(data);
+  }, []);
+
+  const handleFieldTelemetryUpdate = useCallback((data: {
     chargeCount: number;
     eFieldAtCursor: number;
     fPredicted: number;
@@ -541,7 +612,7 @@ export default function SimulationCockpit() {
         return next;
       });
     }
-  };
+  }, []);
 
   return (
     <div
@@ -701,19 +772,31 @@ export default function SimulationCockpit() {
             <span className="hidden lg:inline">Lab Report</span>
           </button>
 
-          {/* Class Administration & Gradebook Button */}
-          <button
-            onClick={() => setIsTeacherDashboardOpen(true)}
-            className="px-2.5 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 transition flex items-center space-x-1.5 text-xs font-semibold"
-            title="Open Teacher Class Roster, Student Management & Gradebook"
-          >
-            <Users className="w-3.5 h-3.5 text-amber-400" />
-            <span className="hidden md:inline">
-              {currentUser.role === 'instructor'
-                ? `Class Admin (${classStudents.length})`
-                : 'Class Portal'}
-            </span>
-          </button>
+          {/* Class Administration & Gradebook Button - ONLY for Instructor */}
+          {currentUser.role === 'instructor' && (
+            <button
+              onClick={() => setIsTeacherDashboardOpen(true)}
+              className="px-2.5 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 transition flex items-center space-x-1.5 text-xs font-semibold"
+              title="Open Teacher Class Roster, Student Management & Gradebook"
+            >
+              <Users className="w-3.5 h-3.5 text-amber-400" />
+              <span className="hidden md:inline">
+                Class Admin ({classStudents.length})
+              </span>
+            </button>
+          )}
+
+          {/* Student Account Choices Button - for Students */}
+          {currentUser.role === 'student' && (
+            <button
+              onClick={() => setIsStudentAccountModalOpen(true)}
+              className="px-2.5 py-1.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 transition flex items-center space-x-1.5 text-xs font-semibold"
+              title="Manage student account, privacy choices, reset progress, or delete account"
+            >
+              <User className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="hidden md:inline">My Account</span>
+            </button>
+          )}
 
           <button
             onClick={() => setIsTheoryOpen(true)}
@@ -727,10 +810,14 @@ export default function SimulationCockpit() {
 
           <UserRoleBar
             currentUser={currentUser}
-            allUsers={allUsers}
+            allUsers={visibleUsers}
             onSwitchUser={handleSwitchUser}
             onOpenAuthModal={() => setIsAuthModalOpen(true)}
             onLogout={handleLogout}
+            onForgetAccountOnDevice={handleForgetAccountOnDevice}
+            onOpenStudentAccountModal={() => setIsStudentAccountModalOpen(true)}
+            hiddenAccountsCount={hiddenAccounts.length}
+            onRestoreAllAccounts={handleRestoreAllAccounts}
           />
         </div>
       </div>
@@ -748,7 +835,14 @@ export default function SimulationCockpit() {
       {currentRoute.layer === 'catalog' && (
         <ModelCatalogPortal
           onSelectModel={handleSelectCatalogModel}
-          onOpenClassroom={() => setIsTeacherDashboardOpen(true)}
+          onOpenClassroom={() => {
+            if (currentUser.role === 'instructor') {
+              setIsTeacherDashboardOpen(true);
+            } else {
+              setIsStudentAccountModalOpen(true);
+            }
+          }}
+          onOpenStudentAccount={() => setIsStudentAccountModalOpen(true)}
           onOpenSavedScenes={() => setIsSavedScenesOpen(true)}
           onOpenGuidedLab={() => setIsGuidedLabOpen(true)}
           onOpenTheory={() => setIsTheoryOpen(true)}
@@ -942,8 +1036,9 @@ export default function SimulationCockpit() {
                 controlsState={circuitControls}
                 onSelectComponent={setSelectedComponent}
                 selectedComponentId={selectedComponent?.id ?? null}
-                onUpdateTelemetry={data => setCircuitTelemetry(data)}
+                onUpdateTelemetry={handleCircuitTelemetryUpdate}
                 onOscilloscopeSample={handleCircuitScopeSample}
+                onToast={showToast}
               />
             )}
           </div>
@@ -1687,10 +1782,65 @@ export default function SimulationCockpit() {
                     </div>
 
                     <div
-                      className={`space-y-2 transition-opacity ${
+                      className={`space-y-2.5 transition-opacity ${
                         selectedComponent ? 'opacity-100' : 'opacity-40 pointer-events-none'
                       }`}
                     >
+                      {/* Auto-Connect into Circuit Branch Button */}
+                      {selectedComponent && (
+                        <button
+                          onClick={() => {
+                            const connected = (window as any).__circuitWorkbench?.autoConnectSelectedComponent(
+                              selectedComponent.id
+                            );
+                            if (!connected) {
+                              showToast('Drag component closer to a wire or drop onto the circuit to auto-connect');
+                            }
+                          }}
+                          className="w-full py-1.5 px-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 text-[11px] font-semibold flex items-center justify-center gap-1.5 transition"
+                        >
+                          <Cable className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Snap &amp; Auto-Connect to Nearest Branch</span>
+                        </button>
+                      )}
+
+                      {/* Voltmeter / Ammeter Large LCD Inspection Station */}
+                      {(selectedComponent?.type === 'voltmeter' || selectedComponent?.type === 'ammeter') && (
+                        <div className="space-y-2 pt-1 font-sans">
+                          <div
+                            className={`p-3 rounded-xl border space-y-1.5 ${
+                              selectedComponent.type === 'voltmeter'
+                                ? 'bg-emerald-950/40 border-emerald-500/40'
+                                : 'bg-sky-950/40 border-sky-500/40'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between text-[10px] font-mono">
+                              <span
+                                className={`font-bold ${
+                                  selectedComponent.type === 'voltmeter' ? 'text-emerald-400' : 'text-sky-400'
+                                }`}
+                              >
+                                {selectedComponent.type === 'voltmeter' ? 'DIGITAL VOLTMETER' : 'DIGITAL AMMETER'}
+                              </span>
+                              <span className="text-slate-400">ID: {selectedComponent.id}</span>
+                            </div>
+                            <div className="text-2xl font-black font-mono tracking-tight text-white">
+                              {circuitTelemetry.meterReadings?.find(m => m.id === selectedComponent.id)?.formatted ??
+                                (selectedComponent.measuredValue !== undefined
+                                  ? `${selectedComponent.measuredValue >= 0 ? '+' : ''}${selectedComponent.measuredValue.toFixed(selectedComponent.type === 'voltmeter' ? 2 : 3)} ${selectedComponent.type === 'voltmeter' ? 'V' : 'A'}`
+                                  : selectedComponent.type === 'voltmeter'
+                                  ? '0.00 V'
+                                  : '0.000 A')}
+                            </div>
+                            <p className="text-[10px] text-slate-300 leading-tight">
+                              {selectedComponent.type === 'voltmeter'
+                                ? 'Input Impedance: 10 MΩ (High-Z). Measures electric potential difference.'
+                                : 'Shunt Resistance: 0.001 Ω (Low-Z). Measures branch current drift.'}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
                       {selectedComponent?.type === 'switch' && (
                         <div className="space-y-1.5 pt-1">
                           <div className="flex justify-between items-center">
@@ -1835,6 +1985,76 @@ export default function SimulationCockpit() {
                     <span>Verified</span>
                   </span>
                 </div>
+
+                {/* Live Multimeter Readouts Section */}
+                <div className="pt-2 border-t border-white/10 space-y-1.5 font-sans">
+                  <div className="flex items-center justify-between text-[11px] font-bold text-white">
+                    <span className="flex items-center gap-1.5">
+                      <Activity className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Multimeter Readings</span>
+                    </span>
+                    <span className="text-[10px] font-mono text-emerald-400">
+                      {circuitTelemetry.meterReadings?.length || 0} ACTIVE
+                    </span>
+                  </div>
+
+                  {circuitTelemetry.meterReadings && circuitTelemetry.meterReadings.length > 0 ? (
+                    <div className="space-y-1.5 pt-0.5">
+                      {circuitTelemetry.meterReadings.map(m => (
+                        <div
+                          key={m.id}
+                          className={`p-2 rounded-xl border flex items-center justify-between font-mono text-xs ${
+                            m.type === 'voltmeter'
+                              ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
+                              : 'bg-sky-950/40 border-sky-500/40 text-sky-300'
+                          }`}
+                        >
+                          <div className="flex items-center space-x-1.5 min-w-0">
+                            <span
+                              className={`text-[9px] px-1 py-0.2 rounded font-bold uppercase ${
+                                m.type === 'voltmeter'
+                                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                                  : 'bg-sky-500/20 text-sky-400 border border-sky-500/40'
+                              }`}
+                            >
+                              {m.type === 'voltmeter' ? 'VOLTS' : 'AMPS'}
+                            </span>
+                            <span className="font-semibold text-white truncate text-[11px]">
+                              {m.id}
+                            </span>
+                          </div>
+                          <span className="text-sm font-black tracking-tight text-white ml-2">
+                            {m.formatted}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/10 text-center space-y-1.5">
+                      <p className="text-[10px] text-slate-400">No meters currently in circuit</p>
+                      <div className="flex justify-center gap-1.5">
+                        <button
+                          onClick={() => {
+                            (window as any).__circuitWorkbench?.addComponent('voltmeter', true);
+                            showToast('Added Voltmeter & auto-connected');
+                          }}
+                          className="px-2 py-0.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 text-[10px] font-semibold border border-emerald-500/30"
+                        >
+                          + Voltmeter
+                        </button>
+                        <button
+                          onClick={() => {
+                            (window as any).__circuitWorkbench?.addComponent('ammeter', true);
+                            showToast('Added Ammeter & auto-connected');
+                          }}
+                          className="px-2 py-0.5 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 text-[10px] font-semibold border border-sky-500/30"
+                        >
+                          + Ammeter
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -1923,6 +2143,18 @@ export default function SimulationCockpit() {
           labStorage.exportSubmissionsCSV();
           showToast('Downloaded student grades and submissions as CSV spreadsheet');
         }}
+      />
+
+      {/* Student Account Choices & Privacy Modal */}
+      <StudentAccountModal
+        isOpen={isStudentAccountModalOpen}
+        onClose={() => setIsStudentAccountModalOpen(false)}
+        currentUser={currentUser}
+        submission={currentSubmission}
+        onDeleteAccount={handleDeleteMyAccount}
+        onResetProgress={handleResetMyProgress}
+        onForgetOnDevice={() => handleForgetAccountOnDevice(currentUser.id, currentUser.name)}
+        onUpdateProfile={handleUpdateStudentProfile}
       />
 
       {/* Login & Sign-Up Auth Modal */}
