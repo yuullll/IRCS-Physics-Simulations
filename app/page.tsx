@@ -47,6 +47,7 @@ import {
   ModelCatalogPortal,
   PHYSICS_MODEL_SLOTS,
   PhysicsModelSlot,
+  PhysicsCourseId,
 } from '@/components/catalog/ModelCatalogPortal';
 import { SourceCharge, COULOMB_K } from '@/lib/physics/coulomb';
 import { CircuitComponentData } from '@/lib/physics/mna-solver';
@@ -59,7 +60,7 @@ import {
 } from '@/lib/types/lab';
 
 type LayerRoute =
-  | { layer: 'catalog' }
+  | { layer: 'catalog'; course?: PhysicsCourseId }
   | { layer: 'workspace'; mode: 'field' | 'circuit'; modelTitle: string }
   | { layer: 'slot-detail'; slot: PhysicsModelSlot };
 
@@ -69,9 +70,20 @@ const STATIC_EMPTY_USER_LIST: UserProfile[] = [];
 
 export default function SimulationCockpit() {
   // Multi-Layer Hierarchy & History Stack (No Top Bar — Back/Forward Layer Navigation)
-  const [navHistory, setNavHistory] = useState<LayerRoute[]>([{ layer: 'catalog' }]);
+  const [navHistory, setNavHistory] = useState<LayerRoute[]>([
+    { layer: 'catalog', course: 'em' },
+  ]);
   const [navIndex, setNavIndex] = useState<number>(0);
-  const currentRoute = navHistory[navIndex] || { layer: 'catalog' };
+  const currentRoute = navHistory[navIndex] || { layer: 'catalog', course: 'em' };
+  const activeCourse: PhysicsCourseId =
+    currentRoute.layer === 'catalog'
+      ? currentRoute.course || 'em'
+      : currentRoute.layer === 'slot-detail'
+      ? currentRoute.slot.course || 'em'
+      : 'em';
+
+  // Header visibility on catalog scroll (disappears on scroll down, reappears on scroll up)
+  const [isHeaderVisible, setIsHeaderVisible] = useState(true);
 
   // Active simulation mode when in workspace layer
   const [activeMode, setActiveMode] = useState<'field' | 'circuit'>('field');
@@ -85,6 +97,7 @@ export default function SimulationCockpit() {
       if (route.layer === 'workspace') {
         setActiveMode(route.mode);
       }
+      setIsHeaderVisible(true);
       setNavHistory(prev => {
         const sliced = prev.slice(0, navIndex + 1);
         return [...sliced, route];
@@ -101,6 +114,7 @@ export default function SimulationCockpit() {
     if (navIndex > 0) {
       const target = navHistory[navIndex - 1];
       if (target.layer === 'workspace') setActiveMode(target.mode);
+      setIsHeaderVisible(true);
       setNavIndex(navIndex - 1);
     }
   }, [navIndex, navHistory]);
@@ -109,6 +123,7 @@ export default function SimulationCockpit() {
     if (navIndex < navHistory.length - 1) {
       const target = navHistory[navIndex + 1];
       if (target.layer === 'workspace') setActiveMode(target.mode);
+      setIsHeaderVisible(true);
       setNavIndex(navIndex + 1);
     }
   }, [navIndex, navHistory]);
@@ -622,7 +637,13 @@ export default function SimulationCockpit() {
       {/* ========================================================================= */}
       {/* FLOATING HIERARCHY & BACK/FORWARD NAVIGATION DOCK (NO TOP BAR!)           */}
       {/* ========================================================================= */}
-      <div className="fixed top-4 left-4 z-40 flex items-center gap-2">
+      <div
+        className={`fixed top-4 left-4 z-40 flex items-center gap-2 transition-all duration-300 ${
+          currentRoute.layer === 'catalog' && !isHeaderVisible
+            ? 'opacity-0 -translate-y-8 pointer-events-none'
+            : 'opacity-100 translate-y-0'
+        }`}
+      >
         <div className="bg-[#080e1e]/85 backdrop-blur-xl border border-white/10 rounded-2xl p-1.5 shadow-2xl flex items-center space-x-1.5">
           {/* Back & Forward History Buttons */}
           <button
@@ -657,18 +678,52 @@ export default function SimulationCockpit() {
             <button
               onClick={() => {
                 if (currentRoute.layer !== 'catalog') {
-                  navigateTo({ layer: 'catalog' });
+                  navigateTo({ layer: 'catalog', course: activeCourse });
                 }
               }}
               className={`font-semibold transition flex items-center gap-1.5 ${
                 currentRoute.layer === 'catalog'
-                  ? 'text-sky-400'
+                  ? activeCourse === 'mechanics'
+                    ? 'text-emerald-400'
+                    : 'text-sky-400'
                   : 'text-slate-300 hover:text-white'
               }`}
             >
-              <Compass className="w-3.5 h-3.5 text-sky-400" />
+              <Compass
+                className={`w-3.5 h-3.5 ${
+                  activeCourse === 'mechanics' ? 'text-emerald-400' : 'text-sky-400'
+                }`}
+              />
               <span>Model Catalog</span>
             </button>
+
+            {currentRoute.layer === 'catalog' && (
+              <>
+                <span className="text-slate-500 font-mono">/</span>
+                <div className="flex items-center bg-[#050811] p-0.5 rounded-xl border border-white/10 text-[11px]">
+                  <button
+                    onClick={() => navigateTo({ layer: 'catalog', course: 'em' })}
+                    className={`px-2 py-0.5 rounded-lg font-medium transition ${
+                      activeCourse === 'em'
+                        ? 'bg-sky-400 text-slate-950 font-bold'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    C: E&amp;M
+                  </button>
+                  <button
+                    onClick={() => navigateTo({ layer: 'catalog', course: 'mechanics' })}
+                    className={`px-2 py-0.5 rounded-lg font-medium transition ${
+                      activeCourse === 'mechanics'
+                        ? 'bg-emerald-400 text-slate-950 font-bold'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    C: Mechanics
+                  </button>
+                </div>
+              </>
+            )}
 
             {currentRoute.layer === 'workspace' && (
               <>
@@ -714,7 +769,13 @@ export default function SimulationCockpit() {
       {/* ========================================================================= */}
       {/* FLOATING RIGHT CONTEXTUAL ACTIONS & ACCOUNT POD (NO TOP BAR!)             */}
       {/* ========================================================================= */}
-      <div className="fixed top-4 right-4 z-40 flex items-center gap-2">
+      <div
+        className={`fixed top-4 right-4 z-40 flex items-center gap-2 transition-all duration-300 ${
+          currentRoute.layer === 'catalog' && !isHeaderVisible
+            ? 'opacity-0 -translate-y-8 pointer-events-none'
+            : 'opacity-100 translate-y-0'
+        }`}
+      >
         <div className="bg-[#080e1e]/85 backdrop-blur-xl border border-white/10 rounded-2xl p-1.5 shadow-2xl flex items-center space-x-1.5">
           {currentRoute.layer === 'workspace' && (
             <>
@@ -834,6 +895,9 @@ export default function SimulationCockpit() {
       {/* ========================================================================= */}
       {currentRoute.layer === 'catalog' && (
         <ModelCatalogPortal
+          activeCourse={activeCourse}
+          onChangeCourse={course => navigateTo({ layer: 'catalog', course })}
+          onHeaderVisibilityChange={setIsHeaderVisible}
           onSelectModel={handleSelectCatalogModel}
           onOpenClassroom={() => {
             if (currentUser.role === 'instructor') {
@@ -991,8 +1055,8 @@ export default function SimulationCockpit() {
             <div className="absolute top-20 left-1/2 -translate-x-1/2 z-20 bg-sky-950/90 backdrop-blur-md border border-sky-500/60 text-sky-200 text-xs px-4 py-2 rounded-2xl shadow-2xl flex items-center gap-2.5">
               <Cable className="w-4 h-4 text-sky-400" />
               <span>
-                <strong>Wire Connection Tool Active:</strong> Click terminal 1, then click terminal
-                2 to run a wire!
+                <strong>Wire Connection Tool Active:</strong> Select any two circuit elements to
+                connect — terminals are sorted out automatically!
               </span>
               <button
                 onClick={() => setCircuitControls(prev => ({ ...prev, activeTool: 'select' }))}
@@ -1595,7 +1659,7 @@ export default function SimulationCockpit() {
                       <button
                         onClick={() => {
                           setCircuitControls(prev => ({ ...prev, activeTool: 'wire' }));
-                          showToast('Wire Tool active: Click terminal 1, then terminal 2');
+                          showToast('Wire Tool active: Select two elements to auto-connect terminals');
                         }}
                         className={`py-2 px-1 rounded-xl text-center font-semibold transition flex flex-col items-center gap-1 ${
                           circuitControls.activeTool === 'wire'

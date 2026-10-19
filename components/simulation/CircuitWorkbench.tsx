@@ -81,6 +81,9 @@ export function getComponentTerminals(type: ComponentType): [string, string] {
     case 'voltmeter':
     case 'battery':
       return ['pos', 'neg'];
+    case 'lead_pin':
+    case 'ground':
+      return ['term', 'term'];
     default:
       return ['term1', 'term2'];
   }
@@ -590,6 +593,81 @@ export const CircuitWorkbench: React.FC<CircuitWorkbenchProps> = ({
       return worldPos;
     }
     return new THREE.Vector3(comp.x, 0.5, comp.z);
+  }
+
+  // Automatically sort out optimal terminals when user selects two elements to connect
+  function resolveAutoTerminals(
+    fromComp: CircuitComponentData,
+    toComp: CircuitComponentData,
+    existingWires: CircuitWireData[]
+  ): { fromTermId: string; toTermId: string } {
+    const [f1, f2] = getComponentTerminals(fromComp.type);
+    const [t1, t2] = getComponentTerminals(toComp.type);
+    const fromTerms = f1 === f2 ? [f1] : [f1, f2];
+    const toTerms = t1 === t2 ? [t1] : [t1, t2];
+
+    const getDegree = (compId: string, termId: string) =>
+      existingWires.filter(
+        w =>
+          (w.fromCompId === compId && w.fromTermId === termId) ||
+          (w.toCompId === compId && w.toTermId === termId)
+      ).length;
+
+    const directWires = existingWires.filter(
+      w =>
+        (w.fromCompId === fromComp.id && w.toCompId === toComp.id) ||
+        (w.fromCompId === toComp.id && w.toCompId === fromComp.id)
+    );
+
+    let bestFrom = fromTerms[0];
+    let bestTo = toTerms[0];
+    let bestScore = Infinity;
+
+    for (const ft of fromTerms) {
+      for (const tt of toTerms) {
+        const degF = getDegree(fromComp.id, ft);
+        const degT = getDegree(toComp.id, tt);
+        const pF = getTerminalWorldPos(fromComp, ft);
+        const pT = getTerminalWorldPos(toComp, tt);
+        const dist = pF.distanceTo(pT);
+
+        const exactPairExists = directWires.some(
+          w =>
+            (w.fromCompId === fromComp.id &&
+              w.fromTermId === ft &&
+              w.toCompId === toComp.id &&
+              w.toTermId === tt) ||
+            (w.fromCompId === toComp.id &&
+              w.fromTermId === tt &&
+              w.toCompId === fromComp.id &&
+              w.toTermId === ft)
+        );
+
+        const ftUsedBetweenPair = directWires.some(
+          w =>
+            (w.fromCompId === fromComp.id && w.fromTermId === ft) ||
+            (w.toCompId === fromComp.id && w.toTermId === ft)
+        );
+        const ttUsedBetweenPair = directWires.some(
+          w =>
+            (w.fromCompId === toComp.id && w.fromTermId === tt) ||
+            (w.toCompId === toComp.id && w.toTermId === tt)
+        );
+
+        let score = dist + degF * 60 + degT * 60;
+        if (ftUsedBetweenPair) score += 600;
+        if (ttUsedBetweenPair) score += 600;
+        if (exactPairExists) score += 10000;
+
+        if (score < bestScore) {
+          bestScore = score;
+          bestFrom = ft;
+          bestTo = tt;
+        }
+      }
+    }
+
+    return { fromTermId: bestFrom, toTermId: bestTo };
   }
 
   // Generates clean wire geometry: Orthogonal Textbook 90° Routing or Catenary Cable
@@ -1240,54 +1318,87 @@ export const CircuitWorkbench: React.FC<CircuitWorkbenchProps> = ({
       return;
     }
 
-    // 2. Wire Tool
+    // 2. Wire Tool — Select any two circuit elements to automatically connect their terminals
     if (controlsState.activeTool === 'wire') {
-      let clickedTerm: { compId: string; termId: string } | null = null;
-      for (const [cId, grp] of state.componentMeshes.entries()) {
-        const hits = state.raycaster.intersectObjects(grp.children, true);
-        if (hits.length > 0) {
-          let hitObj: THREE.Object3D | null = hits[0].object;
-          while (hitObj && hitObj.parent && hitObj.parent !== grp) {
-            if (hitObj.name) {
-              clickedTerm = { compId: cId, termId: hitObj.name };
-              break;
-            }
-            hitObj = hitObj.parent;
+      let clickedCompId: string | null = null;
+      const allCompMeshes: THREE.Object3D[] = [];
+      state.componentMeshes.forEach(grp => {
+        grp.children.forEach(child => {
+          if (child.name !== 'meterBillboardSprite') {
+            allCompMeshes.push(child);
           }
-          if (clickedTerm) break;
+        });
+      });
+
+      const wireHits = state.raycaster.intersectObjects(allCompMeshes, true);
+      if (wireHits.length > 0) {
+        let rootGrp: THREE.Object3D | null = wireHits[0].object;
+        while (rootGrp && rootGrp.parent && rootGrp.parent !== state.scene) {
+          rootGrp = rootGrp.parent;
+        }
+        for (const [cId, grp] of state.componentMeshes.entries()) {
+          if (grp === rootGrp) {
+            clickedCompId = cId;
+            break;
+          }
         }
       }
 
-      if (clickedTerm) {
+      if (clickedCompId) {
+        const clickedComp = state.components.find(c => c.id === clickedCompId);
         if (!state.wireStartTerminal) {
-          state.wireStartTerminal = clickedTerm;
+          state.wireStartTerminal = { compId: clickedCompId, termId: 'auto' };
           state.terminalHighlightRing.visible = true;
-          const fromC = state.components.find(c => c.id === clickedTerm!.compId);
-          if (fromC) {
-            const p = getTerminalWorldPos(fromC, clickedTerm.termId);
-            state.terminalHighlightRing.position.set(p.x, 0.35, p.z);
+          state.terminalHighlightRing.scale.set(2.2, 2.2, 2.2);
+          if (clickedComp) {
+            state.terminalHighlightRing.position.set(clickedComp.x, 0.25, clickedComp.z);
+            onSelectComponent(clickedComp);
+            if (onToast) {
+              onToast(
+                `Selected ${clickedComp.type.toUpperCase()} (${clickedComp.id}) — click a second element to auto-connect!`
+              );
+            }
           }
         } else {
-          if (
-            state.wireStartTerminal.compId !== clickedTerm.compId ||
-            state.wireStartTerminal.termId !== clickedTerm.termId
-          ) {
-            const newWire: CircuitWireData = {
-              id: `wire_${wireCounter++}`,
-              fromCompId: state.wireStartTerminal.compId,
-              fromTermId: state.wireStartTerminal.termId,
-              toCompId: clickedTerm.compId,
-              toTermId: clickedTerm.termId,
-              current: 0,
-              routingStyle: controlsState.wireRouting || 'orthogonal',
-            };
-            state.wires.push(newWire);
-            createWireMesh(newWire);
+          if (state.wireStartTerminal.compId !== clickedCompId) {
+            const fromComp = state.components.find(c => c.id === state.wireStartTerminal!.compId);
+            const toComp = clickedComp;
+            if (fromComp && toComp) {
+              const { fromTermId, toTermId } = resolveAutoTerminals(fromComp, toComp, state.wires);
+              const newWire: CircuitWireData = {
+                id: `wire_${wireCounter++}`,
+                fromCompId: fromComp.id,
+                fromTermId,
+                toCompId: toComp.id,
+                toTermId,
+                current: 0,
+                routingStyle: controlsState.wireRouting || 'orthogonal',
+              };
+              state.wires.push(newWire);
+              createWireMesh(newWire);
+              onSelectComponent(toComp);
+              if (onToast) {
+                onToast(
+                  `Connected ${fromComp.type.toUpperCase()} (${fromTermId}) → ${toComp.type.toUpperCase()} (${toTermId})`
+                );
+              }
+            }
+          } else {
+            if (onToast) {
+              onToast('Cancelled wire selection');
+            }
           }
           state.wireStartTerminal = null;
           state.terminalHighlightRing.visible = false;
+          state.terminalHighlightRing.scale.set(1, 1, 1);
         }
         return;
+      } else {
+        if (state.wireStartTerminal) {
+          state.wireStartTerminal = null;
+          state.terminalHighlightRing.visible = false;
+          state.terminalHighlightRing.scale.set(1, 1, 1);
+        }
       }
     }
 
@@ -1364,33 +1475,42 @@ export const CircuitWorkbench: React.FC<CircuitWorkbenchProps> = ({
     const hitPt = new THREE.Vector3();
     const hitTable = state.raycaster.ray.intersectPlane(state.tablePlane, hitPt);
 
-    // Terminal hover highlight in wire mode
+    // Element hover highlight in wire mode
     if (controlsState.activeTool === 'wire' && !state.wireStartTerminal) {
-      let hoveredTerm: { compId: string; termId: string } | null = null;
-      for (const [cId, grp] of state.componentMeshes.entries()) {
-        const hits = state.raycaster.intersectObjects(grp.children, true);
-        if (hits.length > 0) {
-          let hitObj: THREE.Object3D | null = hits[0].object;
-          while (hitObj && hitObj.parent && hitObj.parent !== grp) {
-            if (hitObj.name) {
-              hoveredTerm = { compId: cId, termId: hitObj.name };
-              break;
-            }
-            hitObj = hitObj.parent;
+      let hoveredCompId: string | null = null;
+      const allCompMeshes: THREE.Object3D[] = [];
+      state.componentMeshes.forEach(grp => {
+        grp.children.forEach(child => {
+          if (child.name !== 'meterBillboardSprite') {
+            allCompMeshes.push(child);
           }
-          if (hoveredTerm) break;
+        });
+      });
+
+      const hits = state.raycaster.intersectObjects(allCompMeshes, true);
+      if (hits.length > 0) {
+        let rootGrp: THREE.Object3D | null = hits[0].object;
+        while (rootGrp && rootGrp.parent && rootGrp.parent !== state.scene) {
+          rootGrp = rootGrp.parent;
+        }
+        for (const [cId, grp] of state.componentMeshes.entries()) {
+          if (grp === rootGrp) {
+            hoveredCompId = cId;
+            break;
+          }
         }
       }
 
-      if (hoveredTerm) {
-        const c = state.components.find(comp => comp.id === hoveredTerm!.compId);
+      if (hoveredCompId) {
+        const c = state.components.find(comp => comp.id === hoveredCompId);
         if (c) {
-          const p = getTerminalWorldPos(c, hoveredTerm.termId);
           state.terminalHighlightRing.visible = true;
-          state.terminalHighlightRing.position.set(p.x, 0.35, p.z);
+          state.terminalHighlightRing.scale.set(2.2, 2.2, 2.2);
+          state.terminalHighlightRing.position.set(c.x, 0.25, c.z);
         }
       } else {
         state.terminalHighlightRing.visible = false;
+        state.terminalHighlightRing.scale.set(1, 1, 1);
       }
     }
 
@@ -1636,10 +1756,96 @@ export const CircuitWorkbench: React.FC<CircuitWorkbenchProps> = ({
       deleteSelectedComponent: (id: string) => {
         const state = threeRef.current;
         if (!state) return;
+        const comp = state.components.find(c => c.id === id);
+        const attachedWires = state.wires.filter(w => w.fromCompId === id || w.toCompId === id);
+
+        if (comp && attachedWires.length >= 2) {
+          const [t1] = getComponentTerminals(comp.type);
+          const side1Endpoints: Array<{ compId: string; termId: string }> = [];
+          const side2Endpoints: Array<{ compId: string; termId: string }> = [];
+
+          attachedWires.forEach(w => {
+            if (w.fromCompId === id && w.toCompId !== id) {
+              if (w.fromTermId === t1) {
+                side1Endpoints.push({ compId: w.toCompId, termId: w.toTermId });
+              } else {
+                side2Endpoints.push({ compId: w.toCompId, termId: w.toTermId });
+              }
+            } else if (w.toCompId === id && w.fromCompId !== id) {
+              if (w.toTermId === t1) {
+                side1Endpoints.push({ compId: w.fromCompId, termId: w.fromTermId });
+              } else {
+                side2Endpoints.push({ compId: w.fromCompId, termId: w.fromTermId });
+              }
+            }
+          });
+
+          // Remove old wires attached to deleted component and remove component
+          state.wires = state.wires.filter(w => w.fromCompId !== id && w.toCompId !== id);
+          state.components = state.components.filter(c => c.id !== id);
+
+          const addBridgeWire = (
+            epA: { compId: string; termId: string },
+            epB: { compId: string; termId: string }
+          ) => {
+            if (epA.compId === epB.compId && epA.termId === epB.termId) return;
+            const exists = state.wires.some(
+              w =>
+                (w.fromCompId === epA.compId &&
+                  w.fromTermId === epA.termId &&
+                  w.toCompId === epB.compId &&
+                  w.toTermId === epB.termId) ||
+                (w.fromCompId === epB.compId &&
+                  w.fromTermId === epB.termId &&
+                  w.toCompId === epA.compId &&
+                  w.toTermId === epA.termId)
+            );
+            if (!exists) {
+              state.wires.push({
+                id: `wire_${wireCounter++}`,
+                fromCompId: epA.compId,
+                fromTermId: epA.termId,
+                toCompId: epB.compId,
+                toTermId: epB.termId,
+                current: 0,
+                routingStyle: controlsState.wireRouting || 'orthogonal',
+              });
+            }
+          };
+
+          if (side1Endpoints.length > 0 && side2Endpoints.length > 0) {
+            // Bridge primary terminals across the removed component with a replacement wire
+            addBridgeWire(side1Endpoints[0], side2Endpoints[0]);
+            for (let i = 1; i < side1Endpoints.length; i++) {
+              addBridgeWire(side1Endpoints[0], side1Endpoints[i]);
+            }
+            for (let j = 1; j < side2Endpoints.length; j++) {
+              addBridgeWire(side2Endpoints[0], side2Endpoints[j]);
+            }
+          } else {
+            const allEndpoints = [...side1Endpoints, ...side2Endpoints];
+            for (let i = 1; i < allEndpoints.length; i++) {
+              addBridgeWire(allEndpoints[0], allEndpoints[i]);
+            }
+          }
+
+          rebuildCircuitScene();
+          onSelectComponent(null);
+          if (onToast) {
+            onToast(
+              `Deleted ${comp.type.toUpperCase()} and automatically replaced it with a wire!`
+            );
+          }
+          return;
+        }
+
         state.wires = state.wires.filter(w => w.fromCompId !== id && w.toCompId !== id);
         state.components = state.components.filter(c => c.id !== id);
         rebuildCircuitScene();
         onSelectComponent(null);
+        if (onToast && comp) {
+          onToast(`Deleted ${comp.type.toUpperCase()}`);
+        }
       },
       clearWires: () => {
         const state = threeRef.current;
