@@ -396,8 +396,23 @@ export function computeTrajectoryRK4(
       });
     }
 
-    // Stop upon impact with the ground plane (y <= 0)
-    if (y <= 0 && step > 2) {
+    // Stop upon impact with the ground plane (y <= 0 after rising)
+    if (y <= 0 && step > 1) {
+      // Interpolate exact impact point at y = 0
+      const prevPt = points[points.length - 2];
+      if (prevPt && prevPt.y > 0) {
+        const frac = prevPt.y / Math.max(1e-6, prevPt.y - y);
+        const lastIdx = points.length - 1;
+        points[lastIdx] = {
+          ...points[lastIdx],
+          time: prevPt.time + frac * (t - prevPt.time),
+          x: prevPt.x + frac * (x - prevPt.x),
+          y: 0,
+          z: prevPt.z + frac * (z - prevPt.z),
+        };
+      } else {
+        points[points.length - 1].y = 0;
+      }
       break;
     }
   }
@@ -445,6 +460,32 @@ export function computeTrajectoryRK4(
     flightTime: landingPoint.time,
     terminalVelocity: termVel,
   };
+}
+
+export const SHOT_COLOR_PALETTE: Array<{ name: string; hex: string; threeHex: number }> = [
+  { name: 'Sky Blue', hex: '#38bdf8', threeHex: 0x38bdf8 },
+  { name: 'Solar Orange', hex: '#f97316', threeHex: 0xf97316 },
+  { name: 'Emerald Green', hex: '#10b981', threeHex: 0x10b981 },
+  { name: 'Crimson Rose', hex: '#f43f5e', threeHex: 0xf43f5e },
+  { name: 'Amethyst Purple', hex: '#a855f7', threeHex: 0xa855f7 },
+  { name: 'Amber Gold', hex: '#eab308', threeHex: 0xeab308 },
+  { name: 'Electric Cyan', hex: '#06b6d4', threeHex: 0x06b6d4 },
+  { name: 'Neon Lime', hex: '#84cc16', threeHex: 0x84cc16 },
+  { name: 'Magenta Pink', hex: '#ec4899', threeHex: 0xec4899 },
+  { name: 'Cobalt Indigo', hex: '#6366f1', threeHex: 0x6366f1 },
+];
+
+export interface SavedProjectileShot {
+  id: string;
+  shotNumber: number;
+  colorName: string;
+  colorHex: string;
+  colorThree: number;
+  presetName: string;
+  dragModel: DragModel;
+  launch: LaunchParameters;
+  projectile: ProjectileParameters;
+  summary: TrajectorySummary;
 }
 
 /**
