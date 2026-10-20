@@ -36,6 +36,7 @@ import {
   CircuitMeterReading,
 } from '@/components/simulation/CircuitWorkbench';
 import { Oscilloscope, DataPoint } from '@/components/ui/Oscilloscope';
+import { ProjectileSandbox } from '@/components/simulation/ProjectileSandbox';
 import { CalculusTheoryModal } from '@/components/ui/CalculusTheoryModal';
 import { UserRoleBar } from '@/components/auth/UserRoleBar';
 import { AuthModal } from '@/components/auth/AuthModal';
@@ -61,7 +62,7 @@ import {
 
 type LayerRoute =
   | { layer: 'catalog'; course?: PhysicsCourseId }
-  | { layer: 'workspace'; mode: 'field' | 'circuit'; modelTitle: string }
+  | { layer: 'workspace'; mode: 'field' | 'circuit' | 'projectile'; modelTitle: string }
   | { layer: 'slot-detail'; slot: PhysicsModelSlot };
 
 const STATIC_DEFAULT_USER = MOCK_USERS[1];
@@ -86,7 +87,7 @@ export default function SimulationCockpit() {
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
 
   // Active simulation mode when in workspace layer
-  const [activeMode, setActiveMode] = useState<'field' | 'circuit'>('field');
+  const [activeMode, setActiveMode] = useState<'field' | 'circuit' | 'projectile'>('field');
   const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(false);
   const [isTheoryOpen, setIsTheoryOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -731,26 +732,64 @@ export default function SimulationCockpit() {
                 <span className="font-bold text-white truncate max-w-[200px] sm:max-w-xs">
                   {activeMode === 'field'
                     ? '01. Electric Field Sandbox'
-                    : '02. Circuit Workbench'}
+                    : activeMode === 'circuit'
+                    ? '02. Circuit Workbench'
+                    : '01. Projectile & Drag Ballistics'}
                 </span>
                 {/* Quick Sibling Layer Switcher inside Workspace */}
-                <button
-                  onClick={() => {
-                    const nextMode = activeMode === 'field' ? 'circuit' : 'field';
-                    navigateTo({
-                      layer: 'workspace',
-                      mode: nextMode,
-                      modelTitle:
-                        nextMode === 'field'
-                          ? 'Electrostatic Field & Lorentz Dynamics'
-                          : '3D Circuit Workbench & MNA Solver',
-                    });
-                  }}
-                  className="ml-1.5 px-2 py-0.5 rounded-lg bg-white/5 hover:bg-white/10 text-[11px] font-mono text-slate-300 border border-white/10 transition"
-                  title="Switch to sibling 3D simulation model"
-                >
-                  Switch to {activeMode === 'field' ? 'Circuits →' : 'E-Field →'}
-                </button>
+                <div className="flex items-center bg-white/5 p-0.5 rounded-xl border border-white/10 text-[11px] font-mono ml-1.5">
+                  <button
+                    onClick={() =>
+                      navigateTo({
+                        layer: 'workspace',
+                        mode: 'field',
+                        modelTitle: 'Electrostatic Field & Lorentz Dynamics',
+                      })
+                    }
+                    className={`px-2 py-0.5 rounded-lg transition ${
+                      activeMode === 'field'
+                        ? 'bg-sky-400 text-slate-950 font-bold'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                    title="Switch to E-Field Sandbox"
+                  >
+                    E-Field
+                  </button>
+                  <button
+                    onClick={() =>
+                      navigateTo({
+                        layer: 'workspace',
+                        mode: 'circuit',
+                        modelTitle: '3D Circuit Workbench & MNA Solver',
+                      })
+                    }
+                    className={`px-2 py-0.5 rounded-lg transition ${
+                      activeMode === 'circuit'
+                        ? 'bg-amber-400 text-slate-950 font-bold'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                    title="Switch to 3D Circuit Workbench"
+                  >
+                    Circuits
+                  </button>
+                  <button
+                    onClick={() =>
+                      navigateTo({
+                        layer: 'workspace',
+                        mode: 'projectile',
+                        modelTitle: 'Non-Linear Projectile & Drag Ballistics',
+                      })
+                    }
+                    className={`px-2 py-0.5 rounded-lg transition ${
+                      activeMode === 'projectile'
+                        ? 'bg-emerald-400 text-slate-950 font-bold'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                    title="Switch to Mechanics Projectile & Ballistics"
+                  >
+                    Ballistics
+                  </button>
+                </div>
               </>
             )}
 
@@ -978,6 +1017,19 @@ export default function SimulationCockpit() {
                     onClick={() =>
                       navigateTo({
                         layer: 'workspace',
+                        mode: 'projectile',
+                        modelTitle: 'Non-Linear Projectile & Drag Ballistics',
+                      })
+                    }
+                    className="px-4 py-2.5 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-bold text-xs transition flex items-center gap-2"
+                  >
+                    <Target className="w-4 h-4" />
+                    <span>Open 3D Ballistics Simulator</span>
+                  </button>
+                  <button
+                    onClick={() =>
+                      navigateTo({
+                        layer: 'workspace',
                         mode: 'field',
                         modelTitle: 'Electrostatic Field & Lorentz Dynamics',
                       })
@@ -1095,7 +1147,7 @@ export default function SimulationCockpit() {
                 defaultSourceQ={sourceDefaultQ}
                 tracerSettings={tracerSettings}
               />
-            ) : (
+            ) : activeMode === 'circuit' ? (
               <CircuitWorkbench
                 controlsState={circuitControls}
                 onSelectComponent={setSelectedComponent}
@@ -1104,13 +1156,16 @@ export default function SimulationCockpit() {
                 onOscilloscopeSample={handleCircuitScopeSample}
                 onToast={showToast}
               />
+            ) : (
+              <ProjectileSandbox onToast={showToast} />
             )}
           </div>
 
           {/* ========================================================================= */}
           {/* FLOATING LEFT SIMULATION PARAMETERS DOCK                                  */}
           {/* ========================================================================= */}
-          <div className="absolute top-20 left-4 z-20 w-80 max-h-[calc(100vh-6.5rem)] overflow-y-auto bg-[#080e1e]/85 backdrop-blur-xl border border-white/10 rounded-2xl p-4 flex flex-col space-y-3.5 shadow-2xl">
+          {activeMode !== 'projectile' && (
+            <div className="absolute top-20 left-4 z-20 w-80 max-h-[calc(100vh-6.5rem)] overflow-y-auto bg-[#080e1e]/85 backdrop-blur-xl border border-white/10 rounded-2xl p-4 flex flex-col space-y-3.5 shadow-2xl">
             <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
               <div className="flex items-center gap-2">
                 <Sliders className="w-3.5 h-3.5 text-sky-400" />
@@ -1987,12 +2042,14 @@ export default function SimulationCockpit() {
                   </div>
                 </>
               ))}
-          </div>
+            </div>
+          )}
 
           {/* ========================================================================= */}
           {/* FLOATING RIGHT TELEMETRY POD                                              */}
           {/* ========================================================================= */}
-          <div className="absolute top-20 right-4 z-10 bg-[#080e1e]/85 backdrop-blur-xl border border-white/10 rounded-2xl p-4 w-72 flex flex-col space-y-2.5 text-xs shadow-2xl">
+          {activeMode !== 'projectile' && (
+            <div className="absolute top-20 right-4 z-10 bg-[#080e1e]/85 backdrop-blur-xl border border-white/10 rounded-2xl p-4 w-72 flex flex-col space-y-2.5 text-xs shadow-2xl">
             <div className="flex items-center justify-between border-b border-white/10 pb-2">
               <span className="font-bold text-white flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-sky-400" />
@@ -2122,11 +2179,13 @@ export default function SimulationCockpit() {
               </div>
             )}
           </div>
+          )}
 
           {/* ========================================================================= */}
           {/* BOTTOM OSCILLOSCOPE DOCK                                                  */}
           {/* ========================================================================= */}
-          <div className="absolute bottom-4 right-4 z-10 w-96 max-w-[calc(100vw-2rem)]">
+          {activeMode !== 'projectile' && (
+            <div className="absolute bottom-4 right-4 z-10 w-96 max-w-[calc(100vw-2rem)]">
             {activeMode === 'field' ? (
               <Oscilloscope
                 mode="field"
@@ -2158,6 +2217,7 @@ export default function SimulationCockpit() {
               />
             )}
           </div>
+          )}
         </main>
       )}
 

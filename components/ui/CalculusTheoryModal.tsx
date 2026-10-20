@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { BookOpen, X, Calculator, Zap, Compass, Cpu } from 'lucide-react';
+import { BookOpen, X, Calculator, Zap, Compass, Cpu, Activity } from 'lucide-react';
 
 interface CalculusTheoryModalProps {
   isOpen: boolean;
@@ -116,6 +116,40 @@ export const CalculusTheoryModal: React.FC<CalculusTheoryModalProps> = ({ isOpen
             </div>
             <p className="text-slate-400 leading-relaxed">
               Voltmeters must be wired in parallel (infinite internal impedance). Ammeters must be wired in series (near-zero impedance). The time constant &#964; = RC governs the 63.2% charge threshold.
+            </p>
+          </div>
+
+          {/* Section 5: AP Physics C Mechanics Kinematics & Calculus Ballistics */}
+          <div className="p-4 rounded-xl bg-slate-950/80 border border-emerald-500/40 space-y-2">
+            <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
+              <Activity className="w-4 h-4" />
+              <span>5. Mechanics Kinematics &amp; Calculus Definite Integrals</span>
+            </div>
+            <div className="p-2.5 rounded-lg bg-slate-900/90 font-mono text-[11px] text-emerald-300 space-y-1.5">
+              <div className="text-slate-400 text-[10px] uppercase tracking-wider font-sans font-bold">
+                Constant-Acceleration Kinematics (Vacuum Only):
+              </div>
+              <div>
+                1. Velocity-Time: <strong>v_x = v_x0 + a_x t</strong>
+              </div>
+              <div>
+                2. Position-Time: <strong>x = x_0 + v_x0 t + ½ a_x t²</strong>
+              </div>
+              <div>
+                3. Work-Kinematic: <strong>v_x² = v_x0² + 2 a_x (x - x_0)</strong>
+              </div>
+              <div className="text-slate-400 text-[10px] uppercase tracking-wider font-sans font-bold pt-1">
+                Universal Calculus Formulations (Vacuum &amp; Non-Linear Drag):
+              </div>
+              <div>
+                4. Displacement Integral: <strong>&#916;x = &#8747; v_x(t) dt</strong>
+              </div>
+              <div>
+                5. Velocity Shift Integral: <strong>&#916;v_x = &#8747; a_x(t) dt</strong>
+              </div>
+            </div>
+            <p className="text-slate-400 leading-relaxed">
+              When aerodynamic drag is present (F_drag = -b v or -c v²), acceleration a(v) is NOT constant. Formulas 1–3 break down with large percentage errors. The calculus integral definitions (Formulas 4 &amp; 5) remain exact and universal because velocity is the derivative of position and acceleration is the derivative of velocity.
             </p>
           </div>
         </div>

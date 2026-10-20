@@ -28,7 +28,7 @@ export interface PhysicsModelSlot {
   equation: string;
   description: string;
   status: 'live' | 'blank';
-  simulationMode?: 'field' | 'circuit';
+  simulationMode?: 'field' | 'circuit' | 'projectile';
   accentColor: 'cyan' | 'amber' | 'emerald' | 'rose' | 'sky';
   metrics: string[];
 }
@@ -160,10 +160,11 @@ export const MECHANICS_MODEL_SLOTS: PhysicsModelSlot[] = [
     unit: 'Unit 1 · Kinematics',
     equation: 'm dv/dt = m g - b v - c |v| v',
     description:
-      'Reserved simulation slot for 3D projectile trajectories under Stokes linear and Newtonian quadratic aerodynamic drag, terminal velocity asymptotes, and range optimization.',
-    status: 'blank',
+      'Interactive 3D projectile ballistics under vacuum, Stokes linear, and Newtonian quadratic drag. Validates all 5 AP kinematics formulas (v_x, x(t), v_x², ∫v_x dt, ∫a_x dt) with live RK4 integration.',
+    status: 'live',
+    simulationMode: 'projectile',
     accentColor: 'emerald',
-    metrics: ['Blank Model Slot', 'Terminal Velocity Solver', '3D Trajectory Envelope'],
+    metrics: ['Live 3D RK4 Integrator', '5 Kinematics Formulas Proof', 'Stokes vs Quadratic Drag'],
   },
   {
     id: 'mech-newton-pulleys',
@@ -824,7 +825,7 @@ export const ModelCatalogPortal: React.FC<ModelCatalogPortalProps> = ({
           <div className="lg:col-span-5">
             <div
               onClick={() =>
-                onSelectModel(isMechanics ? MECHANICS_MODEL_SLOTS[6] : PHYSICS_MODEL_SLOTS[0])
+                onSelectModel(isMechanics ? MECHANICS_MODEL_SLOTS[0] : PHYSICS_MODEL_SLOTS[0])
               }
               className={`group cursor-pointer relative rounded-2xl border p-6 backdrop-blur-xl shadow-2xl transition-all duration-300 overflow-hidden ${
                 isMechanics
