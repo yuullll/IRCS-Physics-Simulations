@@ -44,6 +44,7 @@ import { StudentAccountModal } from '@/components/auth/StudentAccountModal';
 import { SavedScenesDrawer } from '@/components/lab/SavedScenesDrawer';
 import { GuidedLabModal } from '@/components/lab/GuidedLabModal';
 import { InstructorDashboardModal } from '@/components/lab/InstructorDashboardModal';
+import { MathFormula } from '@/components/ui/MathFormula';
 import {
   ModelCatalogPortal,
   PHYSICS_MODEL_SLOTS,
@@ -865,7 +866,13 @@ export default function SimulationCockpit() {
             : 'opacity-100 translate-y-0'
         }`}
       >
-        <div className="bg-[#080e1e]/85 backdrop-blur-xl border border-white/10 rounded-2xl p-1.5 shadow-2xl flex items-center space-x-1.5">
+        <div
+          className={`backdrop-blur-xl border rounded-2xl p-1.5 shadow-2xl flex items-center space-x-1.5 transition-colors duration-300 ${
+            activeCourse === 'mechanics'
+              ? 'bg-[#040e0b]/90 border-emerald-500/25'
+              : 'bg-[#080e1e]/85 border-white/10'
+          }`}
+        >
           {currentRoute.layer === 'workspace' && (
             <>
               {/* 3D / 2D Camera Toggle */}
@@ -915,10 +922,14 @@ export default function SimulationCockpit() {
 
           <button
             onClick={() => setIsGuidedLabOpen(true)}
-            className="px-2.5 py-1.5 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 border border-sky-500/30 transition flex items-center space-x-1.5 text-xs font-semibold"
+            className={`px-2.5 py-1.5 rounded-xl border transition flex items-center space-x-1.5 text-xs font-semibold ${
+              activeCourse === 'mechanics'
+                ? 'bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border-emerald-500/30'
+                : 'bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 border-sky-500/30'
+            }`}
             title="Open Guided Lab Report"
           >
-            <ClipboardList className="w-3.5 h-3.5 text-sky-400" />
+            <ClipboardList className={`w-3.5 h-3.5 ${activeCourse === 'mechanics' ? 'text-emerald-400' : 'text-sky-400'}`} />
             <span className="hidden lg:inline">Lab Report</span>
           </button>
 
@@ -940,10 +951,14 @@ export default function SimulationCockpit() {
           {isLoggedIn && currentUser.role === 'student' && (
             <button
               onClick={() => setIsStudentAccountModalOpen(true)}
-              className="px-2.5 py-1.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 transition flex items-center space-x-1.5 text-xs font-semibold"
+              className={`px-2.5 py-1.5 rounded-xl border transition flex items-center space-x-1.5 text-xs font-semibold ${
+                activeCourse === 'mechanics'
+                  ? 'bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border-emerald-500/30'
+                  : 'bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border-cyan-500/30'
+              }`}
               title="Manage student account, privacy choices, reset progress, or delete account"
             >
-              <User className="w-3.5 h-3.5 text-cyan-400" />
+              <User className={`w-3.5 h-3.5 ${activeCourse === 'mechanics' ? 'text-emerald-400' : 'text-cyan-400'}`} />
               <span className="hidden md:inline">My Account</span>
             </button>
           )}
@@ -953,7 +968,7 @@ export default function SimulationCockpit() {
             className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 transition text-xs"
             title="AP Physics C Theory Guide"
           >
-            <BookOpen className="w-3.5 h-3.5 text-sky-400" />
+            <BookOpen className={`w-3.5 h-3.5 ${activeCourse === 'mechanics' ? 'text-emerald-400' : 'text-sky-400'}`} />
           </button>
 
           <div className="h-5 w-px bg-white/10 mx-0.5" />
@@ -969,13 +984,20 @@ export default function SimulationCockpit() {
             onOpenStudentAccountModal={() => setIsStudentAccountModalOpen(true)}
             hiddenAccountsCount={hiddenAccounts.length}
             onRestoreAllAccounts={handleRestoreAllAccounts}
+            course={activeCourse}
           />
         </div>
       </div>
 
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-[#080e1e]/95 backdrop-blur-xl border border-sky-400/40 text-sky-200 text-xs py-2.5 px-4 rounded-xl shadow-2xl transition-all duration-300">
+        <div
+          className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 backdrop-blur-xl text-xs py-2.5 px-4 rounded-xl shadow-2xl transition-all duration-300 ${
+            activeCourse === 'mechanics'
+              ? 'bg-[#040e0b]/95 border border-emerald-400/40 text-emerald-200'
+              : 'bg-[#080e1e]/95 border border-sky-400/40 text-sky-200'
+          }`}
+        >
           {toastMessage}
         </div>
       )}
@@ -1061,10 +1083,10 @@ export default function SimulationCockpit() {
                 </div>
 
                 <div className="flex flex-wrap items-center justify-between gap-4 text-xs font-mono text-slate-300">
-                  <div>
-                    <span className="text-slate-400 mr-2">FUNDAMENTAL UNIT LAW:</span>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-slate-400 mr-1 text-[11px] uppercase tracking-wider">FUNDAMENTAL UNIT LAW:</span>
                     <span className={isMechUnit ? 'text-emerald-300 font-bold' : 'text-sky-300 font-bold'}>
-                      {unit.equation}
+                      <MathFormula rawLatex={unit.equation} fallbackText={unit.equation} />
                     </span>
                   </div>
                   <div className="text-slate-400">
@@ -1139,11 +1161,11 @@ export default function SimulationCockpit() {
                                 Equation
                               </span>
                               <span
-                                className={`text-xs font-mono font-bold truncate ${
+                                className={`text-xs font-bold truncate ${
                                   isMechUnit ? 'text-emerald-300' : 'text-sky-300'
                                 }`}
                               >
-                                {sim.equation}
+                                <MathFormula rawLatex={sim.equation} fallbackText={sim.equation} />
                               </span>
                             </div>
 
@@ -1251,8 +1273,8 @@ export default function SimulationCockpit() {
                               <span className="text-[10px] font-mono text-slate-400 uppercase shrink-0">
                                 Equation
                               </span>
-                              <span className="text-xs font-mono font-bold text-amber-300 truncate">
-                                {sim.equation}
+                              <span className="text-xs font-bold text-amber-300 truncate">
+                                <MathFormula rawLatex={sim.equation} fallbackText={sim.equation} />
                               </span>
                             </div>
 

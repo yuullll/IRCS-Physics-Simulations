@@ -26,6 +26,7 @@ interface UserRoleBarProps {
   onOpenStudentAccountModal?: () => void;
   hiddenAccountsCount?: number;
   onRestoreAllAccounts?: () => void;
+  course?: 'mechanics' | 'em';
 }
 
 const emptySubscribe = () => () => {};
@@ -41,9 +42,11 @@ export const UserRoleBar: React.FC<UserRoleBarProps> = ({
   onOpenStudentAccountModal,
   hiddenAccountsCount = 0,
   onRestoreAllAccounts,
+  course = 'em',
 }) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const isMechanics = course === 'mechanics';
 
   // Idiomatic client hydration detection using useSyncExternalStore
   const mounted = useSyncExternalStore(
@@ -77,7 +80,9 @@ export const UserRoleBar: React.FC<UserRoleBarProps> = ({
       {activeLoggedIn && (
         <button
           onClick={() => setDropdownOpen(prev => !prev)}
-          className="flex items-center space-x-2 bg-slate-950/80 hover:bg-slate-800 border border-slate-700/80 hover:border-cyan-500/60 px-3 py-1.5 rounded-xl text-slate-200 transition shadow-sm"
+          className={`flex items-center space-x-2 bg-slate-950/80 hover:bg-slate-800 border border-slate-700/80 px-3 py-1.5 rounded-xl text-slate-200 transition shadow-sm ${
+            isMechanics ? 'hover:border-emerald-500/60' : 'hover:border-cyan-500/60'
+          }`}
           title="Account: Click to switch user, manage account, or sign out"
         >
           <span className="text-base leading-none">{displayUser.avatar}</span>
@@ -88,6 +93,8 @@ export const UserRoleBar: React.FC<UserRoleBarProps> = ({
               className={`font-semibold uppercase text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1 ${
                 displayUser.role === 'instructor'
                   ? 'bg-amber-950 text-amber-400 border border-amber-800/60'
+                  : isMechanics
+                  ? 'bg-emerald-950 text-emerald-400 border border-emerald-800/60'
                   : 'bg-cyan-950 text-cyan-400 border border-cyan-800/60'
               }`}
             >
@@ -109,7 +116,11 @@ export const UserRoleBar: React.FC<UserRoleBarProps> = ({
       {!activeLoggedIn && (
         <button
           onClick={onOpenAuthModal}
-          className="px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-cyan-500/50 text-cyan-400 hover:text-cyan-300 transition flex items-center space-x-1.5 font-semibold text-xs shadow-sm"
+          className={`px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border transition flex items-center space-x-1.5 font-semibold text-xs shadow-sm ${
+            isMechanics
+              ? 'border-emerald-500/50 text-emerald-400 hover:text-emerald-300'
+              : 'border-cyan-500/50 text-cyan-400 hover:text-cyan-300'
+          }`}
           title="Log in with existing credentials or register a new account"
         >
           <LogIn className="w-3.5 h-3.5" />
@@ -119,7 +130,11 @@ export const UserRoleBar: React.FC<UserRoleBarProps> = ({
 
       {/* Account Dropdown Menu */}
       {dropdownOpen && (
-        <div className="absolute right-0 top-full mt-2 w-80 bg-[#080e1e] border border-white/15 rounded-2xl shadow-2xl py-2 z-50 animate-fadeIn text-slate-200 backdrop-blur-2xl">
+        <div
+          className={`absolute right-0 top-full mt-2 w-80 border rounded-2xl shadow-2xl py-2 z-50 animate-fadeIn text-slate-200 backdrop-blur-2xl ${
+            isMechanics ? 'bg-[#040e0b]/95 border-emerald-500/25' : 'bg-[#080e1e]/95 border-white/15'
+          }`}
+        >
           <div className="px-3.5 py-1.5 border-b border-white/10 flex items-center justify-between text-[10px] uppercase font-bold text-slate-400 tracking-wider">
             <span>Current Session</span>
             <button
@@ -127,7 +142,9 @@ export const UserRoleBar: React.FC<UserRoleBarProps> = ({
                 setDropdownOpen(false);
                 onOpenAuthModal();
               }}
-              className="text-cyan-400 hover:text-cyan-300 font-semibold flex items-center gap-1 normal-case text-xs"
+              className={`font-semibold flex items-center gap-1 normal-case text-xs ${
+                isMechanics ? 'text-emerald-400 hover:text-emerald-300' : 'text-cyan-400 hover:text-cyan-300'
+              }`}
             >
               <UserPlus className="w-3 h-3" />
               <span>Register</span>
@@ -146,7 +163,11 @@ export const UserRoleBar: React.FC<UserRoleBarProps> = ({
                     setDropdownOpen(false);
                     onOpenStudentAccountModal();
                   }}
-                  className="px-2 py-0.5 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/30 text-[11px] font-semibold flex items-center gap-1"
+                  className={`px-2 py-0.5 rounded-lg border text-[11px] font-semibold flex items-center gap-1 ${
+                    isMechanics
+                      ? 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border-emerald-500/30'
+                      : 'bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border-sky-500/30'
+                  }`}
                   title="Manage student account, reset progress, or delete account"
                 >
                   <Settings className="w-3 h-3" />
@@ -156,7 +177,7 @@ export const UserRoleBar: React.FC<UserRoleBarProps> = ({
             </div>
             <div className="text-[11px] text-slate-400 mt-0.5">{displayUser.email}</div>
             <div className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1">
-              <ShieldCheck className="w-3 h-3 text-cyan-400" />
+              <ShieldCheck className={`w-3 h-3 ${isMechanics ? 'text-emerald-400' : 'text-cyan-400'}`} />
               <span>{displayUser.className}</span>
             </div>
           </div>
@@ -190,6 +211,8 @@ export const UserRoleBar: React.FC<UserRoleBarProps> = ({
                         className={`text-[9px] px-1 py-0.2 rounded font-mono shrink-0 ${
                           u.role === 'instructor'
                             ? 'bg-amber-950 text-amber-400 border border-amber-800/50'
+                            : isMechanics
+                            ? 'bg-emerald-950 text-emerald-400 border border-emerald-800/50'
                             : 'bg-cyan-950 text-cyan-400 border border-cyan-800/50'
                         }`}
                       >
@@ -202,7 +225,9 @@ export const UserRoleBar: React.FC<UserRoleBarProps> = ({
 
                 <div className="flex items-center space-x-1.5 shrink-0">
                   {u.id === displayUser.id ? (
-                    <span className="text-xs text-cyan-400 font-bold px-1.5">Active</span>
+                    <span className={`text-xs font-bold px-1.5 ${isMechanics ? 'text-emerald-400' : 'text-cyan-400'}`}>
+                      Active
+                    </span>
                   ) : (
                     onForgetAccountOnDevice && (
                       <button
@@ -224,17 +249,23 @@ export const UserRoleBar: React.FC<UserRoleBarProps> = ({
 
           {/* Hidden Device Logins Footer (if any accounts hidden on this laptop) */}
           {hiddenAccountsCount > 0 && onRestoreAllAccounts && (
-            <div className="px-3.5 py-1.5 bg-sky-950/20 border-t border-white/5 flex items-center justify-between text-[10px] text-sky-300">
+            <div
+              className={`px-3.5 py-1.5 border-t border-white/5 flex items-center justify-between text-[10px] ${
+                isMechanics ? 'bg-emerald-950/20 text-emerald-300' : 'bg-sky-950/20 text-sky-300'
+              }`}
+            >
               <span>{hiddenAccountsCount} account(s) hidden from this laptop</span>
               <button
                 onClick={() => {
                   onRestoreAllAccounts();
                   setDropdownOpen(false);
                 }}
-                className="underline hover:text-white font-medium flex items-center gap-1"
+                className={`font-semibold flex items-center gap-1 ${
+                  isMechanics ? 'text-emerald-400 hover:text-emerald-300' : 'text-sky-400 hover:text-sky-300'
+                }`}
               >
-                <RefreshCw className="w-2.5 h-2.5" />
-                <span>Restore View</span>
+                <RefreshCw className="w-3 h-3" />
+                <span>Restore</span>
               </button>
             </div>
           )}

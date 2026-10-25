@@ -15,6 +15,7 @@ import {
   Layers,
 } from 'lucide-react';
 import { UserProfile } from '@/lib/types/lab';
+import { MathFormula } from '@/components/ui/MathFormula';
 
 export type PhysicsCourseId = 'mechanics' | 'em';
 
@@ -907,7 +908,7 @@ export const ModelCatalogPortal: React.FC<ModelCatalogPortalProps> = ({
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const lastScrollTopRef = useRef<number>(0);
 
-  const [cursorPos, setCursorPos] = useState({ x: 720, y: 400 });
+  const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null);
   const [cursorSpeed, setCursorSpeed] = useState(0);
   const [hoveredCardId, setHoveredCardId] = useState<string | null>(null);
   const [cardCoords, setCardCoords] = useState<
@@ -1241,11 +1242,16 @@ export const ModelCatalogPortal: React.FC<ModelCatalogPortalProps> = ({
     setCardCoords(prev => ({ ...prev, [id]: { x, y, rx, ry, normX, normY } }));
   };
 
-  // Global normalized cursor fallback so unit previews also subtly respond when moving cursor across page
+  // Global normalized cursor fallback so unit previews also subtly respond when moving cursor across page.
+  // Defaults deterministically to 0.5 on SSR and initial client hydration to prevent hydration mismatch.
   const globalNormX =
-    typeof window !== 'undefined' ? Math.max(0.1, Math.min(0.9, cursorPos.x / window.innerWidth)) : 0.5;
+    cursorPos && typeof window !== 'undefined' && window.innerWidth > 0
+      ? Math.max(0.1, Math.min(0.9, cursorPos.x / window.innerWidth))
+      : 0.5;
   const globalNormY =
-    typeof window !== 'undefined' ? Math.max(0.1, Math.min(0.9, cursorPos.y / window.innerHeight)) : 0.5;
+    cursorPos && typeof window !== 'undefined' && window.innerHeight > 0
+      ? Math.max(0.1, Math.min(0.9, cursorPos.y / window.innerHeight))
+      : 0.5;
 
   const cedUrl = isMechanics
     ? 'https://apcentral.collegeboard.org/media/pdf/ap-physics-c-mechanics-course-and-exam-description.pdf'
@@ -1442,7 +1448,7 @@ export const ModelCatalogPortal: React.FC<ModelCatalogPortalProps> = ({
                       isMechanics ? 'text-emerald-300' : 'text-sky-300'
                     }`}
                   >
-                    ({(cursorPos.x * 0.04 - 28).toFixed(1)}m, {(cursorPos.y * 0.04 - 16).toFixed(1)}m)
+                    ({(((cursorPos?.x ?? 720) * 0.04) - 28).toFixed(1)}m, {(((cursorPos?.y ?? 400) * 0.04) - 16).toFixed(1)}m)
                   </div>
                 </div>
                 <div className="p-3 rounded-xl bg-black/40 border border-white/5">
@@ -1596,17 +1602,17 @@ export const ModelCatalogPortal: React.FC<ModelCatalogPortalProps> = ({
                       />
                     </div>
 
-                    {/* Governing Law */}
+                    {/* Governing Law in Handwritten Math Notation */}
                     <div className="px-3.5 py-2 rounded-xl bg-black/50 border border-white/[0.07] flex items-center justify-between gap-2">
                       <span className="text-[10px] font-mono text-slate-400 uppercase shrink-0">
                         Unit Law
                       </span>
                       <span
-                        className={`text-xs font-mono font-bold truncate ${
+                        className={`text-xs font-bold truncate ${
                           isMechanics ? 'text-emerald-300' : 'text-sky-300'
                         }`}
                       >
-                        {unit.equation}
+                        <MathFormula rawLatex={unit.equation} fallbackText={unit.equation} />
                       </span>
                     </div>
                   </div>

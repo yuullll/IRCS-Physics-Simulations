@@ -35,6 +35,7 @@ import {
   X,
   Compass,
 } from 'lucide-react';
+import { MathFormula, Var, Vec, Sub, Sup, Dot, BigSum } from '@/components/ui/MathFormula';
 
 export interface ProjectileSandboxControls {
   dragModel: DragModel;
@@ -2074,31 +2075,34 @@ export const ProjectileSandbox: React.FC<ProjectileSandboxProps> = ({
               </span>
             </div>
 
-            {/* Big Math Equation Banner */}
-            <div className="py-2 px-3 bg-[#050811] rounded-xl border border-white/10 text-center">
-              <div className="text-base font-mono font-black tracking-wide text-white">
-                {currentFormulaProofs[selectedFormulaIndex].latex.replace(/\\/g, '')}
+            {/* Big Math Equation Banner in Standard Handwritten Typography */}
+            <div className="py-2.5 px-3 bg-[#050811] rounded-xl border border-white/10 text-center flex flex-col items-center justify-center">
+              <div className="text-lg font-bold text-white min-h-[36px] flex items-center justify-center">
+                <MathFormula
+                  rawLatex={currentFormulaProofs[selectedFormulaIndex].latex}
+                  fallbackText={currentFormulaProofs[selectedFormulaIndex].latex}
+                />
               </div>
               <div className="text-[10px] text-slate-400 mt-0.5">
                 {currentFormulaProofs[selectedFormulaIndex].name}
               </div>
             </div>
 
-            {/* LHS vs RHS Numerical Audit */}
-            <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+            {/* LHS vs RHS Numerical Audit in Standard Mathematical Notation */}
+            <div className="grid grid-cols-2 gap-2 text-xs">
               <div className="p-2 rounded-xl bg-white/5 border border-white/5">
-                <div className="text-[10px] text-slate-400 truncate">
-                  {currentFormulaProofs[selectedFormulaIndex].leftHandSideName}
+                <div className="text-[11px] text-slate-300 font-serif italic truncate">
+                  <MathFormula fallbackText={currentFormulaProofs[selectedFormulaIndex].leftHandSideName} />
                 </div>
-                <div className="text-sm font-bold text-emerald-300 mt-0.5">
+                <div className="text-sm font-bold font-mono text-emerald-300 mt-0.5">
                   {currentFormulaProofs[selectedFormulaIndex].leftHandSideValue.toFixed(3)}
                 </div>
               </div>
               <div className="p-2 rounded-xl bg-white/5 border border-white/5">
-                <div className="text-[10px] text-slate-400 truncate">
-                  {currentFormulaProofs[selectedFormulaIndex].rightHandSideName}
+                <div className="text-[11px] text-slate-300 font-serif italic truncate">
+                  <MathFormula fallbackText={currentFormulaProofs[selectedFormulaIndex].rightHandSideName} />
                 </div>
-                <div className="text-sm font-bold text-white mt-0.5">
+                <div className="text-sm font-bold font-mono text-white mt-0.5">
                   {currentFormulaProofs[selectedFormulaIndex].rightHandSideValue.toFixed(3)}
                 </div>
               </div>
@@ -2136,8 +2140,8 @@ export const ProjectileSandbox: React.FC<ProjectileSandboxProps> = ({
                 <Compass className="w-3.5 h-3.5 text-emerald-400" />
                 <span>Real-Time Free-Body Diagram</span>
               </span>
-              <span className="text-[10px] font-mono text-emerald-400">
-                m = {activeMass}kg · g = {activeGravity}m/s²
+              <span className="text-[11px] font-serif text-emerald-400">
+                <Var>m</Var> = {activeMass} kg <Dot /> <Var>g</Var> = {activeGravity} m/s²
               </span>
             </div>
 
@@ -2218,18 +2222,18 @@ export const ProjectileSandbox: React.FC<ProjectileSandboxProps> = ({
                   {/* Projectile Center Mass Body */}
                   <circle cx="0" cy="0" r="6" fill="#10b981" stroke="#ffffff" strokeWidth="1.5" />
                 </svg>
-                <div className="w-full space-y-0.5 font-mono text-[10px] pt-1 border-t border-white/5">
+                <div className="w-full space-y-0.5 font-serif text-[11px] pt-1 border-t border-white/5">
                   <div className="flex justify-between text-purple-300">
-                    <span>Gravity Fg:</span>
-                    <span>{fgMagnitude.toFixed(1)} N ↓</span>
+                    <span><Var>F</Var><Sub>g</Sub> = <Var>m</Var><Var>g</Var>:</span>
+                    <span className="font-mono">{fgMagnitude.toFixed(1)} N ↓</span>
                   </div>
                   <div className="flex justify-between text-amber-300">
-                    <span>Drag |Fd|:</span>
-                    <span>{dragMagnitude.toFixed(1)} N</span>
+                    <span>|<Vec>F</Vec><Sub>drag</Sub>|:</span>
+                    <span className="font-mono">{dragMagnitude.toFixed(1)} N</span>
                   </div>
                   <div className="flex justify-between text-rose-300 font-bold">
-                    <span>Net |ΣF|:</span>
-                    <span>{netForceMagnitude.toFixed(1)} N</span>
+                    <span>|<BigSum /><Vec>F</Vec><Sub>net</Sub>|:</span>
+                    <span className="font-mono">{netForceMagnitude.toFixed(1)} N</span>
                   </div>
                 </div>
               </div>
@@ -2339,18 +2343,18 @@ export const ProjectileSandbox: React.FC<ProjectileSandboxProps> = ({
                   {/* Projectile Center Mass Body */}
                   <circle cx="0" cy="0" r="5" fill="#38bdf8" stroke="#ffffff" strokeWidth="1.5" />
                 </svg>
-                <div className="w-full space-y-0.5 font-mono text-[10px] pt-1 border-t border-white/5">
+                <div className="w-full space-y-0.5 font-serif text-[11px] pt-1 border-t border-white/5">
                   <div className="flex justify-between text-sky-300">
-                    <span>Comp Vx:</span>
-                    <span>{currVx.toFixed(1)} m/s</span>
+                    <span><Var>v</Var><Sub>x</Sub>:</span>
+                    <span className="font-mono">{currVx.toFixed(1)} m/s</span>
                   </div>
                   <div className="flex justify-between text-cyan-300">
-                    <span>Comp Vy:</span>
-                    <span>{currVy.toFixed(1)} m/s</span>
+                    <span><Var>v</Var><Sub>y</Sub>:</span>
+                    <span className="font-mono">{currVy.toFixed(1)} m/s</span>
                   </div>
                   <div className="flex justify-between text-emerald-300 font-bold">
-                    <span>Speed |v|:</span>
-                    <span>{currSpeed.toFixed(1)} m/s</span>
+                    <span>|<Vec>v</Vec>|:</span>
+                    <span className="font-mono">{currSpeed.toFixed(1)} m/s</span>
                   </div>
                 </div>
               </div>
