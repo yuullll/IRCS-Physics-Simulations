@@ -216,6 +216,10 @@ export const ProjectileSandbox: React.FC<ProjectileSandboxProps> = ({
   const [nextShotNumber, setNextShotNumber] = useState<number>(1);
   const nextShotCounterRef = useRef<number>(1);
 
+  // Panel minimize / expand states
+  const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState<boolean>(false);
+  const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState<boolean>(false);
+
   // Live preview trajectory for current slider settings
   const [liveTrajectories, setLiveTrajectories] = useState<{
     active: TrajectorySummary;
@@ -1341,7 +1345,11 @@ export const ProjectileSandbox: React.FC<ProjectileSandboxProps> = ({
       {/* ========================================================================= */}
       {/* FLOATING LEFT CONTROL POD: LAUNCHER, MASS, GRAVITY, SPEED & MEMORY        */}
       {/* ========================================================================= */}
-      <div className="absolute top-20 left-4 z-20 w-84 max-h-[calc(100vh-6.5rem)] overflow-y-auto bg-[#071511]/92 backdrop-blur-xl border border-emerald-500/30 rounded-2xl p-4 flex flex-col space-y-3.5 shadow-2xl text-slate-100">
+      <div
+        className={`absolute top-20 left-4 z-20 ${
+          isLeftPanelCollapsed ? 'w-64' : 'w-84 max-h-[calc(100vh-6.5rem)] overflow-y-auto'
+        } bg-[#071511]/92 backdrop-blur-xl border border-emerald-500/30 rounded-2xl p-4 flex flex-col space-y-3.5 shadow-2xl text-slate-100 transition-all duration-200`}
+      >
         <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
           <div className="flex items-center gap-2">
             <Sliders className="w-4 h-4 text-emerald-400" />
@@ -1349,13 +1357,24 @@ export const ProjectileSandbox: React.FC<ProjectileSandboxProps> = ({
               Origin Launcher &amp; Ballistics
             </span>
           </div>
-          <span className="text-[10px] font-mono text-emerald-300 bg-emerald-500/15 px-2 py-0.5 rounded-lg border border-emerald-500/30">
-            ORIGIN (0, 0, 0)
-          </span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] font-mono text-emerald-300 bg-emerald-500/15 px-1.5 py-0.5 rounded-lg border border-emerald-500/30">
+              (0, 0, 0)
+            </span>
+            <button
+              onClick={() => setIsLeftPanelCollapsed(prev => !prev)}
+              className="text-[11px] text-slate-400 hover:text-white font-mono px-1 py-0.5 rounded hover:bg-white/10 transition"
+              title={isLeftPanelCollapsed ? 'Expand Launcher Controls' : 'Minimize Launcher Controls'}
+            >
+              {isLeftPanelCollapsed ? 'Expand' : 'Minimize'}
+            </button>
+          </div>
         </div>
 
-        {/* PRIMARY ACTION: FIRE NEW PROJECTILE WITH ALLOCATED COLOR & IMPACT FLAG */}
-        <div className="p-3 rounded-xl bg-black/50 border border-emerald-500/30 space-y-2.5">
+        {!isLeftPanelCollapsed && (
+          <>
+            {/* PRIMARY ACTION: FIRE NEW PROJECTILE WITH ALLOCATED COLOR & IMPACT FLAG */}
+            <div className="p-3 rounded-xl bg-black/50 border border-emerald-500/30 space-y-2.5">
           <button
             onClick={() => handleLaunchNewProjectile()}
             className="w-full py-2.5 px-3 rounded-xl font-bold text-xs text-slate-950 shadow-lg transition flex items-center justify-center gap-2 hover:brightness-110 active:scale-[0.99]"
@@ -1892,6 +1911,8 @@ export const ProjectileSandbox: React.FC<ProjectileSandboxProps> = ({
             </div>
           </div>
         </div>
+        </>
+        )}
       </div>
 
       {/* ========================================================================= */}
@@ -2029,7 +2050,11 @@ export const ProjectileSandbox: React.FC<ProjectileSandboxProps> = ({
       {/* FLOATING RIGHT PANEL: MERGED AP KINEMATICS AUDITOR & FORMULA STATION      */}
       {/* + REAL-TIME FREE-BODY DIAGRAM & VELOCITY DECOMPOSITION                    */}
       {/* ========================================================================= */}
-      <div className="absolute top-20 right-4 z-20 w-96 max-h-[calc(100vh-6.5rem)] overflow-y-auto bg-[#071612]/92 backdrop-blur-xl border border-emerald-500/30 rounded-2xl p-4 flex flex-col space-y-3.5 shadow-2xl text-slate-100">
+      <div
+        className={`absolute top-20 right-4 z-20 ${
+          isRightPanelCollapsed ? 'w-72' : 'w-96 max-h-[calc(100vh-6.5rem)] overflow-y-auto'
+        } bg-[#071612]/92 backdrop-blur-xl border border-emerald-500/30 rounded-2xl p-4 flex flex-col space-y-3.5 shadow-2xl text-slate-100 transition-all duration-200`}
+      >
         {/* Merged Header: AP Kinematics Auditor & Formula Verification Station */}
         <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
           <div className="flex items-center gap-2">
@@ -2043,12 +2068,23 @@ export const ProjectileSandbox: React.FC<ProjectileSandboxProps> = ({
               </div>
             </div>
           </div>
-          <span className="text-[10px] font-mono text-slate-300 bg-black/40 px-2 py-1 rounded-lg border border-white/10">
-            t = {simTime.toFixed(2)}s / {(auditedSummary?.flightTime ?? 0).toFixed(2)}s
-          </span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] font-mono text-slate-300 bg-black/40 px-2 py-1 rounded-lg border border-white/10">
+              t = {simTime.toFixed(2)}s
+            </span>
+            <button
+              onClick={() => setIsRightPanelCollapsed(prev => !prev)}
+              className="text-[11px] text-slate-400 hover:text-white font-mono px-1.5 py-0.5 rounded hover:bg-white/10 transition"
+              title={isRightPanelCollapsed ? 'Expand Formula Station' : 'Minimize Formula Station'}
+            >
+              {isRightPanelCollapsed ? 'Expand' : 'Minimize'}
+            </button>
+          </div>
         </div>
 
-        {/* Projectile Choice Selector for Formula Verification Station */}
+        {!isRightPanelCollapsed && (
+          <>
+            {/* Projectile Choice Selector for Formula Verification Station */}
         {savedShots.length > 0 && (
           <div className="p-2.5 rounded-xl bg-black/60 border border-emerald-500/30 space-y-1.5">
             <div className="flex items-center justify-between text-[10px] font-mono">
@@ -2510,6 +2546,8 @@ export const ProjectileSandbox: React.FC<ProjectileSandboxProps> = ({
             </div>
           </div>
         </div>
+        </>
+        )}
       </div>
 
       {/* ========================================================================= */}

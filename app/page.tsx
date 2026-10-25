@@ -108,6 +108,7 @@ export default function SimulationCockpit() {
   // Header visibility on catalog scroll (disappears on scroll down, reappears on scroll up)
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
   const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(false);
+  const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState(false);
   const [isTheoryOpen, setIsTheoryOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -242,6 +243,7 @@ export default function SimulationCockpit() {
     activeTool: 'select',
     viewMode: '3d',
     wireRouting: 'orthogonal',
+    showMeterOverlays: true,
   });
 
   const [selectedComponent, setSelectedComponent] = useState<CircuitComponentData | null>(null);
@@ -940,9 +942,17 @@ export default function SimulationCockpit() {
           <button
             onClick={() => setIsTheoryOpen(true)}
             className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 transition text-xs"
-            title="AP Physics C Theory Guide"
+            title={
+              activeCourse === 'mechanics'
+                ? 'AP Physics C: Mechanics Formula Sheet'
+                : 'AP Physics C: Electricity & Magnetism Formula Sheet'
+            }
           >
-            <BookOpen className={`w-3.5 h-3.5 ${activeCourse === 'mechanics' ? 'text-emerald-400' : 'text-sky-400'}`} />
+            <BookOpen
+              className={`w-3.5 h-3.5 ${
+                activeCourse === 'mechanics' ? 'text-emerald-400' : 'text-sky-400'
+              }`}
+            />
           </button>
 
           <div className="h-5 w-px bg-white/10 mx-0.5" />
@@ -2018,6 +2028,31 @@ export default function SimulationCockpit() {
                         </button>
                       </div>
 
+                      <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-white/10">
+                        <span className="text-slate-400">Element Meter Overlays:</span>
+                        <button
+                          onClick={() => {
+                            const nextVal = circuitControls.showMeterOverlays === false;
+                            setCircuitControls(prev => ({
+                              ...prev,
+                              showMeterOverlays: nextVal,
+                            }));
+                            showToast(
+                              nextVal
+                                ? 'Showing voltmeter/ammeter readings directly above elements'
+                                : 'Hiding voltmeter/ammeter readings directly above elements'
+                            );
+                          }}
+                          className={`px-2.5 py-0.5 rounded-lg text-[10px] font-mono font-semibold transition border ${
+                            circuitControls.showMeterOverlays !== false
+                              ? 'bg-amber-400 text-slate-950 border-amber-300 font-bold shadow-sm'
+                              : 'bg-white/5 text-slate-400 border-white/10 hover:text-white'
+                          }`}
+                        >
+                          {circuitControls.showMeterOverlays !== false ? 'Show Above Elements' : 'Hidden Above Elements'}
+                        </button>
+                      </div>
+
                       <div className="grid grid-cols-2 gap-1.5 pt-1">
                         <button
                           onClick={() => {
@@ -2309,16 +2344,32 @@ export default function SimulationCockpit() {
           {/* FLOATING RIGHT TELEMETRY POD                                              */}
           {/* ========================================================================= */}
           {activeMode !== 'projectile' && (
-            <div className="absolute top-20 right-4 z-10 bg-[#080e1e]/85 backdrop-blur-xl border border-white/10 rounded-2xl p-4 w-72 flex flex-col space-y-2.5 text-xs shadow-2xl">
+            <div
+              className={`absolute top-20 right-4 z-10 bg-[#080e1e]/85 backdrop-blur-xl border border-white/10 rounded-2xl p-4 ${
+                isRightPanelCollapsed ? 'w-56' : 'w-72'
+              } flex flex-col space-y-2.5 text-xs shadow-2xl transition-all duration-200`}
+            >
             <div className="flex items-center justify-between border-b border-white/10 pb-2">
               <span className="font-bold text-white flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-sky-400" />
                 Live Telemetry
               </span>
-              <span className="text-[10px] font-mono text-sky-400">
-                {isAutoSaving ? 'Saving...' : activeMode === 'field' ? 'RK4 Engine' : 'MNA Solver'}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-mono text-sky-400">
+                  {isAutoSaving ? 'Saving...' : activeMode === 'field' ? 'RK4 Engine' : 'MNA Solver'}
+                </span>
+                <button
+                  onClick={() => setIsRightPanelCollapsed(prev => !prev)}
+                  className="text-[11px] text-slate-400 hover:text-white font-mono px-1 py-0.5 rounded hover:bg-white/10 transition"
+                  title={isRightPanelCollapsed ? 'Expand Telemetry Pod' : 'Minimize Telemetry Pod'}
+                >
+                  {isRightPanelCollapsed ? 'Expand' : 'Minimize'}
+                </button>
+              </div>
             </div>
+
+            {!isRightPanelCollapsed && (
+              <>
 
             {activeMode === 'field' ? (
               <div className="space-y-1.5 font-mono text-[11px]">
@@ -2438,6 +2489,8 @@ export default function SimulationCockpit() {
                 </div>
               </div>
             )}
+            </>
+            )}
           </div>
           )}
 
@@ -2553,7 +2606,11 @@ export default function SimulationCockpit() {
       />
 
       {/* AP Physics C Theory Modal */}
-      <CalculusTheoryModal isOpen={isTheoryOpen} onClose={() => setIsTheoryOpen(false)} />
+      <CalculusTheoryModal
+        isOpen={isTheoryOpen}
+        onClose={() => setIsTheoryOpen(false)}
+        course={activeCourse}
+      />
     </div>
   );
 }

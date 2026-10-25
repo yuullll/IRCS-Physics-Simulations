@@ -557,39 +557,111 @@ const UnitCursorInteraction: React.FC<{
     }
 
     case 4: {
-      // Unit 4: Linear Momentum — 2D Collision & Impulse vectors following cursor
-      const colX = 135;
+      // Unit 4: Linear Momentum — Exact 2D Elastic Collision & 90° Scattering (Equal Masses m₁ = m₂)
+      const colX = 130;
       const colY = 46;
-      const inX = Math.min(115, targetX);
-      const inY = targetY;
-      const dy = colY - inY;
+      const R1 = 6;
+      const R2 = 6;
+      const D = R1 + R2; // 12
+      // Clamp impact parameter b so contact is guaranteed within physical radius
+      const maxB = D * 0.88; // ~10.5
+      const rawB = targetY - colY;
+      const b = Math.max(-maxB, Math.min(maxB, rawB));
+      // Collision normal angle α: sin(α) = b / D
+      const sinAlpha = b / D;
+      const alpha = Math.asin(sinAlpha);
+      const cosAlpha = Math.cos(alpha);
+
+      // Contact coordinates
+      const contactX1 = colX - D * cosAlpha;
+      const contactY1 = colY - D * sinAlpha;
+
+      // Elastic collision kinematics (v0 along +x, m1 = m2):
+      // Target 2 recoils along line of centers at angle α with speed v0 * cos(α)
+      // Projectile 1 scatters along tangent at angle (α - π/2) with speed v0 * sin(α)
+      // Resulting angle between v1' and v2' is identically 90°
+      const v0 = 54;
+      const v2Mag = v0 * cosAlpha;
+      const v1Mag = v0 * Math.abs(sinAlpha);
+
+      // Velocity vectors
+      const v2x = v2Mag * cosAlpha;
+      const v2y = v2Mag * sinAlpha;
+      const v1x = v1Mag * Math.abs(sinAlpha);
+      const v1y = -Math.sign(b || 1) * v1Mag * cosAlpha;
+
+      // Right-angle symbol points
+      const sqSize = 6;
+      const u2x = cosAlpha;
+      const u2y = sinAlpha;
+      const u1x = Math.abs(sinAlpha);
+      const u1y = -Math.sign(b || 1) * cosAlpha;
+      const sqP1x = colX + u2x * sqSize;
+      const sqP1y = colY + u2y * sqSize;
+      const sqP2x = colX + (u2x + u1x) * sqSize;
+      const sqP2y = colY + (u2y + u1y) * sqSize;
+      const sqP3x = colX + u1x * sqSize;
+      const sqP3y = colY + u1y * sqSize;
+
       return (
         <svg viewBox="0 0 260 92" className="w-full h-24 rounded-xl bg-black/50 border border-white/10 overflow-hidden">
-          {/* Incident momentum vector p1 */}
-          <line x1={inX} y1={inY} x2={colX - 8} y2={colY} stroke="#fb7185" strokeWidth="2.2" />
-          {/* Scattered momentum vectors p1' and p2' */}
+          {/* Impact parameter guide line */}
+          <line x1="20" y1={colY + b} x2={contactX1} y2={colY + b} stroke="#fda4af" strokeWidth="1.5" strokeDasharray="3 2" />
+          {/* Target central axis */}
+          <line x1="15" y1={colY} x2="245" y2={colY} stroke="#334155" strokeWidth="1" strokeDasharray="2 3" />
+          
+          {/* Incident trajectory */}
+          <line x1="20" y1={colY + b} x2={contactX1} y2={contactY1} stroke="#f43f5e" strokeWidth="2.4" />
+          
+          {/* Line of centers at collision */}
+          <line x1={contactX1} y1={contactY1} x2={colX} y2={colY} stroke="#94a3b8" strokeWidth="1" strokeDasharray="2 2" />
+
+          {/* Scattered trajectory 1 (deflected mass m1) */}
           <line
-            x1={colX + 8}
-            y1={colY}
-            x2={colX + 65}
-            y2={colY - dy * 0.6 - 16}
+            x1={contactX1}
+            y1={contactY1}
+            x2={contactX1 + v1x * 0.9}
+            y2={contactY1 + v1y * 0.9}
             stroke="#fb7185"
-            strokeWidth="1.8"
-            strokeDasharray="3 2"
+            strokeWidth="2.2"
           />
+
+          {/* Scattered trajectory 2 (struck mass m2) */}
           <line
-            x1={colX + 8}
+            x1={colX}
             y1={colY}
-            x2={colX + 65}
-            y2={colY + dy * 0.6 + 16}
+            x2={colX + v2x * 0.9}
+            y2={colY + v2y * 0.9}
             stroke="#38bdf8"
-            strokeWidth="1.8"
-            strokeDasharray="3 2"
+            strokeWidth="2.2"
           />
-          <circle cx={inX} cy={inY} r="5.5" fill="#f43f5e" />
-          <circle cx={colX} cy={colY} r="6.5" fill="#38bdf8" />
-          <text x="180" y="18" fill="#fda4af" fontSize="9" fontFamily="monospace">
+
+          {/* 90° right-angle indicator when both velocities are non-zero */}
+          {Math.abs(b) > 1.2 && (
+            <polyline
+              points={`${sqP1x.toFixed(1)},${sqP1y.toFixed(1)} ${sqP2x.toFixed(1)},${sqP2y.toFixed(1)} ${sqP3x.toFixed(1)},${sqP3y.toFixed(1)}`}
+              fill="none"
+              stroke="#e2e8f0"
+              strokeWidth="1"
+            />
+          )}
+
+          {/* Incident particle at start */}
+          <circle cx="28" cy={colY + b} r={R1} fill="#f43f5e" />
+          {/* Incident particle at impact */}
+          <circle cx={contactX1} cy={contactY1} r={R1} fill="#fb7185" fillOpacity="0.4" stroke="#fb7185" strokeWidth="1" />
+          {/* Target particle */}
+          <circle cx={colX} cy={colY} r={R2} fill="#0ea5e9" stroke="#38bdf8" strokeWidth="1.2" />
+
+          {/* Labels & AP Physics Theorem */}
+          <text x="175" y="16" fill="#fb7185" fontSize="8.5" fontFamily="monospace" fontWeight="bold">
             p₁ + p₂ = const
+          </text>
+          <text x="175" y="27" fill="#38bdf8" fontSize="7.5" fontFamily="monospace">
+            θ₁ + θ₂ = 90° (Elastic)
+          </text>
+          <text x="24" y="82" fill="#94a3b8" fontSize="7.5" fontFamily="monospace">
+            b = {b.toFixed(1)} px · α = {((alpha * 180) / Math.PI).toFixed(0)}°
           </text>
         </svg>
       );

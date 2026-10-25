@@ -17,6 +17,7 @@ export interface CircuitWorkbenchControls {
   activeTool: 'select' | 'wire' | 'cut' | 'multimeter_probe';
   viewMode: '3d' | 'top';
   wireRouting?: 'orthogonal' | 'curved';
+  showMeterOverlays?: boolean;
 }
 
 export interface CircuitMeterReading {
@@ -540,6 +541,7 @@ export const CircuitWorkbench: React.FC<CircuitWorkbenchProps> = ({
       // Camera-Facing 3D Floating Billboard Sprite
       // ALWAYS faces the camera directly at ANY angle (360° rotation and top-down views)
       const billboard = createMeterBillboard(comp.type, comp.id);
+      billboard.sprite.visible = controlsRef.current.showMeterOverlays !== false;
       if (threeRef.current) {
         threeRef.current.meterBillboards.set(comp.id, billboard);
       }
@@ -1175,11 +1177,15 @@ export const CircuitWorkbench: React.FC<CircuitWorkbenchProps> = ({
           }
 
           // 2. Camera-Facing Floating Billboard Sprite update
-          // Crystal-clear at ANY angle, never glitches
+          // Crystal-clear at ANY angle, can be toggled on/off in workbench controls
           const billboardData = state.meterBillboards.get(c.id);
           if (billboardData) {
-            renderMeterBillboardCanvas(billboardData.ctx, c.type, c.id, val);
-            billboardData.texture.needsUpdate = true;
+            const isVisible = liveControls.showMeterOverlays !== false;
+            billboardData.sprite.visible = isVisible;
+            if (isVisible) {
+              renderMeterBillboardCanvas(billboardData.ctx, c.type, c.id, val);
+              billboardData.texture.needsUpdate = true;
+            }
           }
         }
       });
