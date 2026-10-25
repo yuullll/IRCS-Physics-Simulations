@@ -204,6 +204,7 @@ class LabStorageService {
   private memoryAutoSaves: Record<string, SceneSnapshot> = {};
   private memoryUsers: UserProfile[] = [...MOCK_USERS];
   private currentUserId: string = 'user_student_1'; // Alex Chen default
+  private isLoggedIn: boolean = true;
   private hiddenAccountIds: Set<string> = new Set();
   private cachedVisibleUsers: UserProfile[] = [];
   private cachedHiddenUsers: UserProfile[] = [];
@@ -242,8 +243,11 @@ class LabStorageService {
         }
 
         const storedUserId = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
-        if (storedUserId && this.memoryUsers.some(u => u.id === storedUserId)) {
+        if (storedUserId === '__LOGGED_OUT__') {
+          this.isLoggedIn = false;
+        } else if (storedUserId && this.memoryUsers.some(u => u.id === storedUserId)) {
           this.currentUserId = storedUserId;
+          this.isLoggedIn = true;
         }
 
         const storedHidden = localStorage.getItem(STORAGE_KEYS.HIDDEN_DEVICE_ACCOUNTS);
@@ -284,6 +288,10 @@ class LabStorageService {
   }
 
   // Auth & Profile
+  public getIsLoggedIn(): boolean {
+    return this.isLoggedIn;
+  }
+
   public getCurrentUser(): UserProfile {
     const user = this.memoryUsers.find(u => u.id === this.currentUserId);
     return user || this.memoryUsers[0] || MOCK_USERS[1];
@@ -293,6 +301,7 @@ class LabStorageService {
     const found = this.memoryUsers.find(u => u.id === userId);
     if (found) {
       this.currentUserId = found.id;
+      this.isLoggedIn = true;
       if (typeof window !== 'undefined') {
         localStorage.setItem(STORAGE_KEYS.CURRENT_USER, found.id);
       }
@@ -424,6 +433,7 @@ class LabStorageService {
     }
 
     this.currentUserId = newUser.id;
+    this.isLoggedIn = true;
 
     if (typeof window !== 'undefined') {
       try {
@@ -446,6 +456,7 @@ class LabStorageService {
     }
 
     this.currentUserId = found.id;
+    this.isLoggedIn = true;
     if (typeof window !== 'undefined') {
       try {
         localStorage.setItem(STORAGE_KEYS.CURRENT_USER, found.id);
@@ -456,12 +467,11 @@ class LabStorageService {
   }
 
   public logoutUser(): UserProfile {
-    // Switch to first student default
     const fallback = this.memoryUsers.find(u => u.role === 'student') || MOCK_USERS[1];
-    this.currentUserId = fallback.id;
+    this.isLoggedIn = false;
     if (typeof window !== 'undefined') {
       try {
-        localStorage.setItem(STORAGE_KEYS.CURRENT_USER, fallback.id);
+        localStorage.setItem(STORAGE_KEYS.CURRENT_USER, '__LOGGED_OUT__');
       } catch (e) {}
     }
     this.notify();

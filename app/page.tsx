@@ -49,6 +49,7 @@ import {
   PHYSICS_MODEL_SLOTS,
   PhysicsModelSlot,
   PhysicsCourseId,
+  PhysicsUnitModule,
 } from '@/components/catalog/ModelCatalogPortal';
 import { SourceCharge, COULOMB_K } from '@/lib/physics/coulomb';
 import { CircuitComponentData } from '@/lib/physics/mna-solver';
@@ -62,7 +63,13 @@ import {
 
 type LayerRoute =
   | { layer: 'catalog'; course?: PhysicsCourseId }
-  | { layer: 'workspace'; mode: 'field' | 'circuit' | 'projectile'; modelTitle: string }
+  | { layer: 'unit'; unit: PhysicsUnitModule }
+  | {
+      layer: 'workspace';
+      mode: 'field' | 'circuit' | 'projectile';
+      modelTitle: string;
+      unit?: PhysicsUnitModule;
+    }
   | { layer: 'slot-detail'; slot: PhysicsModelSlot };
 
 const STATIC_DEFAULT_USER = MOCK_USERS[1];
@@ -70,18 +77,22 @@ const STATIC_USER_LIST = MOCK_USERS;
 const STATIC_EMPTY_USER_LIST: UserProfile[] = [];
 
 export default function SimulationCockpit() {
-  // Multi-Layer Hierarchy & History Stack (No Top Bar — Back/Forward Layer Navigation)
+  // Multi-Layer Hierarchy & History Stack (Mechanics first on the left, E&M on the right)
   const [navHistory, setNavHistory] = useState<LayerRoute[]>([
-    { layer: 'catalog', course: 'em' },
+    { layer: 'catalog', course: 'mechanics' },
   ]);
   const [navIndex, setNavIndex] = useState<number>(0);
-  const currentRoute = navHistory[navIndex] || { layer: 'catalog', course: 'em' };
+  const currentRoute = navHistory[navIndex] || { layer: 'catalog', course: 'mechanics' };
   const activeCourse: PhysicsCourseId =
     currentRoute.layer === 'catalog'
-      ? currentRoute.course || 'em'
+      ? currentRoute.course || 'mechanics'
+      : currentRoute.layer === 'unit'
+      ? currentRoute.unit.course
+      : currentRoute.layer === 'workspace' && currentRoute.unit
+      ? currentRoute.unit.course
       : currentRoute.layer === 'slot-detail'
-      ? currentRoute.slot.course || 'em'
-      : 'em';
+      ? currentRoute.slot.course || 'mechanics'
+      : 'mechanics';
 
   // Header visibility on catalog scroll (disappears on scroll down, reappears on scroll up)
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
@@ -134,6 +145,11 @@ export default function SimulationCockpit() {
     labStorage.subscribe,
     () => labStorage.getCurrentUser(),
     () => STATIC_DEFAULT_USER
+  );
+  const isLoggedIn = useSyncExternalStore(
+    labStorage.subscribe,
+    () => labStorage.getIsLoggedIn(),
+    () => true
   );
   const visibleUsers = useSyncExternalStore(
     labStorage.subscribe,
@@ -550,13 +566,22 @@ export default function SimulationCockpit() {
     showToast('Returned to active workspace');
   };
 
-  // Handle selecting a model card from the first-page Catalog
-  const handleSelectCatalogModel = (slot: PhysicsModelSlot) => {
+  // Handle selecting a Unit Module card from the first-page Catalog
+  const handleSelectUnit = (unit: PhysicsUnitModule) => {
+    navigateTo({
+      layer: 'unit',
+      unit,
+    });
+  };
+
+  // Handle selecting a simulation model slot from a Unit Subtopics page
+  const handleSelectCatalogModel = (slot: PhysicsModelSlot, parentUnit?: PhysicsUnitModule) => {
     if (slot.status === 'live' && slot.simulationMode) {
       navigateTo({
         layer: 'workspace',
         mode: slot.simulationMode,
         modelTitle: slot.title,
+        unit: parentUnit,
       });
       showToast(`Entered ${slot.title}`);
     } else {
@@ -640,7 +665,7 @@ export default function SimulationCockpit() {
       {/* ========================================================================= */}
       <div
         className={`fixed top-4 left-4 z-40 flex items-center gap-2 transition-all duration-300 ${
-          currentRoute.layer === 'catalog' && !isHeaderVisible
+          (currentRoute.layer === 'catalog' || currentRoute.layer === 'unit') && !isHeaderVisible
             ? 'opacity-0 -translate-y-8 pointer-events-none'
             : 'opacity-100 translate-y-0'
         }`}
@@ -701,17 +726,8 @@ export default function SimulationCockpit() {
             {currentRoute.layer === 'catalog' && (
               <>
                 <span className="text-slate-500 font-mono">/</span>
+                {/* Reversed order: Mechanics on the left, E&M on the right */}
                 <div className="flex items-center bg-[#050811] p-0.5 rounded-xl border border-white/10 text-[11px]">
-                  <button
-                    onClick={() => navigateTo({ layer: 'catalog', course: 'em' })}
-                    className={`px-2 py-0.5 rounded-lg font-medium transition ${
-                      activeCourse === 'em'
-                        ? 'bg-sky-400 text-slate-950 font-bold'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    C: E&amp;M
-                  </button>
                   <button
                     onClick={() => navigateTo({ layer: 'catalog', course: 'mechanics' })}
                     className={`px-2 py-0.5 rounded-lg font-medium transition ${
@@ -722,22 +738,73 @@ export default function SimulationCockpit() {
                   >
                     C: Mechanics
                   </button>
+                  <button
+                    onClick={() => navigateTo({ layer: 'catalog', course: 'em' })}
+                    className={`px-2 py-0.5 rounded-lg font-medium transition ${
+                      activeCourse === 'em'
+                        ? 'bg-sky-400 text-slate-950 font-bold'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    C: E&amp;M
+                  </button>
                 </div>
+              </>
+            )}
+
+            {currentRoute.layer === 'unit' && (
+              <>
+                <span className="text-slate-500 font-mono">/</span>
+                <span
+                  className={`font-bold truncate max-w-[260px] ${
+                    currentRoute.unit.course === 'mechanics' ? 'text-emerald-300' : 'text-sky-300'
+                  }`}
+                >
+                  {currentRoute.unit.title}
+                </span>
               </>
             )}
 
             {currentRoute.layer === 'workspace' && (
               <>
+                {currentRoute.unit && (
+                  <>
+                    <span className="text-slate-500 font-mono">/</span>
+                    <button
+                      onClick={() => navigateTo({ layer: 'unit', unit: currentRoute.unit! })}
+                      className="text-slate-300 hover:text-white font-medium truncate max-w-[140px]"
+                    >
+                      {currentRoute.unit.code}
+                    </button>
+                  </>
+                )}
                 <span className="text-slate-500 font-mono">/</span>
                 <span className="font-bold text-white truncate max-w-[200px] sm:max-w-xs">
                   {activeMode === 'field'
-                    ? '01. Electric Field Sandbox'
+                    ? '8.3 Electric Fields Sandbox'
                     : activeMode === 'circuit'
-                    ? '02. Circuit Workbench'
-                    : '01. Projectile & Drag Ballistics'}
+                    ? 'Unit 11 Circuit Workbench'
+                    : '1.3 Projectile & Drag Ballistics'}
                 </span>
                 {/* Quick Sibling Layer Switcher inside Workspace */}
                 <div className="flex items-center bg-white/5 p-0.5 rounded-xl border border-white/10 text-[11px] font-mono ml-1.5">
+                  <button
+                    onClick={() =>
+                      navigateTo({
+                        layer: 'workspace',
+                        mode: 'projectile',
+                        modelTitle: 'Non-Linear Projectile & Drag Ballistics',
+                      })
+                    }
+                    className={`px-2 py-0.5 rounded-lg transition ${
+                      activeMode === 'projectile'
+                        ? 'bg-emerald-400 text-slate-950 font-bold'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                    title="Switch to 1.3 Mechanics Projectile & Ballistics"
+                  >
+                    Ballistics
+                  </button>
                   <button
                     onClick={() =>
                       navigateTo({
@@ -751,7 +818,7 @@ export default function SimulationCockpit() {
                         ? 'bg-sky-400 text-slate-950 font-bold'
                         : 'text-slate-400 hover:text-white'
                     }`}
-                    title="Switch to E-Field Sandbox"
+                    title="Switch to 8.3 E-Field Sandbox"
                   >
                     E-Field
                   </button>
@@ -768,26 +835,9 @@ export default function SimulationCockpit() {
                         ? 'bg-amber-400 text-slate-950 font-bold'
                         : 'text-slate-400 hover:text-white'
                     }`}
-                    title="Switch to 3D Circuit Workbench"
+                    title="Switch to Unit 11 3D Circuit Workbench"
                   >
                     Circuits
-                  </button>
-                  <button
-                    onClick={() =>
-                      navigateTo({
-                        layer: 'workspace',
-                        mode: 'projectile',
-                        modelTitle: 'Non-Linear Projectile & Drag Ballistics',
-                      })
-                    }
-                    className={`px-2 py-0.5 rounded-lg transition ${
-                      activeMode === 'projectile'
-                        ? 'bg-emerald-400 text-slate-950 font-bold'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                    title="Switch to Mechanics Projectile & Ballistics"
-                  >
-                    Ballistics
                   </button>
                 </div>
               </>
@@ -810,7 +860,7 @@ export default function SimulationCockpit() {
       {/* ========================================================================= */}
       <div
         className={`fixed top-4 right-4 z-40 flex items-center gap-2 transition-all duration-300 ${
-          currentRoute.layer === 'catalog' && !isHeaderVisible
+          (currentRoute.layer === 'catalog' || currentRoute.layer === 'unit') && !isHeaderVisible
             ? 'opacity-0 -translate-y-8 pointer-events-none'
             : 'opacity-100 translate-y-0'
         }`}
@@ -872,8 +922,8 @@ export default function SimulationCockpit() {
             <span className="hidden lg:inline">Lab Report</span>
           </button>
 
-          {/* Class Administration & Gradebook Button - ONLY for Instructor */}
-          {currentUser.role === 'instructor' && (
+          {/* Class Administration & Gradebook Button - ONLY for logged-in Instructor */}
+          {isLoggedIn && currentUser.role === 'instructor' && (
             <button
               onClick={() => setIsTeacherDashboardOpen(true)}
               className="px-2.5 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 transition flex items-center space-x-1.5 text-xs font-semibold"
@@ -886,8 +936,8 @@ export default function SimulationCockpit() {
             </button>
           )}
 
-          {/* Student Account Choices Button - for Students */}
-          {currentUser.role === 'student' && (
+          {/* Student Account Choices Button - for logged-in Students */}
+          {isLoggedIn && currentUser.role === 'student' && (
             <button
               onClick={() => setIsStudentAccountModalOpen(true)}
               className="px-2.5 py-1.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 transition flex items-center space-x-1.5 text-xs font-semibold"
@@ -910,6 +960,7 @@ export default function SimulationCockpit() {
 
           <UserRoleBar
             currentUser={currentUser}
+            isLoggedIn={isLoggedIn}
             allUsers={visibleUsers}
             onSwitchUser={handleSwitchUser}
             onOpenAuthModal={() => setIsAuthModalOpen(true)}
@@ -930,14 +981,14 @@ export default function SimulationCockpit() {
       )}
 
       {/* ========================================================================= */}
-      {/* LAYER 0: SCROLLABLE FIRST PAGE MODEL SELECTION CATALOG                    */}
+      {/* LAYER 0: SCROLLABLE FIRST PAGE UNIT SELECTION CATALOG                     */}
       {/* ========================================================================= */}
       {currentRoute.layer === 'catalog' && (
         <ModelCatalogPortal
           activeCourse={activeCourse}
           onChangeCourse={course => navigateTo({ layer: 'catalog', course })}
           onHeaderVisibilityChange={setIsHeaderVisible}
-          onSelectModel={handleSelectCatalogModel}
+          onSelectUnit={handleSelectUnit}
           onOpenClassroom={() => {
             if (currentUser.role === 'instructor') {
               setIsTeacherDashboardOpen(true);
@@ -954,6 +1005,278 @@ export default function SimulationCockpit() {
           submissionCount={teacherSubmissions.length}
         />
       )}
+
+      {/* ========================================================================= */}
+      {/* LAYER 1: UNIT SUBTOPICS & SIMULATION SELECTION PAGE                       */}
+      {/* ========================================================================= */}
+      {currentRoute.layer === 'unit' && (() => {
+        const unit = currentRoute.unit;
+        const isMechUnit = unit.course === 'mechanics';
+        const regularSubtopics = unit.subtopics.filter(s => !s.isSummaryBlock);
+        const summaryBlocks = unit.subtopics.filter(s => s.isSummaryBlock);
+
+        return (
+          <div
+            onScroll={e => {
+              const top = e.currentTarget.scrollTop;
+              if (top < 50) setIsHeaderVisible(true);
+              else if (top > 90) setIsHeaderVisible(false);
+            }}
+            className={`w-full h-full overflow-y-auto pt-24 pb-24 px-6 sm:px-10 transition-colors ${
+              isMechUnit ? 'bg-[#040b09]' : 'bg-[#050811]'
+            }`}
+          >
+            <div className="max-w-7xl mx-auto space-y-10">
+              {/* Unit Header Card */}
+              <div
+                className={`p-8 rounded-3xl border shadow-2xl space-y-5 ${
+                  isMechUnit
+                    ? 'bg-[#071612]/90 border-emerald-500/25'
+                    : 'bg-[#0a1224]/90 border-white/15'
+                }`}
+              >
+                <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-5">
+                  <div className="space-y-1.5">
+                    <div
+                      className={`text-xs font-mono uppercase tracking-wider ${
+                        isMechUnit ? 'text-emerald-400' : 'text-sky-400'
+                      }`}
+                    >
+                      {isMechUnit
+                        ? 'AP PHYSICS C: MECHANICS · UNIT SUBTOPICS'
+                        : 'AP PHYSICS C: ELECTRICITY & MAGNETISM · UNIT SUBTOPICS'}
+                    </div>
+                    <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
+                      {unit.title}
+                    </h1>
+                  </div>
+
+                  <button
+                    onClick={() => navigateTo({ layer: 'catalog', course: unit.course })}
+                    className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-semibold transition flex items-center gap-2"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                    <span>Back to Unit Selection</span>
+                  </button>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-4 text-xs font-mono text-slate-300">
+                  <div>
+                    <span className="text-slate-400 mr-2">FUNDAMENTAL UNIT LAW:</span>
+                    <span className={isMechUnit ? 'text-emerald-300 font-bold' : 'text-sky-300 font-bold'}>
+                      {unit.equation}
+                    </span>
+                  </div>
+                  <div className="text-slate-400">
+                    {regularSubtopics.length} Subtopics
+                    {summaryBlocks.length > 0 ? ' · 1 Unit Summary Block' : ''}
+                  </div>
+                </div>
+              </div>
+
+              {/* Subtopics Grid */}
+              <div className="space-y-6">
+                <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                  <div>
+                    <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+                      {unit.code} Subtopics &amp; Interactive Models
+                    </h2>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Select an active simulation block below to launch its 3D workspace. Subtopics without a deployed simulation are marked Under Development.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {regularSubtopics.map(sub => {
+                    const sim = sub.simulation;
+                    const isUnnamedPlaceholder = sub.title === 'Under Development';
+
+                    if (sim) {
+                      return (
+                        <div
+                          key={sub.id}
+                          onClick={() => handleSelectCatalogModel(sim, unit)}
+                          className={`group cursor-pointer rounded-2xl p-6 transition-all duration-200 flex flex-col justify-between shadow-xl border ${
+                            isMechUnit
+                              ? 'bg-[#071a14]/95 border-emerald-400/50 hover:border-emerald-300'
+                              : 'bg-[#0b162c]/95 border-sky-400/50 hover:border-sky-300'
+                          }`}
+                        >
+                          <div className="space-y-4">
+                            <div className="flex items-center justify-between text-xs font-mono">
+                              <span
+                                className={`font-bold ${
+                                  isMechUnit ? 'text-emerald-400' : 'text-sky-400'
+                                }`}
+                              >
+                                SUBTOPIC {sub.code}
+                              </span>
+                              <span className="text-emerald-400 font-semibold flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                                LIVE 3D SIMULATION
+                              </span>
+                            </div>
+
+                            <div>
+                              <div className="text-xs font-semibold text-slate-300 mb-1">
+                                {sub.title}
+                              </div>
+                              <h3
+                                className={`text-xl font-bold text-white transition-colors ${
+                                  isMechUnit
+                                    ? 'group-hover:text-emerald-300'
+                                    : 'group-hover:text-sky-300'
+                                }`}
+                              >
+                                {sim.title}
+                              </h3>
+                              <p className="text-xs text-slate-400 mt-1">{sim.subtitle}</p>
+                            </div>
+
+                            <div className="px-3.5 py-2 rounded-xl bg-black/50 border border-white/10 flex items-center justify-between gap-2">
+                              <span className="text-[10px] font-mono text-slate-400 uppercase shrink-0">
+                                Equation
+                              </span>
+                              <span
+                                className={`text-xs font-mono font-bold truncate ${
+                                  isMechUnit ? 'text-emerald-300' : 'text-sky-300'
+                                }`}
+                              >
+                                {sim.equation}
+                              </span>
+                            </div>
+
+                            <p className="text-xs text-slate-300/90 leading-relaxed">
+                              {sim.description}
+                            </p>
+                          </div>
+
+                          <div className="pt-5 mt-5 border-t border-white/10 flex items-center justify-between text-xs font-bold">
+                            <span
+                              className={
+                                isMechUnit
+                                  ? 'text-emerald-400 group-hover:text-emerald-300'
+                                  : 'text-sky-400 group-hover:text-sky-300'
+                              }
+                            >
+                              Launch 3D Simulation
+                            </span>
+                            <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-white transition-transform group-hover:translate-x-1" />
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    // Empty / Under Development Subtopic Block
+                    return (
+                      <div
+                        key={sub.id}
+                        className={`rounded-2xl p-6 flex flex-col justify-between border border-dashed ${
+                          isMechUnit
+                            ? 'bg-[#071511]/60 border-emerald-500/20'
+                            : 'bg-[#070c18]/60 border-white/10'
+                        }`}
+                      >
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between text-xs font-mono text-slate-500">
+                            <span>{isUnnamedPlaceholder ? `BLOCK ${sub.code}` : `SUBTOPIC ${sub.code}`}</span>
+                            <span>EMPTY BLOCK</span>
+                          </div>
+
+                          <h3 className="text-lg font-bold text-slate-200">
+                            {sub.title}
+                          </h3>
+
+                          <div className="p-4 rounded-xl bg-black/40 border border-white/5 text-center my-3">
+                            <span className="text-xs font-mono text-slate-400">
+                              Under Development
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="pt-4 mt-4 border-t border-white/5 flex items-center justify-between text-xs font-mono text-slate-500">
+                          <span>Simulation Slot</span>
+                          <span>Under Development</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Separate Summary Block (e.g., Unit 11 Summary for 3D Circuit Workbench & MNA Solver) */}
+              {summaryBlocks.length > 0 && (
+                <div className="space-y-4 pt-4">
+                  <div className="border-b border-white/10 pb-3 flex items-center justify-between">
+                    <div>
+                      <div className="text-xs font-mono text-amber-400 uppercase tracking-wider">
+                        UNIT SYNTHESIS WORKBENCH (TEMPORARY BLOCK)
+                      </div>
+                      <h2 className="text-xl sm:text-2xl font-bold text-white mt-0.5">
+                        Unit 11 Summary
+                      </h2>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {summaryBlocks.map(summaryItem => {
+                      const sim = summaryItem.simulation;
+                      if (!sim) return null;
+                      return (
+                        <div
+                          key={summaryItem.id}
+                          onClick={() => handleSelectCatalogModel(sim, unit)}
+                          className="group cursor-pointer rounded-2xl p-6 bg-[#0b162c]/95 border border-amber-400/50 hover:border-amber-300 transition-all duration-200 flex flex-col justify-between shadow-xl"
+                        >
+                          <div className="space-y-4">
+                            <div className="flex items-center justify-between text-xs font-mono">
+                              <span className="text-amber-400 font-bold uppercase">
+                                {summaryItem.title}
+                              </span>
+                              <span className="text-emerald-400 font-semibold flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                                LIVE 3D SIMULATION
+                              </span>
+                            </div>
+
+                            <div>
+                              <h3 className="text-xl font-bold text-white group-hover:text-amber-300 transition-colors">
+                                {sim.title}
+                              </h3>
+                              <p className="text-xs text-slate-400 mt-1">{sim.subtitle}</p>
+                            </div>
+
+                            <div className="px-3.5 py-2 rounded-xl bg-black/50 border border-white/10 flex items-center justify-between gap-2">
+                              <span className="text-[10px] font-mono text-slate-400 uppercase shrink-0">
+                                Equation
+                              </span>
+                              <span className="text-xs font-mono font-bold text-amber-300 truncate">
+                                {sim.equation}
+                              </span>
+                            </div>
+
+                            <p className="text-xs text-slate-300/90 leading-relaxed">
+                              {sim.description}
+                            </p>
+                          </div>
+
+                          <div className="pt-5 mt-5 border-t border-white/10 flex items-center justify-between text-xs font-bold">
+                            <span className="text-amber-400 group-hover:text-amber-300">
+                              Launch 3D Circuit Workbench
+                            </span>
+                            <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-white transition-transform group-hover:translate-x-1" />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ========================================================================= */}
       {/* LAYER 1A: RESERVED / BLANK CURRICULUM SLOT DETAIL PAGE                    */}
@@ -973,34 +1296,8 @@ export default function SimulationCockpit() {
                   <p className="text-sm text-slate-400">{currentRoute.slot.subtitle}</p>
                 </div>
                 <span className="text-xs font-mono text-amber-300">
-                  Reserved Curriculum Slot
+                  Under Development
                 </span>
-              </div>
-
-              <div className="p-5 rounded-2xl bg-[#050811] border border-white/10 flex items-center justify-between">
-                <span className="text-xs font-mono text-slate-400 uppercase">
-                  Primary Differential / Integral Law
-                </span>
-                <span className="text-lg font-mono font-bold text-sky-300">
-                  {currentRoute.slot.equation}
-                </span>
-              </div>
-
-              <p className="text-sm text-slate-300 leading-relaxed">
-                {currentRoute.slot.description} This module slot is architected into the
-                multi-layer curriculum directory so additional 3D WebGL models can be plugged in
-                seamlessly alongside the flagship Electrostatics and Circuit MNA engines.
-              </p>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
-                {currentRoute.slot.metrics.map(m => (
-                  <div
-                    key={m}
-                    className="p-4 rounded-xl bg-[#050811]/80 border border-white/5 text-xs font-mono text-slate-300"
-                  >
-                    {m}
-                  </div>
-                ))}
               </div>
 
               <div className="pt-6 border-t border-white/10 flex flex-wrap items-center justify-between gap-4">
@@ -1009,50 +1306,8 @@ export default function SimulationCockpit() {
                   className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-semibold transition flex items-center gap-2"
                 >
                   <ArrowLeft className="w-4 h-4" />
-                  <span>Back to Model Catalog</span>
+                  <span>Back</span>
                 </button>
-
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() =>
-                      navigateTo({
-                        layer: 'workspace',
-                        mode: 'projectile',
-                        modelTitle: 'Non-Linear Projectile & Drag Ballistics',
-                      })
-                    }
-                    className="px-4 py-2.5 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-bold text-xs transition flex items-center gap-2"
-                  >
-                    <Target className="w-4 h-4" />
-                    <span>Open 3D Ballistics Simulator</span>
-                  </button>
-                  <button
-                    onClick={() =>
-                      navigateTo({
-                        layer: 'workspace',
-                        mode: 'field',
-                        modelTitle: 'Electrostatic Field & Lorentz Dynamics',
-                      })
-                    }
-                    className="px-4 py-2.5 rounded-xl bg-sky-400 hover:bg-sky-300 text-slate-950 font-bold text-xs transition flex items-center gap-2"
-                  >
-                    <Zap className="w-4 h-4" />
-                    <span>Open 3D Electric Field Sandbox</span>
-                  </button>
-                  <button
-                    onClick={() =>
-                      navigateTo({
-                        layer: 'workspace',
-                        mode: 'circuit',
-                        modelTitle: '3D Circuit Workbench & MNA Solver',
-                      })
-                    }
-                    className="px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs transition flex items-center gap-2"
-                  >
-                    <Cpu className="w-4 h-4" />
-                    <span>Open 3D Circuit Workbench</span>
-                  </button>
-                </div>
               </div>
             </div>
           </div>

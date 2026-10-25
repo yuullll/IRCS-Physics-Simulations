@@ -17,6 +17,7 @@ import {
 
 interface UserRoleBarProps {
   currentUser: UserProfile;
+  isLoggedIn?: boolean;
   allUsers: UserProfile[];
   onSwitchUser: (userId: string) => void;
   onOpenAuthModal: () => void;
@@ -31,6 +32,7 @@ const emptySubscribe = () => () => {};
 
 export const UserRoleBar: React.FC<UserRoleBarProps> = ({
   currentUser,
+  isLoggedIn = true,
   allUsers,
   onSwitchUser,
   onOpenAuthModal,
@@ -67,48 +69,53 @@ export const UserRoleBar: React.FC<UserRoleBarProps> = ({
 
   // Ensure deterministic SSR render to eliminate hydration mismatch
   const displayUser = mounted ? currentUser : (allUsers[1] || currentUser);
+  const activeLoggedIn = mounted ? isLoggedIn : true;
 
   return (
     <div ref={menuRef} className="relative inline-flex items-center space-x-2 text-xs">
-      {/* Active User Pill Button */}
-      <button
-        onClick={() => setDropdownOpen(prev => !prev)}
-        className="flex items-center space-x-2 bg-slate-950/80 hover:bg-slate-800 border border-slate-700/80 hover:border-cyan-500/60 px-3 py-1.5 rounded-xl text-slate-200 transition shadow-sm"
-        title="Account: Click to switch user, manage account, or forget device access"
-      >
-        <span className="text-base leading-none">{displayUser.avatar}</span>
-        <div className="flex items-center space-x-1.5 text-left">
-          <span className="font-semibold text-white tracking-tight">{displayUser.name}</span>
-          <span className="text-slate-500">·</span>
-          <span
-            className={`font-semibold uppercase text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1 ${
-              displayUser.role === 'instructor'
-                ? 'bg-amber-950 text-amber-400 border border-amber-800/60'
-                : 'bg-cyan-950 text-cyan-400 border border-cyan-800/60'
-            }`}
-          >
-            {displayUser.role === 'instructor' ? (
-              <>
-                <GraduationCap className="w-2.5 h-2.5" />
-                <span>Teacher</span>
-              </>
-            ) : (
-              <span>Student</span>
-            )}
-          </span>
-        </div>
-        <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />
-      </button>
+      {/* Active User Pill Button (when logged in) */}
+      {activeLoggedIn && (
+        <button
+          onClick={() => setDropdownOpen(prev => !prev)}
+          className="flex items-center space-x-2 bg-slate-950/80 hover:bg-slate-800 border border-slate-700/80 hover:border-cyan-500/60 px-3 py-1.5 rounded-xl text-slate-200 transition shadow-sm"
+          title="Account: Click to switch user, manage account, or sign out"
+        >
+          <span className="text-base leading-none">{displayUser.avatar}</span>
+          <div className="flex items-center space-x-1.5 text-left">
+            <span className="font-semibold text-white tracking-tight">{displayUser.name}</span>
+            <span className="text-slate-500">·</span>
+            <span
+              className={`font-semibold uppercase text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1 ${
+                displayUser.role === 'instructor'
+                  ? 'bg-amber-950 text-amber-400 border border-amber-800/60'
+                  : 'bg-cyan-950 text-cyan-400 border border-cyan-800/60'
+              }`}
+            >
+              {displayUser.role === 'instructor' ? (
+                <>
+                  <GraduationCap className="w-2.5 h-2.5" />
+                  <span>Teacher</span>
+                </>
+              ) : (
+                <span>Student</span>
+              )}
+            </span>
+          </div>
+          <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />
+        </button>
+      )}
 
-      {/* Quick Sign In / Sign Up Button */}
-      <button
-        onClick={onOpenAuthModal}
-        className="px-2.5 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 hover:border-cyan-500/50 text-cyan-400 hover:text-cyan-300 transition flex items-center space-x-1.5 font-semibold text-xs shadow-sm"
-        title="Log in with existing credentials or register a new account"
-      >
-        <LogIn className="w-3.5 h-3.5" />
-        <span className="hidden md:inline">Sign In / Sign Up</span>
-      </button>
+      {/* Quick Sign In / Sign Up Button — Only shown when no active account is logged in */}
+      {!activeLoggedIn && (
+        <button
+          onClick={onOpenAuthModal}
+          className="px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-cyan-500/50 text-cyan-400 hover:text-cyan-300 transition flex items-center space-x-1.5 font-semibold text-xs shadow-sm"
+          title="Log in with existing credentials or register a new account"
+        >
+          <LogIn className="w-3.5 h-3.5" />
+          <span>Sign In / Sign Up</span>
+        </button>
+      )}
 
       {/* Account Dropdown Menu */}
       {dropdownOpen && (
