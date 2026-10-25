@@ -438,7 +438,8 @@ const UnitCursorInteraction: React.FC<{
   normX: number; // 0 to 1 within card (or relative to card)
   normY: number; // 0 to 1 within card
   isHovered: boolean;
-}> = ({ unitNumber, normX, normY, isHovered }) => {
+  cursorSpeed?: number;
+}> = ({ unitNumber, normX, normY, isHovered, cursorSpeed = 0 }) => {
   // Clamp normalized cursor coordinates to [0.08, 0.92]
   const cx = Math.max(0.08, Math.min(0.92, normX));
   const cy = Math.max(0.12, Math.min(0.88, normY));
@@ -590,28 +591,16 @@ const UnitCursorInteraction: React.FC<{
       const v1x = v1Mag * Math.abs(sinAlpha);
       const v1y = -Math.sign(b || 1) * v1Mag * cosAlpha;
 
-      // Right-angle symbol points
-      const sqSize = 6;
-      const u2x = cosAlpha;
-      const u2y = sinAlpha;
-      const u1x = Math.abs(sinAlpha);
-      const u1y = -Math.sign(b || 1) * cosAlpha;
-      const sqP1x = colX + u2x * sqSize;
-      const sqP1y = colY + u2y * sqSize;
-      const sqP2x = colX + (u2x + u1x) * sqSize;
-      const sqP2y = colY + (u2y + u1y) * sqSize;
-      const sqP3x = colX + u1x * sqSize;
-      const sqP3y = colY + u1y * sqSize;
+      // Red incident particle starts at startX = 28
+      const startX = 28;
 
       return (
         <svg viewBox="0 0 260 92" className="w-full h-24 rounded-xl bg-black/50 border border-white/10 overflow-hidden">
-          {/* Impact parameter guide line */}
-          <line x1="20" y1={colY + b} x2={contactX1} y2={colY + b} stroke="#fda4af" strokeWidth="1.5" strokeDasharray="3 2" />
           {/* Target central axis */}
           <line x1="15" y1={colY} x2="245" y2={colY} stroke="#334155" strokeWidth="1" strokeDasharray="2 3" />
           
-          {/* Incident trajectory */}
-          <line x1="20" y1={colY + b} x2={contactX1} y2={contactY1} stroke="#f43f5e" strokeWidth="2.4" />
+          {/* Incident trajectory originating cleanly from the red particle */}
+          <line x1={startX} y1={colY + b} x2={contactX1} y2={contactY1} stroke="#f43f5e" strokeWidth="2.4" />
           
           {/* Line of centers at collision */}
           <line x1={contactX1} y1={contactY1} x2={colX} y2={colY} stroke="#94a3b8" strokeWidth="1" strokeDasharray="2 2" />
@@ -636,21 +625,11 @@ const UnitCursorInteraction: React.FC<{
             strokeWidth="2.2"
           />
 
-          {/* 90° right-angle indicator when both velocities are non-zero */}
-          {Math.abs(b) > 1.2 && (
-            <polyline
-              points={`${sqP1x.toFixed(1)},${sqP1y.toFixed(1)} ${sqP2x.toFixed(1)},${sqP2y.toFixed(1)} ${sqP3x.toFixed(1)},${sqP3y.toFixed(1)}`}
-              fill="none"
-              stroke="#e2e8f0"
-              strokeWidth="1"
-            />
-          )}
-
-          {/* Incident particle at start */}
-          <circle cx="28" cy={colY + b} r={R1} fill="#f43f5e" />
+          {/* Incident particle at start (red line begins exactly here) */}
+          <circle cx={startX} cy={colY + b} r={R1} fill="#f43f5e" />
           {/* Incident particle at impact */}
           <circle cx={contactX1} cy={contactY1} r={R1} fill="#fb7185" fillOpacity="0.4" stroke="#fb7185" strokeWidth="1" />
-          {/* Target particle */}
+          {/* Target particle (blue) */}
           <circle cx={colX} cy={colY} r={R2} fill="#0ea5e9" stroke="#38bdf8" strokeWidth="1.2" />
 
           {/* Labels & AP Physics Theorem */}
@@ -675,17 +654,28 @@ const UnitCursorInteraction: React.FC<{
       const armLen = 58;
       const endX = pivX + Math.cos(angle) * armLen;
       const endY = pivY + Math.sin(angle) * armLen;
-      // Perpendicular force vector
-      const fx = -Math.sin(angle) * 22;
-      const fy = Math.cos(angle) * 22;
+
+      // Tail attached to swing particle follows cursor direction, length scales with speed
+      const toCurX = targetX - endX;
+      const toCurY = targetY - endY;
+      const curDist = Math.hypot(toCurX, toCurY) || 1;
+      const dirX = toCurX / curDist;
+      const dirY = toCurY / curDist;
+      const tailLen = isHovered ? Math.max(12, Math.min(48, 14 + cursorSpeed * 0.45)) : 18;
+      const tailEndX = endX + dirX * tailLen;
+      const tailEndY = endY + dirY * tailLen;
+
       return (
         <svg viewBox="0 0 260 92" className="w-full h-24 rounded-xl bg-black/50 border border-white/10 overflow-hidden">
           <circle cx={pivX} cy={pivY} r="24" fill="none" stroke="#1e293b" strokeWidth="1.5" strokeDasharray="3 3" />
-          {/* Lever Arm r */}
+          {/* Lever Arm r connecting pivot to swing particle */}
           <line x1={pivX} y1={pivY} x2={endX} y2={endY} stroke="#10b981" strokeWidth="3.5" strokeLinecap="round" />
-          {/* Tangential Force Vector F */}
-          <line x1={endX} y1={endY} x2={endX + fx} y2={endY + fy} stroke="#f59e0b" strokeWidth="2.2" />
+          {/* Tail attached to swing particle: follows cursor direction, length scales with speed */}
+          <line x1={endX} y1={endY} x2={tailEndX} y2={tailEndY} stroke="#f59e0b" strokeWidth="2.5" strokeLinecap="round" />
+          <circle cx={tailEndX} cy={tailEndY} r="2.2" fill="#fbbf24" />
+          {/* Pivot point */}
           <circle cx={pivX} cy={pivY} r="4.5" fill="#f8fafc" />
+          {/* Swing particle */}
           <circle cx={endX} cy={endY} r="4.5" fill="#34d399" />
           <text x="178" y="18" fill="#6ee7b7" fontSize="9" fontFamily="monospace">
             τ = r × F
@@ -704,16 +694,27 @@ const UnitCursorInteraction: React.FC<{
       const ang = Math.atan2(dy, dx);
       const satX = cX + Math.cos(ang) * r;
       const satY = cY + Math.sin(ang) * r;
-      // Tangential velocity scales inversely with r (conservation of L = mvr)
-      const vLen = Math.min(34, (32 / r) * 16);
-      const vx = -Math.sin(ang) * vLen;
-      const vy = Math.cos(ang) * vLen;
+
+      // Tail attached to swing particle follows cursor direction, length scales with speed
+      const toCurX = targetX - satX;
+      const toCurY = targetY - satY;
+      const curDist = Math.hypot(toCurX, toCurY) || 1;
+      const dirX = toCurX / curDist;
+      const dirY = toCurY / curDist;
+      const tailLen = isHovered ? Math.max(12, Math.min(48, 14 + cursorSpeed * 0.45)) : 18;
+      const tailEndX = satX + dirX * tailLen;
+      const tailEndY = satY + dirY * tailLen;
+
       return (
         <svg viewBox="0 0 260 92" className="w-full h-24 rounded-xl bg-black/50 border border-white/10 overflow-hidden">
           <circle cx={cX} cy={cY} r={r} fill="none" stroke="#38bdf8" strokeWidth="1.5" strokeDasharray="3 3" />
           <circle cx={cX} cy={cY} r="6" fill="#0ea5e9" />
+          {/* Radial line attaching particle to pivot / central body */}
           <line x1={cX} y1={cY} x2={satX} y2={satY} stroke="#64748b" strokeWidth="1.2" />
-          <line x1={satX} y1={satY} x2={satX + vx} y2={satY + vy} stroke="#10b981" strokeWidth="2.2" />
+          {/* Tail attached to swing particle: follows cursor direction, length scales with speed */}
+          <line x1={satX} y1={satY} x2={tailEndX} y2={tailEndY} stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" />
+          <circle cx={tailEndX} cy={tailEndY} r="2.2" fill="#34d399" />
+          {/* Swing particle */}
           <circle cx={satX} cy={satY} r="4.5" fill="#34d399" />
           <text x="178" y="18" fill="#7dd3fc" fontSize="9" fontFamily="monospace">
             L = Iω = const
@@ -1698,6 +1699,7 @@ export const ModelCatalogPortal: React.FC<ModelCatalogPortalProps> = ({
                         normX={isHovered ? coords.normX : globalNormX}
                         normY={isHovered ? coords.normY : globalNormY}
                         isHovered={isHovered}
+                        cursorSpeed={isHovered ? cursorSpeed : 0}
                       />
                     </div>
 

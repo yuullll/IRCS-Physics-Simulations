@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react';
 import {
   BookOpen,
   X,
-  ExternalLink,
   Table,
   Layers,
   Sigma,
@@ -131,18 +130,6 @@ export const CalculusTheoryModal: React.FC<CalculusTheoryModalProps> = ({
               </button>
             </div>
 
-            {/* Official PDF Asset link */}
-            <a
-              href={pdfUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 text-xs font-semibold flex items-center gap-1.5 transition"
-              title="Open the official attached College Board PDF file"
-            >
-              <span className="hidden sm:inline">Open PDF</span>
-              <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
-            </a>
-
             {/* Close Button */}
             <button
               onClick={onClose}
@@ -157,14 +144,14 @@ export const CalculusTheoryModal: React.FC<CalculusTheoryModalProps> = ({
         {/* ========================================================================= */}
         {/* TAB NAVIGATION BAR (MATCHES SECTIONS OF THE ATTACHED FORMULA SHEETS)      */}
         {/* ========================================================================= */}
-        <div className="px-6 py-2.5 border-b border-white/10 bg-black/20 flex flex-wrap items-center gap-2 text-xs font-semibold overflow-x-auto">
+        <div className="px-6 py-3.5 border-b border-white/10 bg-black/40 flex items-center gap-2.5 text-xs font-semibold overflow-x-auto shrink-0 min-h-[58px]">
           <button
             onClick={() => setUserSelectedTab('constants')}
-            className={`px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 ${
+            className={`px-3.5 py-2 rounded-xl transition flex items-center gap-2 shrink-0 whitespace-nowrap ${
               activeTab === 'constants'
                 ? isMechanics
-                  ? 'bg-emerald-500/25 text-emerald-300 border border-emerald-500/40'
-                  : 'bg-sky-500/25 text-sky-300 border border-sky-500/40'
+                  ? 'bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 shadow-sm'
+                  : 'bg-sky-500/25 text-sky-300 border border-sky-500/40 shadow-sm'
                 : 'text-slate-400 hover:text-white bg-white/5 border border-transparent'
             }`}
           >
@@ -175,49 +162,49 @@ export const CalculusTheoryModal: React.FC<CalculusTheoryModalProps> = ({
           {isMechanics ? (
             <button
               onClick={() => setUserSelectedTab('equations')}
-              className={`px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 ${
+              className={`px-3.5 py-2 rounded-xl transition flex items-center gap-2 shrink-0 whitespace-nowrap ${
                 activeTab === 'equations'
-                  ? 'bg-emerald-500/25 text-emerald-300 border border-emerald-500/40'
+                  ? 'bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 shadow-sm'
                   : 'text-slate-400 hover:text-white bg-white/5 border border-transparent'
               }`}
             >
               <Sigma className="w-3.5 h-3.5" />
-              <span>Mechanics Equations (Page 2)</span>
+              <span>Mechanics Equations</span>
             </button>
           ) : (
             <>
               <button
                 onClick={() => setUserSelectedTab('em_equations')}
-                className={`px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 ${
+                className={`px-3.5 py-2 rounded-xl transition flex items-center gap-2 shrink-0 whitespace-nowrap ${
                   activeTab === 'em_equations'
-                    ? 'bg-sky-500/25 text-sky-300 border border-sky-500/40'
+                    ? 'bg-sky-500/25 text-sky-300 border border-sky-500/40 shadow-sm'
                     : 'text-slate-400 hover:text-white bg-white/5 border border-transparent'
                 }`}
               >
                 <Zap className="w-3.5 h-3.5" />
-                <span>Electricity &amp; Magnetism Equations (Page 2)</span>
+                <span>Electricity &amp; Magnetism Equations</span>
               </button>
               <button
                 onClick={() => setUserSelectedTab('equations')}
-                className={`px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 ${
+                className={`px-3.5 py-2 rounded-xl transition flex items-center gap-2 shrink-0 whitespace-nowrap ${
                   activeTab === 'equations'
-                    ? 'bg-sky-500/25 text-sky-300 border border-sky-500/40'
+                    ? 'bg-sky-500/25 text-sky-300 border border-sky-500/40 shadow-sm'
                     : 'text-slate-400 hover:text-white bg-white/5 border border-transparent'
                 }`}
               >
                 <Orbit className="w-3.5 h-3.5" />
-                <span>Mechanics Equations (Page 3)</span>
+                <span>Mechanics Equations</span>
               </button>
             </>
           )}
 
           <button
             onClick={() => setUserSelectedTab('geometry')}
-            className={`px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 ${
+            className={`px-3.5 py-2 rounded-xl transition flex items-center gap-2 shrink-0 whitespace-nowrap ${
               activeTab === 'geometry'
                 ? isMechanics
-                  ? 'bg-emerald-500/25 text-emerald-300 border border-emerald-500/40'
-                  : 'bg-sky-500/25 text-sky-300 border border-sky-500/40'
+                  ? 'bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 shadow-sm'
+                  : 'bg-sky-500/25 text-sky-300 border border-sky-500/40 shadow-sm'
                 : 'text-slate-400 hover:text-white bg-white/5 border border-transparent'
             }`}
           >
@@ -570,9 +557,8 @@ export const CalculusTheoryModal: React.FC<CalculusTheoryModalProps> = ({
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Column 1: Kinematics, Dynamics, Work, Energy, Momentum */}
                   <div className="space-y-4">
-                    <div className="text-xs font-mono font-bold text-emerald-400 uppercase border-b border-white/10 pb-1 flex items-center justify-between">
-                      <span>Translational Motion, Energy &amp; Momentum</span>
-                      <span className="text-[10px] text-slate-400 font-normal">Column 1</span>
+                    <div className="text-xs font-mono font-bold text-emerald-400 uppercase border-b border-white/10 pb-1">
+                      Translational Motion, Energy &amp; Momentum
                     </div>
 
                     {/* Kinematics */}
@@ -687,9 +673,8 @@ export const CalculusTheoryModal: React.FC<CalculusTheoryModalProps> = ({
 
                   {/* Column 2: Rotational Dynamics, Oscillations */}
                   <div className="space-y-4">
-                    <div className="text-xs font-mono font-bold text-emerald-400 uppercase border-b border-white/10 pb-1 flex items-center justify-between">
-                      <span>Rotational Dynamics &amp; Oscillations</span>
-                      <span className="text-[10px] text-slate-400 font-normal">Column 2</span>
+                    <div className="text-xs font-mono font-bold text-emerald-400 uppercase border-b border-white/10 pb-1">
+                      Rotational Dynamics &amp; Oscillations
                     </div>
 
                     {/* Angular Kinematics */}
@@ -826,9 +811,8 @@ export const CalculusTheoryModal: React.FC<CalculusTheoryModalProps> = ({
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Column 1: Electrostatics, Gauss's Law, Potential, Capacitors, Current & Resistance */}
                   <div className="space-y-4">
-                    <div className="text-xs font-mono font-bold text-sky-400 uppercase border-b border-white/10 pb-1 flex items-center justify-between">
-                      <span>Electrostatics, Gauss, Potential &amp; DC Conduction</span>
-                      <span className="text-[10px] text-slate-400 font-normal">Column 1</span>
+                    <div className="text-xs font-mono font-bold text-sky-400 uppercase border-b border-white/10 pb-1">
+                      Electrostatics, Gauss, Potential &amp; DC Conduction
                     </div>
 
                     {/* Coulomb's Law & Electric Fields */}
@@ -925,9 +909,8 @@ export const CalculusTheoryModal: React.FC<CalculusTheoryModalProps> = ({
 
                   {/* Column 2: Circuits, Magnetism, Induction & Maxwell */}
                   <div className="space-y-4">
-                    <div className="text-xs font-mono font-bold text-sky-400 uppercase border-b border-white/10 pb-1 flex items-center justify-between">
-                      <span>Circuits, Magnetism, Induction &amp; Oscillations</span>
-                      <span className="text-[10px] text-slate-400 font-normal">Column 2</span>
+                    <div className="text-xs font-mono font-bold text-sky-400 uppercase border-b border-white/10 pb-1">
+                      Circuits, Magnetism, Induction &amp; Oscillations
                     </div>
 
                     {/* Circuit Combinations & RC Transients */}

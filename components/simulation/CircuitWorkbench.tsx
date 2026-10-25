@@ -1091,6 +1091,7 @@ export const CircuitWorkbench: React.FC<CircuitWorkbenchProps> = ({
       if (!state) return;
 
       state.controls.update();
+      const liveControls = controlsRef.current;
 
       // Solve MNA Circuit System
       const mnaResult = solveCircuitMNA(state.components, state.wires, dt);
@@ -1206,7 +1207,6 @@ export const CircuitWorkbench: React.FC<CircuitWorkbenchProps> = ({
       }
 
       // Update Carrier Drift Arrows along wires
-      const liveControls = controlsRef.current;
       const isConventional = liveControls.flowConvention === 'conventional';
       const colorHex = isConventional ? 0xf59e0b : 0x38bdf8;
       const emissiveHex = isConventional ? 0xd97706 : 0x0284c7;
