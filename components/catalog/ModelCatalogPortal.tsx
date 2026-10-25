@@ -449,27 +449,34 @@ const UnitCursorInteraction: React.FC<{
 
   switch (unitNumber) {
     case 1: {
-      // Unit 1: Kinematics — Parabolic trajectory arc & velocity vector aiming toward cursor
+      // Unit 1: Kinematics — Parabolic trajectory arc & velocity vector strictly tangent to initial launch
       const startX = 24;
       const startY = 76;
       const ctrlX = (startX + targetX) * 0.5;
-      const ctrlY = Math.min(startY, targetY) - 32;
+      const ctrlY = Math.min(startY, targetY) - 34;
       const pathD = `M ${startX} ${startY} Q ${ctrlX} ${ctrlY} ${targetX} ${targetY}`;
-      const vx = (targetX - startX) * 0.32;
-      const vy = (ctrlY - startY) * 0.45;
+      // Exact tangent vector at t = 0 points towards the control point (ctrlX, ctrlY)
+      const tanDx = ctrlX - startX;
+      const tanDy = ctrlY - startY;
+      const tanDist = Math.hypot(tanDx, tanDy) || 1;
+      const vLen = Math.min(36, Math.max(22, tanDist * 0.52));
+      const vx = (tanDx / tanDist) * vLen;
+      const vy = (tanDy / tanDist) * vLen;
       return (
         <svg viewBox="0 0 260 92" className="w-full h-24 rounded-xl bg-black/50 border border-white/10 overflow-hidden">
           <line x1="16" y1="76" x2="244" y2="76" stroke="#1e293b" strokeWidth="1" />
           <path d={pathD} fill="none" stroke="#10b981" strokeWidth="2" strokeDasharray="4 3" />
-          {/* Initial Velocity Vector v0 */}
+          {/* Initial Velocity Vector v0 — strictly tangent and positioned above the concave-down arc */}
           <line
             x1={startX}
             y1={startY}
             x2={startX + vx}
             y2={startY + vy}
             stroke="#34d399"
-            strokeWidth="2"
+            strokeWidth="2.2"
+            strokeLinecap="round"
           />
+          <circle cx={startX + vx} cy={startY + vy} r="2" fill="#6ee7b7" />
           <circle cx={startX} cy={startY} r="3.5" fill="#10b981" />
           {/* Projectile tracking cursor */}
           <circle cx={targetX} cy={targetY} r={isHovered ? 5.5 : 4.5} fill="#34d399" />
@@ -647,30 +654,38 @@ const UnitCursorInteraction: React.FC<{
     }
 
     case 5: {
-      // Unit 5: Torque and Rotational Dynamics — Pivoted lever arm rotating toward cursor
+      // Unit 5: Torque and Rotational Dynamics — Pivoted lever arm with perpendicular tail pointing toward cursor
       const pivX = 85;
       const pivY = 50;
+      const distToPiv = Math.hypot(targetX - pivX, targetY - pivY);
+      // Line connecting pivot to moving particle changes length based on cursor distance (clamped to [22, 38] so particle is never off-screen)
+      const armLen = isHovered ? Math.max(22, Math.min(38, 18 + distToPiv * 0.26)) : 32;
       const angle = Math.atan2(targetY - pivY, targetX - pivX);
-      const armLen = 58;
       const endX = pivX + Math.cos(angle) * armLen;
       const endY = pivY + Math.sin(angle) * armLen;
 
-      // Tail attached to swing particle follows cursor direction, length scales with speed
+      // Tail MUST be perpendicular to circular path (tangent to circle):
+      // The two perpendicular unit vectors are (-sin(angle), cos(angle)) and (sin(angle), -cos(angle))
+      // Choose the direction that points toward the cursor
       const toCurX = targetX - endX;
       const toCurY = targetY - endY;
-      const curDist = Math.hypot(toCurX, toCurY) || 1;
-      const dirX = toCurX / curDist;
-      const dirY = toCurY / curDist;
+      const dot = (-Math.sin(angle)) * toCurX + Math.cos(angle) * toCurY;
+      const sign = dot >= 0 ? 1 : -1;
+      const tanX = sign * (-Math.sin(angle));
+      const tanY = sign * Math.cos(angle);
+
+      // Tail length changes based on speed of cursor (faster = longer)
       const tailLen = isHovered ? Math.max(12, Math.min(48, 14 + cursorSpeed * 0.45)) : 18;
-      const tailEndX = endX + dirX * tailLen;
-      const tailEndY = endY + dirY * tailLen;
+      const tailEndX = endX + tanX * tailLen;
+      const tailEndY = endY + tanY * tailLen;
 
       return (
         <svg viewBox="0 0 260 92" className="w-full h-24 rounded-xl bg-black/50 border border-white/10 overflow-hidden">
-          <circle cx={pivX} cy={pivY} r="24" fill="none" stroke="#1e293b" strokeWidth="1.5" strokeDasharray="3 3" />
-          {/* Lever Arm r connecting pivot to swing particle */}
-          <line x1={pivX} y1={pivY} x2={endX} y2={endY} stroke="#10b981" strokeWidth="3.5" strokeLinecap="round" />
-          {/* Tail attached to swing particle: follows cursor direction, length scales with speed */}
+          {/* Circular path guide with current radius */}
+          <circle cx={pivX} cy={pivY} r={armLen} fill="none" stroke="#1e293b" strokeWidth="1.2" strokeDasharray="3 3" />
+          {/* Lever Arm r connecting pivot to swing particle (length adapts to cursor distance) */}
+          <line x1={pivX} y1={pivY} x2={endX} y2={endY} stroke="#10b981" strokeWidth="3" strokeLinecap="round" />
+          {/* Perpendicular Tail: strictly perpendicular to circular path, points towards cursor, scales with speed */}
           <line x1={endX} y1={endY} x2={tailEndX} y2={tailEndY} stroke="#f59e0b" strokeWidth="2.5" strokeLinecap="round" />
           <circle cx={tailEndX} cy={tailEndY} r="2.2" fill="#fbbf24" />
           {/* Pivot point */}
@@ -685,33 +700,37 @@ const UnitCursorInteraction: React.FC<{
     }
 
     case 6: {
-      // Unit 6: Energy and Momentum of Rotating Systems — Orbiting body whose radius tracks cursor
+      // Unit 6: Energy and Momentum of Rotating Systems — Orbiting body with perpendicular tail
       const cX = 125;
       const cY = 46;
-      const dx = targetX - cX;
-      const dy = targetY - cY;
-      const r = Math.max(14, Math.min(38, Math.hypot(dx, dy) * 0.45));
-      const ang = Math.atan2(dy, dx);
+      const distToCenter = Math.hypot(targetX - cX, targetY - cY);
+      // Line connecting center and moving particle changes length with cursor distance (clamped to [20, 38] to stay visible)
+      const r = isHovered ? Math.max(20, Math.min(38, 18 + distToCenter * 0.26)) : 28;
+      const ang = Math.atan2(targetY - cY, targetX - cX);
       const satX = cX + Math.cos(ang) * r;
       const satY = cY + Math.sin(ang) * r;
 
-      // Tail attached to swing particle follows cursor direction, length scales with speed
+      // Tail MUST be perpendicular to circular path (tangent to orbit), pointing towards cursor
       const toCurX = targetX - satX;
       const toCurY = targetY - satY;
-      const curDist = Math.hypot(toCurX, toCurY) || 1;
-      const dirX = toCurX / curDist;
-      const dirY = toCurY / curDist;
+      const dot = (-Math.sin(ang)) * toCurX + Math.cos(ang) * toCurY;
+      const sign = dot >= 0 ? 1 : -1;
+      const tanX = sign * (-Math.sin(ang));
+      const tanY = sign * Math.cos(ang);
+
+      // Tail length changes based on speed of cursor (faster = longer)
       const tailLen = isHovered ? Math.max(12, Math.min(48, 14 + cursorSpeed * 0.45)) : 18;
-      const tailEndX = satX + dirX * tailLen;
-      const tailEndY = satY + dirY * tailLen;
+      const tailEndX = satX + tanX * tailLen;
+      const tailEndY = satY + tanY * tailLen;
 
       return (
         <svg viewBox="0 0 260 92" className="w-full h-24 rounded-xl bg-black/50 border border-white/10 overflow-hidden">
-          <circle cx={cX} cy={cY} r={r} fill="none" stroke="#38bdf8" strokeWidth="1.5" strokeDasharray="3 3" />
+          {/* Orbit circular path */}
+          <circle cx={cX} cy={cY} r={r} fill="none" stroke="#38bdf8" strokeWidth="1.2" strokeDasharray="3 3" />
           <circle cx={cX} cy={cY} r="6" fill="#0ea5e9" />
-          {/* Radial line attaching particle to pivot / central body */}
-          <line x1={cX} y1={cY} x2={satX} y2={satY} stroke="#64748b" strokeWidth="1.2" />
-          {/* Tail attached to swing particle: follows cursor direction, length scales with speed */}
+          {/* Radial line attaching particle to central pivot (length adapts to cursor distance) */}
+          <line x1={cX} y1={cY} x2={satX} y2={satY} stroke="#64748b" strokeWidth="1.5" />
+          {/* Perpendicular Tail: strictly perpendicular to circular path, points towards cursor, scales with speed */}
           <line x1={satX} y1={satY} x2={tailEndX} y2={tailEndY} stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" />
           <circle cx={tailEndX} cy={tailEndY} r="2.2" fill="#34d399" />
           {/* Swing particle */}

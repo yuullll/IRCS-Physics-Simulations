@@ -77,18 +77,33 @@ export interface LabDataRow {
   percentError: number; // in %
 }
 
+export interface CommentItem {
+  id: string;
+  authorId: string;
+  authorName: string;
+  authorRole: UserRole;
+  text: string;
+  timestamp: string;
+}
+
 export interface LabAssignment {
   id: string;
   title: string;
   subtitle: string;
   topic: string;
+  description?: string;
+  course?: 'mechanics' | 'em';
+  dueDate?: string;
+  assignedBy?: string;
+  createdAt?: string;
   objectives: string[];
-  fixedParameters: {
-    q1Micro: number;
-    q2Micro: number;
-    kConstant: number;
+  fixedParameters?: {
+    q1Micro?: number;
+    q2Micro?: number;
+    kConstant?: number;
+    [key: string]: any;
   };
-  rubric: {
+  rubric?: {
     hypothesisMax: number;
     dataAccuracyMax: number;
     analysisMax: number;
@@ -116,6 +131,8 @@ export interface LabSubmission {
   sceneSnapshot: SceneSnapshot;
   grade?: number;
   feedback?: string;
+  studentComments?: string;
+  comments?: CommentItem[];
   gradedAt?: string;
   gradedBy?: string;
 }

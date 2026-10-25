@@ -25,6 +25,7 @@ interface StudentAccountModalProps {
   onResetProgress: () => void;
   onForgetOnDevice: () => void;
   onUpdateProfile?: (name: string, avatar: string) => void;
+  course?: 'mechanics' | 'em';
 }
 
 export const StudentAccountModal: React.FC<StudentAccountModalProps> = ({
@@ -36,6 +37,7 @@ export const StudentAccountModal: React.FC<StudentAccountModalProps> = ({
   onResetProgress,
   onForgetOnDevice,
   onUpdateProfile,
+  course = 'mechanics',
 }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [confirmInput, setConfirmInput] = useState('');
@@ -46,19 +48,43 @@ export const StudentAccountModal: React.FC<StudentAccountModalProps> = ({
 
   if (!isOpen) return null;
 
+  const isMechanics = course === 'mechanics';
   const AVATARS = ['🧑‍🎓', '👩‍🎓', '👨‍🎓', '⚡', '🔬', '💡', '🧪', '🔭'];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn select-none">
-      <div className="relative w-full max-w-lg bg-[#080e1e] border border-white/15 rounded-3xl shadow-2xl overflow-hidden flex flex-col text-slate-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn select-none">
+      <div
+        className={`relative w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden flex flex-col text-slate-200 border transition-colors ${
+          isMechanics
+            ? 'bg-[#050f0c] border-emerald-500/30 shadow-emerald-950/40'
+            : 'bg-[#060c18] border-sky-500/30 shadow-sky-950/40'
+        }`}
+      >
         {/* Header */}
         <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between bg-white/[0.02]">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-2xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-xl">
+            <div
+              className={`w-10 h-10 rounded-2xl flex items-center justify-center text-xl border ${
+                isMechanics
+                  ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
+                  : 'bg-sky-500/15 border-sky-500/30 text-sky-300'
+              }`}
+            >
               {currentUser.avatar}
             </div>
             <div>
-              <h2 className="text-base font-bold text-white tracking-tight">Student Account Settings</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-bold text-white tracking-tight">Student Account Settings</h2>
+                <span
+                  className={`text-[9px] font-mono px-2 py-0.5 rounded font-bold uppercase ${
+                    isMechanics
+                      ? 'bg-emerald-500/20 text-emerald-300'
+                      : 'bg-sky-500/20 text-sky-300'
+                  }`}
+                >
+                  {isMechanics ? 'Mechanics Lab' : 'E&M Lab'}
+                </span>
+              </div>
               <div className="text-xs text-slate-400">Manage your credentials, data, and device access</div>
             </div>
           </div>
@@ -73,9 +99,19 @@ export const StudentAccountModal: React.FC<StudentAccountModalProps> = ({
         {/* Modal Body */}
         <div className="p-6 space-y-5 overflow-y-auto max-h-[75vh]">
           {/* Profile Overview Card */}
-          <div className="p-4 rounded-2xl bg-[#050811] border border-white/10 space-y-3">
+          <div
+            className={`p-4 rounded-2xl border space-y-3 ${
+              isMechanics
+                ? 'bg-[#071611] border-emerald-500/20'
+                : 'bg-[#081224] border-sky-500/20'
+            }`}
+          >
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-mono uppercase tracking-wider text-cyan-400 font-bold">
+              <span
+                className={`text-[10px] font-mono uppercase tracking-wider font-bold ${
+                  isMechanics ? 'text-emerald-400' : 'text-sky-400'
+                }`}
+              >
                 Student Identity
               </span>
               <span className="text-[10px] font-mono text-slate-400">ID: {currentUser.id}</span>
@@ -88,7 +124,11 @@ export const StudentAccountModal: React.FC<StudentAccountModalProps> = ({
                     type="text"
                     value={nameVal}
                     onChange={e => setNameVal(e.target.value)}
-                    className="flex-1 px-3 py-1.5 bg-black/50 border border-cyan-500/40 rounded-xl text-white text-xs font-semibold focus:outline-none"
+                    className={`flex-1 px-3 py-1.5 bg-black/50 border rounded-xl text-white text-xs font-semibold focus:outline-none ${
+                      isMechanics
+                        ? 'border-emerald-500/40 focus:border-emerald-400'
+                        : 'border-sky-500/40 focus:border-sky-400'
+                    }`}
                     placeholder="Student Name"
                   />
                   <button
@@ -98,7 +138,11 @@ export const StudentAccountModal: React.FC<StudentAccountModalProps> = ({
                       }
                       setIsEditingName(false);
                     }}
-                    className="px-3 py-1.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs"
+                    className={`px-3 py-1.5 rounded-xl font-bold text-xs ${
+                      isMechanics
+                        ? 'bg-emerald-400 hover:bg-emerald-300 text-slate-950'
+                        : 'bg-sky-400 hover:bg-sky-300 text-slate-950'
+                    }`}
                   >
                     Save
                   </button>
@@ -111,7 +155,11 @@ export const StudentAccountModal: React.FC<StudentAccountModalProps> = ({
                       key={av}
                       onClick={() => setSelectedAvatar(av)}
                       className={`text-lg p-1 rounded-lg transition ${
-                        selectedAvatar === av ? 'bg-cyan-500/30 scale-110' : 'hover:bg-white/10'
+                        selectedAvatar === av
+                          ? isMechanics
+                            ? 'bg-emerald-500/30 ring-1 ring-emerald-400 scale-110'
+                            : 'bg-sky-500/30 ring-1 ring-sky-400 scale-110'
+                          : 'hover:bg-white/10'
                       }`}
                     >
                       {av}

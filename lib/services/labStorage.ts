@@ -48,17 +48,22 @@ export const MOCK_USERS: UserProfile[] = [
   },
 ];
 
-export const DEFAULT_LAB_ASSIGNMENT: LabAssignment = {
+export const DEFAULT_LAB_ASSIGNMENT_EM: LabAssignment = {
   id: 'lab_coulomb_01',
   title: 'Lab 01: Coulomb\'s Inverse Square Law',
   subtitle: 'Fixed Charge Magnitude, Varying Distance Verification',
   topic: 'Electrostatics & Field Calculus',
+  course: 'em',
+  description: 'Investigate the electrostatic interaction force between point charges. Measure how the pairwise force decays with separation distance r in 3D, calculate percent error against theoretical Coulomb formulations, and inspect field streamlines and Gaussian surfaces.',
   objectives: [
     'Measure the electrostatic Coulomb force between two charges at varying separation distances.',
     'Verify that electrostatic force obeys an inverse-square relationship: F ∝ 1/r².',
     'Compare numerical simulated forces with the analytical Coulomb equation F = k·|q₁·q₂|/r².',
     'Calculate percent error and explain sources of divergence in finite numerical integration.',
   ],
+  dueDate: '2026-11-15',
+  assignedBy: 'Dr. Robert Vance',
+  createdAt: '2026-10-01T08:00:00Z',
   fixedParameters: {
     q1Micro: 5.0,
     q2Micro: -5.0,
@@ -73,12 +78,44 @@ export const DEFAULT_LAB_ASSIGNMENT: LabAssignment = {
   },
 };
 
+export const DEFAULT_LAB_ASSIGNMENT_MECH: LabAssignment = {
+  id: 'lab_mechanics_01',
+  title: 'Lab 02: 2D Kinematics & Conservation of Mechanical Energy',
+  subtitle: 'Initial Velocity Angle, Ballistic Range & Conservation Laws',
+  topic: 'Kinematics & Work-Energy Theorem',
+  course: 'mechanics',
+  description: 'Design a projectile launch experiment with varied launch angles and initial speeds. Record the horizontal range, maximum vertex altitude, and time of flight. Confirm mechanical energy conservation E = K + U and evaluate drag dissipative losses.',
+  objectives: [
+    'Derive theoretical ballistic trajectory range R = (v₀² sin 2θ)/g using calculus kinematics.',
+    'Collect flight trials across differing launch angles θ and initial launch velocities v₀.',
+    'Verify mechanical energy conservation between launch point and vertex peak.',
+    'Discuss the effect of quadratic aerodynamic drag on optimal launch angle.',
+  ],
+  dueDate: '2026-11-20',
+  assignedBy: 'Dr. Robert Vance',
+  createdAt: '2026-10-05T08:00:00Z',
+  fixedParameters: {
+    g: 9.8,
+    mass: 1.0,
+  },
+  rubric: {
+    hypothesisMax: 20,
+    dataAccuracyMax: 40,
+    analysisMax: 25,
+    explanationMax: 15,
+    totalMax: 100,
+  },
+};
+
+export const DEFAULT_LAB_ASSIGNMENT = DEFAULT_LAB_ASSIGNMENT_EM;
+
 const STORAGE_KEYS = {
   CURRENT_USER: 'app_ap_physics_current_user_id',
   USERS: 'app_ap_physics_registered_users',
   SAVED_SCENES: 'app_ap_physics_saved_scenes',
   AUTO_SAVES: 'app_ap_physics_auto_saves',
   SUBMISSIONS: 'app_ap_physics_lab_submissions',
+  ASSIGNMENTS: 'app_ap_physics_lab_assignments',
   HIDDEN_DEVICE_ACCOUNTS: 'app_ap_physics_hidden_device_accounts',
 };
 
@@ -199,6 +236,7 @@ function getInitialSubmissions(): LabSubmission[] {
 }
 
 class LabStorageService {
+  private memoryAssignments: LabAssignment[] = [DEFAULT_LAB_ASSIGNMENT_EM, DEFAULT_LAB_ASSIGNMENT_MECH];
   private memorySubmissions: LabSubmission[] = [];
   private memorySavedScenes: SavedExperiment[] = [];
   private memoryAutoSaves: Record<string, SceneSnapshot> = {};
@@ -276,6 +314,18 @@ class LabStorageService {
         const storedAuto = localStorage.getItem(STORAGE_KEYS.AUTO_SAVES);
         if (storedAuto) {
           this.memoryAutoSaves = JSON.parse(storedAuto);
+        }
+
+        const storedAssignments = localStorage.getItem(STORAGE_KEYS.ASSIGNMENTS);
+        if (storedAssignments) {
+          try {
+            const parsedAssns = JSON.parse(storedAssignments);
+            if (Array.isArray(parsedAssns) && parsedAssns.length > 0) {
+              this.memoryAssignments = parsedAssns;
+            }
+          } catch (e) {}
+        } else {
+          localStorage.setItem(STORAGE_KEYS.ASSIGNMENTS, JSON.stringify(this.memoryAssignments));
         }
       } catch (err) {
         console.warn('Storage initialization fallback to memory:', err);
@@ -658,9 +708,80 @@ class LabStorageService {
     this.notify();
   }
 
-  // Lab Submissions & Teacher Workflow
-  public getAssignment(): LabAssignment {
-    return DEFAULT_LAB_ASSIGNMENT;
+  // Lab Assignments Management
+  public getAllAssignments(): LabAssignment[] {
+    return [...this.memoryAssignments];
+  }
+
+  public getAssignmentsForCourse(course?: 'mechanics' | 'em'): LabAssignment[] {
+    if (!course) return [...this.memoryAssignments];
+    return this.memoryAssignments.filter(a => !a.course || a.course === course);
+  }
+
+  public getAssignment(id?: string, course?: 'mechanics' | 'em'): LabAssignment {
+    if (id) {
+      const found = this.memoryAssignments.find(a => a.id === id);
+      if (found) return found;
+    }
+    if (course) {
+      const foundCourse = this.memoryAssignments.find(a => a.course === course);
+      if (foundCourse) return foundCourse;
+    }
+    return this.memoryAssignments[0] || DEFAULT_LAB_ASSIGNMENT;
+  }
+
+  public createAssignment(data: Partial<LabAssignment>): LabAssignment {
+    const user = this.getCurrentUser();
+    const newAssn: LabAssignment = {
+      id: 'lab_' + Math.random().toString(36).substring(2, 9),
+      title: data.title?.trim() || 'New Physics Lab Assignment',
+      subtitle: data.subtitle?.trim() || 'Experimental Calculus Investigation',
+      topic: data.topic?.trim() || 'Laboratory Analysis',
+      description: data.description?.trim() || 'Use the interactive simulation tools to collect empirical measurements, test your hypothesis, and compare experimental findings with analytical calculus formulations.',
+      course: data.course || 'em',
+      dueDate: data.dueDate || '',
+      assignedBy: user.name || 'Instructor',
+      createdAt: new Date().toISOString(),
+      objectives: data.objectives && data.objectives.length > 0 ? data.objectives : [
+        'Formulate a testable physical hypothesis based on governing equations.',
+        'Collect empirical data trials using numerical simulation probes.',
+        'Calculate percent divergence and evaluate experimental uncertainties.',
+      ],
+      fixedParameters: data.fixedParameters || { q1Micro: 5.0, q2Micro: -5.0, kConstant: 8.98755e9 },
+      rubric: data.rubric || {
+        hypothesisMax: 20,
+        dataAccuracyMax: 40,
+        analysisMax: 25,
+        explanationMax: 15,
+        totalMax: 100,
+      },
+    };
+
+    this.memoryAssignments.unshift(newAssn);
+    this.persistAssignments();
+    return newAssn;
+  }
+
+  public updateAssignment(id: string, updates: Partial<LabAssignment>): LabAssignment | null {
+    const idx = this.memoryAssignments.findIndex(a => a.id === id);
+    if (idx === -1) return null;
+    this.memoryAssignments[idx] = { ...this.memoryAssignments[idx], ...updates };
+    this.persistAssignments();
+    return this.memoryAssignments[idx];
+  }
+
+  public deleteAssignment(id: string): void {
+    this.memoryAssignments = this.memoryAssignments.filter(a => a.id !== id);
+    this.persistAssignments();
+  }
+
+  private persistAssignments(): void {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(STORAGE_KEYS.ASSIGNMENTS, JSON.stringify(this.memoryAssignments));
+      } catch (e) {}
+    }
+    this.notify();
   }
 
   public getSubmissionForStudent(
@@ -749,6 +870,32 @@ class LabStorageService {
     sub.gradedBy = instructorName;
     sub.updatedAt = new Date().toISOString();
 
+    this.persistSubmissions();
+    return sub;
+  }
+
+  public addSubmissionComment(
+    submissionId: string,
+    authorId: string,
+    authorName: string,
+    authorRole: 'student' | 'instructor',
+    text: string
+  ): LabSubmission | null {
+    const sub = this.memorySubmissions.find(s => s.id === submissionId);
+    if (!sub || !text.trim()) return null;
+
+    const comment = {
+      id: 'comment_' + Math.random().toString(36).substring(2, 9),
+      authorId,
+      authorName,
+      authorRole,
+      text: text.trim(),
+      timestamp: new Date().toISOString(),
+    };
+
+    if (!sub.comments) sub.comments = [];
+    sub.comments.push(comment);
+    sub.updatedAt = new Date().toISOString();
     this.persistSubmissions();
     return sub;
   }
