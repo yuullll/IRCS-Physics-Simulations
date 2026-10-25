@@ -48,6 +48,7 @@ export interface PhysicsUnitModule {
   course: PhysicsCourseId;
   code: string;
   title: string;
+  intro: string;
   equation: string;
   accentColor: 'cyan' | 'amber' | 'emerald' | 'rose' | 'sky';
   subtopics: PhysicsSubtopic[];
@@ -108,6 +109,8 @@ export const MECHANICS_UNITS: PhysicsUnitModule[] = [
     course: 'mechanics',
     code: 'Unit 1',
     title: 'Unit 1: Kinematics',
+    intro:
+      'Kinematics provides the mathematical foundation for describing motion in one, two, and three dimensions without regard to its causes. Using differential and integral calculus, students analyze position, velocity, and acceleration vectors, interpret graphical and analytical representations of motion, and evaluate projectile trajectories under gravitational and velocity-dependent aerodynamic forces.',
     equation: 'v(t) = dr/dt · a(t) = dv/dt',
     accentColor: 'emerald',
     subtopics: [
@@ -145,6 +148,8 @@ export const MECHANICS_UNITS: PhysicsUnitModule[] = [
     course: 'mechanics',
     code: 'Unit 2',
     title: 'Unit 2: Force and Translational Dynamics',
+    intro:
+      'Translational dynamics investigates the interactions that cause changes in motion. Grounded in Newton’s three laws of motion and free-body diagrams, this unit applies differential equations to analyze forces including gravitation, normal contact forces, tension, static and kinetic friction, and velocity-dependent drag forces acting on single bodies and multi-object systems.',
     equation: '∑ F = dp/dt = m a',
     accentColor: 'amber',
     subtopics: [
@@ -160,6 +165,8 @@ export const MECHANICS_UNITS: PhysicsUnitModule[] = [
     course: 'mechanics',
     code: 'Unit 3',
     title: 'Unit 3: Work, Energy, and Power',
+    intro:
+      'Energy principles provide powerful scalar methods for solving dynamic problems where forces vary with position. This unit explores work defined as a line integral of force, conservative versus nonconservative forces, potential energy functions derived from force fields, conservation of mechanical energy, and instantaneous power delivered to physical systems.',
     equation: 'W = ∫ F · dr = ΔK · F(x) = -dU/dx',
     accentColor: 'cyan',
     subtopics: [
@@ -175,6 +182,8 @@ export const MECHANICS_UNITS: PhysicsUnitModule[] = [
     course: 'mechanics',
     code: 'Unit 4',
     title: 'Unit 4: Linear Momentum',
+    intro:
+      'Linear momentum and impulse describe translational interactions over time. Students utilize Newton’s third law to establish momentum conservation in closed isolated systems, evaluate elastic and inelastic collisions in one and multiple dimensions, and determine the motion of a system’s center of mass under external forces.',
     equation: 'J = ∫ F(t) dt = Δp',
     accentColor: 'rose',
     subtopics: [
@@ -190,6 +199,8 @@ export const MECHANICS_UNITS: PhysicsUnitModule[] = [
     course: 'mechanics',
     code: 'Unit 5',
     title: 'Unit 5: Torque and Rotational Dynamics',
+    intro:
+      'Rotational dynamics extends translational mechanics to extended rigid bodies rotating about fixed and instantaneous axes. Through the rotational analogs of force and mass—torque and rotational inertia (moment of inertia computed via calculus integration)—students analyze angular acceleration and apply Newton’s second law for rotation to rolling and pivoted systems.',
     equation: '∑ τ = I α · τ = r × F',
     accentColor: 'emerald',
     subtopics: [
@@ -205,6 +216,8 @@ export const MECHANICS_UNITS: PhysicsUnitModule[] = [
     course: 'mechanics',
     code: 'Unit 6',
     title: 'Unit 6: Energy and Momentum of Rotating Systems',
+    intro:
+      'This unit synthesizes rotational and translational mechanics by analyzing rolling motion without slipping, rotational kinetic energy, and angular momentum vectors. Students evaluate conservation of angular momentum in isolated interacting systems and calculate work-energy transformations in rotating rigid bodies.',
     equation: 'L = I ω = r × p · K_rot = ½ I ω²',
     accentColor: 'sky',
     subtopics: [
@@ -220,6 +233,8 @@ export const MECHANICS_UNITS: PhysicsUnitModule[] = [
     course: 'mechanics',
     code: 'Unit 7',
     title: 'Unit 7: Oscillations',
+    intro:
+      'Oscillations examine systems displaced from stable equilibrium positions where restoring forces govern motion. Using second-order linear differential equations, students explore simple harmonic motion (SHM) in ideal spring-mass systems and physical pendulums, analyzing kinematic phase relationships, period formulations, and energy resonance.',
     equation: 'd²x/dt² + ω₀² x = 0',
     accentColor: 'amber',
     subtopics: [
@@ -238,6 +253,8 @@ export const EM_UNITS: PhysicsUnitModule[] = [
     course: 'em',
     code: 'Unit 8',
     title: 'Unit 8: Electric Charges, Fields, and Gauss’s Law',
+    intro:
+      'Electrostatics examines static electric charges and the vector electric fields they establish. Students apply Coulomb’s law and the principle of superposition to discrete charges and continuous charge distributions via calculus integration, culminating in Gauss’s law to evaluate symmetric electric flux and field configurations.',
     equation: '∮ E · dA = Q_enc / ε₀',
     accentColor: 'sky',
     subtopics: [
@@ -280,6 +297,8 @@ export const EM_UNITS: PhysicsUnitModule[] = [
     course: 'em',
     code: 'Unit 9',
     title: 'Unit 9: Electric Potential',
+    intro:
+      'Electric potential introduces a scalar energetic framework for electrostatics, defined as potential energy per unit charge. Students compute potential differences via line integrals of the electric field, calculate electric fields from potential gradients (E = -∇V), and determine the electrostatic potential energy stored in configurations of charged particles.',
     equation: 'ΔV = -∫ E · dr · E = -∇V',
     accentColor: 'cyan',
     subtopics: [
@@ -295,6 +314,8 @@ export const EM_UNITS: PhysicsUnitModule[] = [
     course: 'em',
     code: 'Unit 10',
     title: 'Unit 10: Conductors and Capacitors',
+    intro:
+      'This unit investigates electrostatic equilibrium in metallic conductors, excess surface charge distributions, and capacitive energy storage systems. Students analyze capacitance geometries (parallel-plate, cylindrical, spherical), the polarization effects of dielectric materials, and the electrostatic energy density of electric fields.',
     equation: 'Q = C ΔV · U_C = ½ C (ΔV)²',
     accentColor: 'emerald',
     subtopics: [
@@ -310,6 +331,8 @@ export const EM_UNITS: PhysicsUnitModule[] = [
     course: 'em',
     code: 'Unit 11',
     title: 'Unit 11: Electric Circuits',
+    intro:
+      'Electric circuits analyze the steady-state and transient flow of charge through networks of resistive and capacitive components. Students apply Ohm’s law, microscopic charge transport models, and Kirchhoff’s loop and junction rules, and solve first-order differential equations for RC circuit charging and discharging dynamics.',
     equation: '∑ I_in = ∑ I_out · ∑ ΔV = 0',
     accentColor: 'amber',
     subtopics: [
@@ -368,6 +391,8 @@ export const EM_UNITS: PhysicsUnitModule[] = [
     course: 'em',
     code: 'Unit 12',
     title: 'Unit 12: Magnetic Fields and Electromagnetism',
+    intro:
+      'Magnetism explores magnetic fields generated by moving charges and currents, and the magnetic forces exerted on moving charges and current-carrying conductors (Lorentz force). Students apply the Biot-Savart law with calculus integration and utilize Ampère’s law to evaluate symmetric magnetic field distributions.',
     equation: '∮ B · dl = μ₀ I_enc · F_B = q v × B',
     accentColor: 'rose',
     subtopics: [
@@ -383,6 +408,8 @@ export const EM_UNITS: PhysicsUnitModule[] = [
     course: 'em',
     code: 'Unit 13',
     title: 'Unit 13: Electromagnetic Induction',
+    intro:
+      'Electromagnetic induction unites electricity and magnetism through dynamic flux. Students explore magnetic flux, Faraday’s law of induction, Lenz’s law for induced electromotive forces (emf), motional emf in conductors moving through magnetic fields, self-inductance, and energy stored in magnetic fields.',
     equation: 'ℰ = -dΦ_B / dt = ∮ E · dl',
     accentColor: 'sky',
     subtopics: [
@@ -1334,26 +1361,26 @@ export const ModelCatalogPortal: React.FC<ModelCatalogPortalProps> = ({
 
             {isMechanics ? (
               <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-white leading-[1.06]">
-                Newtonian Dynamics &amp;{' '}
+                Calculus-Based{' '}
                 <span className="bg-gradient-to-r from-emerald-400 via-teal-300 to-amber-300 bg-clip-text text-transparent">
-                  Phase-Space Calculus
+                  Classical Mechanics
                 </span>{' '}
-                Observatory.
+                &amp; Dynamics.
               </h1>
             ) : (
               <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-white leading-[1.06]">
-                Spatial Physics &amp;{' '}
+                Calculus-Based{' '}
                 <span className="bg-gradient-to-r from-sky-400 via-cyan-300 to-amber-300 bg-clip-text text-transparent">
-                  Field Calculus
+                  Electricity &amp; Magnetism
                 </span>{' '}
-                Observatory.
+                &amp; Field Theory.
               </h1>
             )}
 
             <p className="text-base sm:text-lg text-slate-300/90 max-w-2xl leading-relaxed font-normal">
               {isMechanics
-                ? 'Explore all 7 AP Physics C: Mechanics curriculum units (Units 1–7). Move your cursor across any unit module below to interact with its preliminary physics preview, or click a unit to browse its subtopics and 3D simulations.'
-                : 'Explore all 6 AP Physics C: Electricity & Magnetism curriculum units (Units 8–13). Move your cursor across any unit module below to interact with its preliminary field preview, or click a unit to browse its subtopics and 3D simulations.'}
+                ? 'A calculus-based college physics laboratory exploring kinematics, Newton’s laws of motion, work, energy, power, systems of particles, linear momentum, rotational dynamics, and oscillations. Select any of the 7 core units below to explore foundational subtopics and high-fidelity 3D numerical simulations.'
+                : 'A calculus-based college physics laboratory exploring electric charges, Gauss’s law, electric potential, conductors, dielectrics and capacitors, direct-current and transient circuits, magnetic fields, and electromagnetic induction. Select any of the 6 core units below to explore foundational subtopics and high-fidelity 3D numerical simulations.'}
             </p>
 
             {/* Single Primary Button Linking to Official College Board CED & Formula Sheet */}

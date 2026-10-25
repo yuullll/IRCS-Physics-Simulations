@@ -20,11 +20,14 @@ export const Vec: React.FC<{ children: React.ReactNode; className?: string }> = 
   children,
   className = '',
 }) => (
-  <span className={`inline-flex flex-col items-center justify-center align-baseline leading-none mx-0.5 ${className}`}>
-    <span className="text-[0.62em] font-sans font-bold leading-none select-none text-current opacity-85 translate-y-[2px]">
+  <span className={`relative inline-block mx-0.5 align-baseline ${className}`}>
+    <span
+      aria-hidden="true"
+      className="absolute -top-[0.52em] left-0 right-0 text-center text-[0.6em] font-sans font-medium leading-none select-none pointer-events-none opacity-90"
+    >
       →
     </span>
-    <span className="font-serif italic font-normal tracking-tight -mt-[1px]">{children}</span>
+    <span className="font-serif italic font-normal tracking-tight inline-block leading-normal">{children}</span>
   </span>
 );
 

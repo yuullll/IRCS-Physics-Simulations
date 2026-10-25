@@ -83,6 +83,10 @@ export default function SimulationCockpit() {
     { layer: 'catalog', course: 'mechanics' },
   ]);
   const [navIndex, setNavIndex] = useState<number>(0);
+  // Active simulation mode when in workspace layer
+  const [activeMode, setActiveMode] = useState<'field' | 'circuit' | 'projectile'>('projectile');
+  const [projectileViewMode, setProjectileViewMode] = useState<'3d' | '2d'>('3d');
+
   const currentRoute = navHistory[navIndex] || { layer: 'catalog', course: 'mechanics' };
   const activeCourse: PhysicsCourseId =
     currentRoute.layer === 'catalog'
@@ -91,15 +95,18 @@ export default function SimulationCockpit() {
       ? currentRoute.unit.course
       : currentRoute.layer === 'workspace' && currentRoute.unit
       ? currentRoute.unit.course
+      : currentRoute.layer === 'workspace' && (currentRoute.mode === 'projectile' || activeMode === 'projectile')
+      ? 'mechanics'
       : currentRoute.layer === 'slot-detail'
       ? currentRoute.slot.course || 'mechanics'
       : 'mechanics';
 
+  const isCurrentMechanics =
+    activeCourse === 'mechanics' ||
+    (currentRoute.layer === 'workspace' && activeMode === 'projectile');
+
   // Header visibility on catalog scroll (disappears on scroll down, reappears on scroll up)
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
-
-  // Active simulation mode when in workspace layer
-  const [activeMode, setActiveMode] = useState<'field' | 'circuit' | 'projectile'>('field');
   const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(false);
   const [isTheoryOpen, setIsTheoryOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -787,60 +794,6 @@ export default function SimulationCockpit() {
                     ? 'Unit 11 Circuit Workbench'
                     : '1.3 Projectile & Drag Ballistics'}
                 </span>
-                {/* Quick Sibling Layer Switcher inside Workspace */}
-                <div className="flex items-center bg-white/5 p-0.5 rounded-xl border border-white/10 text-[11px] font-mono ml-1.5">
-                  <button
-                    onClick={() =>
-                      navigateTo({
-                        layer: 'workspace',
-                        mode: 'projectile',
-                        modelTitle: 'Non-Linear Projectile & Drag Ballistics',
-                      })
-                    }
-                    className={`px-2 py-0.5 rounded-lg transition ${
-                      activeMode === 'projectile'
-                        ? 'bg-emerald-400 text-slate-950 font-bold'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                    title="Switch to 1.3 Mechanics Projectile & Ballistics"
-                  >
-                    Ballistics
-                  </button>
-                  <button
-                    onClick={() =>
-                      navigateTo({
-                        layer: 'workspace',
-                        mode: 'field',
-                        modelTitle: 'Electrostatic Field & Lorentz Dynamics',
-                      })
-                    }
-                    className={`px-2 py-0.5 rounded-lg transition ${
-                      activeMode === 'field'
-                        ? 'bg-sky-400 text-slate-950 font-bold'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                    title="Switch to 8.3 E-Field Sandbox"
-                  >
-                    E-Field
-                  </button>
-                  <button
-                    onClick={() =>
-                      navigateTo({
-                        layer: 'workspace',
-                        mode: 'circuit',
-                        modelTitle: '3D Circuit Workbench & MNA Solver',
-                      })
-                    }
-                    className={`px-2 py-0.5 rounded-lg transition ${
-                      activeMode === 'circuit'
-                        ? 'bg-amber-400 text-slate-950 font-bold'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                    title="Switch to Unit 11 3D Circuit Workbench"
-                  >
-                    Circuits
-                  </button>
-                </div>
               </>
             )}
 
@@ -868,25 +821,31 @@ export default function SimulationCockpit() {
       >
         <div
           className={`backdrop-blur-xl border rounded-2xl p-1.5 shadow-2xl flex items-center space-x-1.5 transition-colors duration-300 ${
-            activeCourse === 'mechanics'
+            isCurrentMechanics
               ? 'bg-[#040e0b]/90 border-emerald-500/25'
               : 'bg-[#080e1e]/85 border-white/10'
           }`}
         >
           {currentRoute.layer === 'workspace' && (
             <>
-              {/* 3D / 2D Camera Toggle */}
+              {/* 3D / 2D Camera Toggle (Synchronized with current simulation) */}
               <div className="hidden md:flex items-center bg-[#050811] p-0.5 rounded-xl border border-white/10 text-[11px]">
                 <button
                   onClick={() => {
                     if (activeMode === 'field')
                       setFieldControls(prev => ({ ...prev, viewMode: '3d' }));
-                    else setCircuitControls(prev => ({ ...prev, viewMode: '3d' }));
+                    else if (activeMode === 'circuit')
+                      setCircuitControls(prev => ({ ...prev, viewMode: '3d' }));
+                    else
+                      setProjectileViewMode('3d');
                   }}
                   className={`px-2.5 py-1 rounded-lg font-medium transition ${
-                    (activeMode === 'field' ? fieldControls.viewMode : circuitControls.viewMode) ===
-                    '3d'
-                      ? 'bg-sky-400 text-slate-950 font-bold'
+                    (activeMode === 'projectile'
+                      ? projectileViewMode === '3d'
+                      : (activeMode === 'field' ? fieldControls.viewMode : circuitControls.viewMode) === '3d')
+                      ? isCurrentMechanics
+                        ? 'bg-emerald-400 text-slate-950 font-bold shadow-lg shadow-emerald-500/20'
+                        : 'bg-sky-400 text-slate-950 font-bold shadow-lg shadow-sky-500/20'
                       : 'text-slate-400 hover:text-white'
                   }`}
                 >
@@ -896,16 +855,27 @@ export default function SimulationCockpit() {
                   onClick={() => {
                     if (activeMode === 'field')
                       setFieldControls(prev => ({ ...prev, viewMode: 'top' }));
-                    else setCircuitControls(prev => ({ ...prev, viewMode: 'top' }));
+                    else if (activeMode === 'circuit')
+                      setCircuitControls(prev => ({ ...prev, viewMode: 'top' }));
+                    else
+                      setProjectileViewMode('2d');
                   }}
                   className={`px-2.5 py-1 rounded-lg font-medium transition ${
-                    (activeMode === 'field' ? fieldControls.viewMode : circuitControls.viewMode) ===
-                    'top'
-                      ? 'bg-sky-400 text-slate-950 font-bold'
+                    (activeMode === 'projectile'
+                      ? projectileViewMode === '2d'
+                      : (activeMode === 'field' ? fieldControls.viewMode : circuitControls.viewMode) === 'top')
+                      ? isCurrentMechanics
+                        ? 'bg-emerald-400 text-slate-950 font-bold shadow-lg shadow-emerald-500/20'
+                        : 'bg-sky-400 text-slate-950 font-bold shadow-lg shadow-sky-500/20'
                       : 'text-slate-400 hover:text-white'
                   }`}
+                  title={
+                    activeMode === 'projectile'
+                      ? 'Lock 2D vantage point perpendicular to projectile motion'
+                      : '2D Orthographic Top-Down Projection'
+                  }
                 >
-                  2D Top
+                  {activeMode === 'projectile' ? '2D View' : '2D Top'}
                 </button>
               </div>
 
@@ -914,7 +884,11 @@ export default function SimulationCockpit() {
                 className="px-2.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 transition flex items-center space-x-1.5 text-xs font-medium"
                 title="Saved Experiment Snapshots"
               >
-                <FolderOpen className="w-3.5 h-3.5 text-sky-400" />
+                <FolderOpen
+                  className={`w-3.5 h-3.5 ${
+                    isCurrentMechanics ? 'text-emerald-400' : 'text-sky-400'
+                  }`}
+                />
                 <span className="hidden xl:inline">Scenes</span>
               </button>
             </>
@@ -1071,6 +1045,11 @@ export default function SimulationCockpit() {
                     <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
                       {unit.title}
                     </h1>
+                    {unit.intro && (
+                      <p className="text-sm text-slate-300/90 leading-relaxed max-w-4xl font-normal pt-1">
+                        {unit.intro}
+                      </p>
+                    )}
                   </div>
 
                   <button
@@ -1434,7 +1413,11 @@ export default function SimulationCockpit() {
                 onToast={showToast}
               />
             ) : (
-              <ProjectileSandbox onToast={showToast} />
+              <ProjectileSandbox
+                onToast={showToast}
+                externalViewMode={projectileViewMode}
+                onViewModeChange={setProjectileViewMode}
+              />
             )}
           </div>
 

@@ -85,6 +85,8 @@ interface ProjectileSandboxProps {
   onUpdateTelemetry?: (telem: ProjectileTelemetry) => void;
   onToast?: (msg: string) => void;
   initialControls?: Partial<ProjectileSandboxControls>;
+  externalViewMode?: '3d' | '2d';
+  onViewModeChange?: (mode: '3d' | '2d') => void;
 }
 
 /**
@@ -166,6 +168,8 @@ export const ProjectileSandbox: React.FC<ProjectileSandboxProps> = ({
   onUpdateTelemetry,
   onToast,
   initialControls,
+  externalViewMode,
+  onViewModeChange,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -188,9 +192,16 @@ export const ProjectileSandbox: React.FC<ProjectileSandboxProps> = ({
     showFreeBodyDiagram: true,
     showComparisonGhost: true,
     actualTimeMultiplier: 1.0,
-    viewMode: '3d',
+    viewMode: externalViewMode === '2d' ? 'side' : '3d',
     ...initialControls,
   });
+
+  // Effective view mode (synchronize with externalViewMode if supplied)
+  const effectiveViewMode = externalViewMode
+    ? externalViewMode === '2d'
+      ? 'side'
+      : '3d'
+    : controls.viewMode;
 
   // Simulation playback & shot memory state
   const [isPlaying, setIsPlaying] = useState<boolean>(true);
@@ -200,6 +211,7 @@ export const ProjectileSandbox: React.FC<ProjectileSandboxProps> = ({
   // Saved Projectile Shots & Impact Flags Memory
   const [savedShots, setSavedShots] = useState<SavedProjectileShot[]>([]);
   const [activeShotId, setActiveShotId] = useState<string | null>(null);
+  const [auditShotId, setAuditShotId] = useState<string>('active');
   const [inspectedFlagShotId, setInspectedFlagShotId] = useState<string | null>(null);
   const [nextShotNumber, setNextShotNumber] = useState<number>(1);
   const nextShotCounterRef = useRef<number>(1);
@@ -447,6 +459,7 @@ export const ProjectileSandbox: React.FC<ProjectileSandboxProps> = ({
       setSavedShots(prev => [...prev, newShot]);
       setNextShotNumber(nextShotCounterRef.current);
       setActiveShotId(newShot.id);
+      setAuditShotId(newShot.id);
       setInspectedFlagShotId(newShot.id);
       setLiveTrajectories({ active: activeTraj, vacuum: vacuumTraj });
       setSimTime(0);
@@ -478,6 +491,8 @@ export const ProjectileSandbox: React.FC<ProjectileSandboxProps> = ({
         return remaining;
       });
 
+      setAuditShotId(prev => (prev === shotId ? 'active' : prev));
+
       if (targetShot && onToast) {
         onToast(`Deleted Shot #${targetShot.shotNumber} (${targetShot.colorName}) and its impact flag`);
       }
@@ -490,6 +505,7 @@ export const ProjectileSandbox: React.FC<ProjectileSandboxProps> = ({
     savedShotsRef.current.forEach(s => removeShotFromThreeScene(s.id));
     setSavedShots([]);
     setActiveShotId(null);
+    setAuditShotId('active');
     setInspectedFlagShotId(null);
     if (onToast) {
       onToast('Cleared all projectile traces and impact flags');
@@ -900,7 +916,7 @@ export const ProjectileSandbox: React.FC<ProjectileSandboxProps> = ({
       controlsObj.update();
 
       const activeCamera =
-        controlsRef.current.viewMode === 'side' || controlsRef.current.viewMode === 'top'
+        controlsRef.current.viewMode === 'top'
           ? orthoCamera
           : camera;
 
@@ -921,18 +937,67 @@ export const ProjectileSandbox: React.FC<ProjectileSandboxProps> = ({
     };
   }, [handleLaunchNewProjectile]);
 
-  // Handle camera view modes (3D Perspective vs 2D Side Elevation vs 2D Top)
+  // Determine which trajectory is currently being animated/audited
+  const activeShot = savedShots.find(s => s.id === activeShotId) || null;
+  const activeSummary = activeShot?.summary ?? liveTrajectories?.active ?? null;
+  const activeLaunchParams: LaunchParameters = useMemo(
+    () =>
+      activeShot?.launch ?? {
+        x0: 0,
+        y0: 0,
+        z0: 0,
+        speed: controls.speed,
+        elevationDeg: controls.elevationDeg,
+        azimuthDeg: controls.azimuthDeg,
+        wind: { x: controls.windX, y: 0, z: controls.windZ },
+      },
+    [
+      activeShot,
+      controls.speed,
+      controls.elevationDeg,
+      controls.azimuthDeg,
+      controls.windX,
+      controls.windZ,
+    ]
+  );
+  const activeMass = activeShot?.projectile.mass ?? controls.mass;
+  const activeGravity = activeShot?.projectile.gravity ?? controls.gravity;
+
+  // Handle camera view modes (3D Perspective vs 2D Orthogonal Parabolic Elevation vs 2D Top)
   useEffect(() => {
     const state = threeRef.current;
     if (!state) return;
 
-    if (controls.viewMode === 'side') {
-      state.orthoCamera.position.set(35, 18, 120);
-      state.orthoCamera.lookAt(35, 18, 0);
-      state.controls.object = state.orthoCamera;
-      state.controls.enableRotate = false;
-      state.controls.target.set(35, 18, 0);
-    } else if (controls.viewMode === 'top') {
+    if (effectiveViewMode === 'side') {
+      // 2D View: Position camera at a 90° vantage point relative to the selected projectile's motion plane
+      const targetShot =
+        savedShots.find(s => s.id === auditShotId) ||
+        savedShots.find(s => s.id === activeShotId) ||
+        savedShots[savedShots.length - 1];
+      const targetAzimuth = targetShot ? targetShot.launch.azimuthDeg : controls.azimuthDeg;
+      const targetSummary = targetShot
+        ? targetShot.summary
+        : activeSummary || liveTrajectories?.active;
+
+      const phiRad = (targetAzimuth * Math.PI) / 180;
+      const normalAngle = ((targetAzimuth + 90) * Math.PI) / 180;
+      const R = Math.max(12, targetSummary?.maxRange || 40);
+      const H = Math.max(5, targetSummary?.maxHeight || 15);
+      const midX = R * 0.5 * Math.cos(phiRad);
+      const midZ = R * 0.5 * Math.sin(phiRad);
+      const midY = Math.max(2, H * 0.5);
+      const distance = Math.max(45, R * 1.35, H * 2.2);
+
+      const camX = midX + Math.cos(normalAngle) * distance;
+      const camY = Math.max(midY, 4);
+      const camZ = midZ + Math.sin(normalAngle) * distance;
+
+      state.camera.position.set(camX, camY, camZ);
+      state.camera.lookAt(midX, midY, midZ);
+      state.controls.object = state.camera;
+      state.controls.enableRotate = false; // Lock 2D perspective so projectile appears as a true upright 2D parabola
+      state.controls.target.set(midX, midY, midZ);
+    } else if (effectiveViewMode === 'top') {
       state.orthoCamera.position.set(0, 140, 0);
       state.orthoCamera.lookAt(0, 0, 0);
       state.controls.object = state.orthoCamera;
@@ -945,7 +1010,15 @@ export const ProjectileSandbox: React.FC<ProjectileSandboxProps> = ({
       state.controls.target.set(25, 8, 0);
     }
     state.controls.update();
-  }, [controls.viewMode]);
+  }, [
+    effectiveViewMode,
+    controls.azimuthDeg,
+    auditShotId,
+    activeShotId,
+    savedShots,
+    activeSummary,
+    liveTrajectories,
+  ]);
 
   // Highlight selected flag ring in 3D scene
   useEffect(() => {
@@ -977,32 +1050,6 @@ export const ProjectileSandbox: React.FC<ProjectileSandboxProps> = ({
     computeTrajectoriesForControls,
     updatePreviewAndCannonGeometry,
   ]);
-
-  // Determine which trajectory is currently being animated/audited
-  const activeShot = savedShots.find(s => s.id === activeShotId) || null;
-  const activeSummary = activeShot?.summary ?? liveTrajectories?.active ?? null;
-  const activeLaunchParams: LaunchParameters = useMemo(
-    () =>
-      activeShot?.launch ?? {
-        x0: 0,
-        y0: 0,
-        z0: 0,
-        speed: controls.speed,
-        elevationDeg: controls.elevationDeg,
-        azimuthDeg: controls.azimuthDeg,
-        wind: { x: controls.windX, y: 0, z: controls.windZ },
-      },
-    [
-      activeShot,
-      controls.speed,
-      controls.elevationDeg,
-      controls.azimuthDeg,
-      controls.windX,
-      controls.windZ,
-    ]
-  );
-  const activeMass = activeShot?.projectile.mass ?? controls.mass;
-  const activeGravity = activeShot?.projectile.gravity ?? controls.gravity;
 
   // Projectile Flight Time Simulation Loop & Kinematic Vector Position
   useEffect(() => {
@@ -1219,23 +1266,28 @@ export const ProjectileSandbox: React.FC<ProjectileSandboxProps> = ({
     }
   };
 
-  // Current sample & formula verification proofs
-  const currentSampleIdx = activeSummary
+  // Determine which projectile motion is audited in the Formula Verification Station
+  const auditedShot = savedShots.find(s => s.id === auditShotId) || null;
+  const auditedSummary = auditedShot?.summary ?? activeSummary;
+  const auditedLaunchParams = auditedShot?.launch ?? activeLaunchParams;
+
+  // Current sample & formula verification proofs for chosen projectile
+  const currentSampleIdx = auditedSummary
     ? Math.min(
-        activeSummary.points.length - 1,
+        auditedSummary.points.length - 1,
         Math.floor(
-          (simTime / Math.max(0.001, activeSummary.flightTime)) *
-            activeSummary.points.length
+          (simTime / Math.max(0.001, auditedSummary.flightTime)) *
+            auditedSummary.points.length
         )
       )
     : 0;
 
-  const currentFormulaProofs = activeSummary
-    ? verifyKinematicsFormulas(activeSummary, currentSampleIdx, activeLaunchParams)
+  const currentFormulaProofs = auditedSummary
+    ? verifyKinematicsFormulas(auditedSummary, currentSampleIdx, auditedLaunchParams)
     : [];
 
   const currentPoint =
-    activeSummary?.points[currentSampleIdx] ?? activeSummary?.points[0];
+    auditedSummary?.points[currentSampleIdx] ?? auditedSummary?.points[0];
 
   const inspectedShot = savedShots.find(s => s.id === inspectedFlagShotId) || null;
   const nextShotColor =
@@ -1822,14 +1874,19 @@ export const ProjectileSandbox: React.FC<ProjectileSandboxProps> = ({
               {(['3d', 'side', 'top'] as const).map(vm => (
                 <button
                   key={vm}
-                  onClick={() => setControls(prev => ({ ...prev, viewMode: vm }))}
-                  className={`px-2 py-0.5 rounded font-bold uppercase ${
-                    controls.viewMode === vm
-                      ? 'bg-emerald-400 text-slate-950'
-                      : 'bg-white/5 text-slate-400'
+                  onClick={() => {
+                    setControls(prev => ({ ...prev, viewMode: vm }));
+                    if (onViewModeChange) {
+                      onViewModeChange(vm === 'side' ? '2d' : '3d');
+                    }
+                  }}
+                  className={`px-2 py-0.5 rounded font-bold uppercase transition ${
+                    effectiveViewMode === vm
+                      ? 'bg-emerald-400 text-slate-950 shadow-sm'
+                      : 'bg-white/5 text-slate-400 hover:text-white'
                   }`}
                 >
-                  {vm}
+                  {vm === 'side' ? '2D View' : vm}
                 </button>
               ))}
             </div>
@@ -1987,9 +2044,56 @@ export const ProjectileSandbox: React.FC<ProjectileSandboxProps> = ({
             </div>
           </div>
           <span className="text-[10px] font-mono text-slate-300 bg-black/40 px-2 py-1 rounded-lg border border-white/10">
-            t = {simTime.toFixed(2)}s / {(activeSummary?.flightTime ?? 0).toFixed(2)}s
+            t = {simTime.toFixed(2)}s / {(auditedSummary?.flightTime ?? 0).toFixed(2)}s
           </span>
         </div>
+
+        {/* Projectile Choice Selector for Formula Verification Station */}
+        {savedShots.length > 0 && (
+          <div className="p-2.5 rounded-xl bg-black/60 border border-emerald-500/30 space-y-1.5">
+            <div className="flex items-center justify-between text-[10px] font-mono">
+              <span className="text-slate-300 font-semibold flex items-center gap-1.5">
+                <Crosshair className="w-3.5 h-3.5 text-emerald-400" />
+                <span>EXAMINE PROJECTILE MOTION:</span>
+              </span>
+              {auditedShot && (
+                <span
+                  className="px-1.5 py-0.5 rounded text-[9px] font-bold"
+                  style={{ backgroundColor: `${auditedShot.colorHex}25`, color: auditedShot.colorHex }}
+                >
+                  #{auditedShot.shotNumber} {auditedShot.colorName}
+                </span>
+              )}
+            </div>
+            <select
+              value={auditShotId}
+              onChange={e => {
+                const val = e.target.value;
+                setAuditShotId(val);
+                if (val !== 'active') {
+                  setActiveShotId(val);
+                  setInspectedFlagShotId(val);
+                  const s = savedShots.find(x => x.id === val);
+                  if (s && threeRef.current) {
+                    const ballMat = threeRef.current.ballMesh.material as THREE.MeshStandardMaterial;
+                    ballMat.color.setHex(s.colorThree);
+                    ballMat.emissive.setHex(s.colorThree);
+                  }
+                }
+              }}
+              className="w-full bg-[#050811] text-emerald-300 font-mono text-xs border border-emerald-500/40 rounded-lg px-2 py-1.5 outline-none focus:border-emerald-400 cursor-pointer"
+            >
+              <option value="active">
+                Active Settings (v₀={controls.speed.toFixed(0)}m/s, θ={controls.elevationDeg.toFixed(0)}°, {controls.dragModel})
+              </option>
+              {savedShots.map(s => (
+                <option key={s.id} value={s.id}>
+                  Shot #{s.shotNumber} ({s.colorName}) · R={s.summary.maxRange.toFixed(1)}m · t={s.summary.flightTime.toFixed(2)}s · {s.dragModel}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Merged 5 Kinematic Equations Selector Grid */}
         <div className="space-y-1.5">
