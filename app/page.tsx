@@ -60,6 +60,7 @@ import {
   UserRole,
   SceneSnapshot,
   LabSubmission,
+  LabAssignment,
 } from '@/lib/types/lab';
 
 type LayerRoute =
@@ -190,7 +191,9 @@ export default function SimulationCockpit() {
   } | null>(null);
 
   // Lab Assignment, Roster & Submissions State directly derived from reactive labStorage
-  const assignment = labStorage.getAssignment();
+  const courseAssignments = labStorage.getAssignmentsForCourse(activeCourse);
+  const assignment = courseAssignments[0] || labStorage.getAssignment();
+  const allAssignments = labStorage.getAllAssignments();
   const currentSubmission = labStorage.getSubmissionForStudent(assignment.id, currentUser.id);
   const teacherSubmissions = labStorage.getAllSubmissionsForTeacher();
   const classStudents = labStorage.getClassStudents();
@@ -535,6 +538,24 @@ export default function SimulationCockpit() {
     }
     labStorage.resetStudentSubmission(studentId);
     showToast(`Reset Lab 01 submission for ${studentName}`);
+  };
+
+  const handleCreateAssignment = (data: Partial<LabAssignment>) => {
+    if (currentUser.role !== 'instructor') {
+      showToast('Access Denied: Only instructors can create assignments.');
+      return;
+    }
+    const created = labStorage.createAssignment({
+      ...data,
+      assignedBy: currentUser.name,
+    });
+    showToast(`Created & assigned lab: "${created.title}"`);
+  };
+
+  const handleAddSubmissionComment = (submissionId: string, text: string) => {
+    const role = currentUser.role === 'instructor' ? 'instructor' : 'student';
+    labStorage.addSubmissionComment(submissionId, currentUser.id, currentUser.name, role, text);
+    showToast('Comment posted to submission');
   };
 
   // Student Account Choices & Device Privacy Actions
@@ -2540,9 +2561,24 @@ export default function SimulationCockpit() {
         onClose={() => setIsGuidedLabOpen(false)}
         assignment={assignment}
         currentUser={currentUser}
+        course={activeCourse}
         initialSubmission={currentSubmission}
         onSaveDraft={handleSaveDraft}
         onSubmitLab={handleSubmitLab}
+        onAddComment={(text: string) => {
+          if (currentSubmission) {
+            handleAddSubmissionComment(currentSubmission.id, text);
+          } else {
+            const draft = labStorage.saveSubmissionDraft({
+              assignmentId: assignment.id,
+              studentComments: text,
+              sceneSnapshot: captureCurrentSnapshot('Lab Draft Snapshot'),
+            });
+            if (draft) {
+              handleAddSubmissionComment(draft.id, text);
+            }
+          }
+        }}
         getLiveSceneSnapshot={() => captureCurrentSnapshot('Lab 01 Submission Snapshot')}
         liveSeparationDistance={liveDistance}
         liveCoulombForce={liveForce}
@@ -2569,13 +2605,17 @@ export default function SimulationCockpit() {
         submissions={teacherSubmissions}
         students={classStudents}
         savedExperiments={allSavedExperiments}
+        assignments={allAssignments}
         currentUser={currentUser}
+        course={activeCourse}
         onGradeSubmission={handleGradeSubmission}
         onRestoreSceneSnapshot={handleRestoreStudentSnapshot}
         onEnrollStudent={handleEnrollStudent}
         onRemoveStudent={handleRemoveStudent}
         onUpdateStudent={handleUpdateStudent}
         onResetStudentSubmission={handleResetStudentSubmission}
+        onCreateAssignment={handleCreateAssignment}
+        onAddComment={handleAddSubmissionComment}
         onExportCSV={() => {
           labStorage.exportSubmissionsCSV();
           showToast('Downloaded student grades and submissions as CSV spreadsheet');
@@ -2587,6 +2627,7 @@ export default function SimulationCockpit() {
         isOpen={isStudentAccountModalOpen}
         onClose={() => setIsStudentAccountModalOpen(false)}
         currentUser={currentUser}
+        course={activeCourse}
         submission={currentSubmission}
         onDeleteAccount={handleDeleteMyAccount}
         onResetProgress={handleResetMyProgress}

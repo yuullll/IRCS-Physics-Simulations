@@ -876,20 +876,35 @@ class LabStorageService {
 
   public addSubmissionComment(
     submissionId: string,
-    authorId: string,
-    authorName: string,
-    authorRole: 'student' | 'instructor',
-    text: string
+    authorIdOrText: string,
+    authorName?: string,
+    authorRole?: 'student' | 'instructor',
+    text?: string
   ): LabSubmission | null {
     const sub = this.memorySubmissions.find(s => s.id === submissionId);
-    if (!sub || !text.trim()) return null;
+    if (!sub) return null;
+
+    let aId = authorIdOrText;
+    let aName = authorName || 'User';
+    let aRole: 'student' | 'instructor' = authorRole || 'student';
+    let msgText = text || '';
+
+    if (text === undefined && authorName !== undefined) {
+      // Called with (submissionId, text, authorName, authorRole)
+      msgText = authorIdOrText;
+      aName = authorName;
+      aRole = authorRole || 'student';
+      aId = 'usr_' + Math.random().toString(36).substring(2, 7);
+    }
+
+    if (!msgText.trim()) return null;
 
     const comment = {
       id: 'comment_' + Math.random().toString(36).substring(2, 9),
-      authorId,
-      authorName,
-      authorRole,
-      text: text.trim(),
+      authorId: aId,
+      authorName: aName,
+      authorRole: aRole,
+      text: msgText.trim(),
       timestamp: new Date().toISOString(),
     };
 

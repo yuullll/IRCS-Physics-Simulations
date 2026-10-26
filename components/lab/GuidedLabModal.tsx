@@ -21,6 +21,7 @@ import {
   Camera,
   GraduationCap,
   Sparkles,
+  MessageSquare,
 } from 'lucide-react';
 
 interface GuidedLabModalProps {
@@ -34,6 +35,8 @@ interface GuidedLabModalProps {
   getLiveSceneSnapshot: () => SceneSnapshot;
   liveSeparationDistance?: number;
   liveCoulombForce?: number;
+  course?: 'mechanics' | 'em';
+  onAddComment?: (text: string) => void;
 }
 
 export const GuidedLabModal: React.FC<GuidedLabModalProps> = ({
@@ -47,7 +50,10 @@ export const GuidedLabModal: React.FC<GuidedLabModalProps> = ({
   getLiveSceneSnapshot,
   liveSeparationDistance,
   liveCoulombForce,
+  course = 'mechanics',
+  onAddComment,
 }) => {
+  const [newCommentText, setNewCommentText] = useState('');
   const [hypothesis, setHypothesis] = useState(
     initialSubmission?.hypothesis ||
       'If the separation distance r between charges q₁ and q₂ increases, the electrostatic force F will decrease proportionally to 1/r², verifying Coulomb\'s inverse-square law.'
@@ -100,8 +106,8 @@ export const GuidedLabModal: React.FC<GuidedLabModalProps> = ({
   // Add row from live 3D reading
   const handleCaptureLiveReading = () => {
     const r = liveSeparationDistance && liveSeparationDistance > 0.1 ? liveSeparationDistance : 5.0;
-    const q1 = assignment.fixedParameters.q1Micro * 1e-6;
-    const q2 = assignment.fixedParameters.q2Micro * 1e-6;
+    const q1 = (assignment.fixedParameters?.q1Micro ?? 5.0) * 1e-6;
+    const q2 = (assignment.fixedParameters?.q2Micro ?? -5.0) * 1e-6;
     const theoreticalF = (COULOMB_K * Math.abs(q1 * q2)) / (r * r);
     const measuredF = liveCoulombForce !== undefined && liveCoulombForce > 0 ? liveCoulombForce : theoreticalF;
     const err = Math.abs((measuredF - theoreticalF) / theoreticalF) * 100;
@@ -121,8 +127,8 @@ export const GuidedLabModal: React.FC<GuidedLabModalProps> = ({
   const handleAddManualRow = () => {
     const trialNum = dataTable.length + 1;
     const r = trialNum * 2.0;
-    const q1 = assignment.fixedParameters.q1Micro * 1e-6;
-    const q2 = assignment.fixedParameters.q2Micro * 1e-6;
+    const q1 = (assignment.fixedParameters?.q1Micro ?? 5.0) * 1e-6;
+    const q2 = (assignment.fixedParameters?.q2Micro ?? -5.0) * 1e-6;
     const theoreticalF = (COULOMB_K * Math.abs(q1 * q2)) / (r * r);
 
     setDataTable(prev => [
@@ -150,8 +156,8 @@ export const GuidedLabModal: React.FC<GuidedLabModalProps> = ({
       if (field === 'distanceR') {
         const r = Math.max(val, 0.1);
         row.rSquared = parseFloat((r * r).toFixed(2));
-        const q1 = assignment.fixedParameters.q1Micro * 1e-6;
-        const q2 = assignment.fixedParameters.q2Micro * 1e-6;
+        const q1 = (assignment.fixedParameters?.q1Micro ?? 5.0) * 1e-6;
+        const q2 = (assignment.fixedParameters?.q2Micro ?? -5.0) * 1e-6;
         row.calculatedForce = parseFloat(((COULOMB_K * Math.abs(q1 * q2)) / (r * r)).toFixed(2));
         row.percentError = parseFloat(
           (Math.abs((row.measuredForce - row.calculatedForce) / row.calculatedForce) * 100).toFixed(2)
@@ -197,28 +203,57 @@ export const GuidedLabModal: React.FC<GuidedLabModalProps> = ({
       dataTable,
       analysisExplanation,
       conclusion,
+      studentComments: initialSubmission?.studentComments || '',
+      comments: initialSubmission?.comments || [],
       sceneSnapshot: liveSnapshot,
     };
     onSubmitLab(sub);
   };
 
+  const isMechanics = course === 'mechanics';
+
+  const handlePostStudentComment = () => {
+    if (!newCommentText.trim()) return;
+    if (onAddComment) {
+      onAddComment(newCommentText.trim());
+    }
+    setNewCommentText('');
+  };
+
   return (
-    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
-      <div className="bg-slate-900 border border-slate-700/80 max-w-3xl w-full rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 select-none">
+      <div
+        className={`border max-w-3xl w-full rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] transition-colors ${
+          isMechanics
+            ? 'bg-[#050f0c] border-emerald-500/30 shadow-emerald-950/40 text-slate-200'
+            : 'bg-[#060c18] border-sky-500/30 shadow-sky-950/40 text-slate-200'
+        }`}
+      >
         {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/80">
-          <div className="flex items-center space-x-2.5">
-            <ClipboardList className="w-5 h-5 text-cyan-400" />
+        <div
+          className={`px-6 py-4 border-b flex items-center justify-between ${
+            isMechanics ? 'bg-[#030907] border-emerald-500/20' : 'bg-[#040810] border-sky-500/20'
+          }`}
+        >
+          <div className="flex items-center space-x-3">
+            <ClipboardList className={`w-5 h-5 ${isMechanics ? 'text-emerald-400' : 'text-sky-400'}`} />
             <div>
               <div className="flex items-center space-x-2">
                 <h2 className="text-base font-bold text-white tracking-tight">{assignment.title}</h2>
+                <span
+                  className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold uppercase ${
+                    isMechanics ? 'bg-emerald-500/20 text-emerald-300' : 'bg-sky-500/20 text-sky-300'
+                  }`}
+                >
+                  {isMechanics ? 'Mechanics Lab' : 'E&M Lab'}
+                </span>
                 <span
                   className={`text-[10px] font-mono px-2 py-0.5 rounded ${
                     isGraded
                       ? 'bg-emerald-950 text-emerald-400 border border-emerald-800/60'
                       : isSubmitted
                       ? 'bg-amber-950 text-amber-400 border border-amber-800/60'
-                      : 'bg-slate-800 text-slate-300'
+                      : 'bg-white/10 text-slate-300'
                   }`}
                 >
                   {isGraded
@@ -233,7 +268,7 @@ export const GuidedLabModal: React.FC<GuidedLabModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+            className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition"
           >
             <X className="w-5 h-5" />
           </button>
@@ -241,6 +276,23 @@ export const GuidedLabModal: React.FC<GuidedLabModalProps> = ({
 
         {/* Content Body */}
         <div className="p-6 overflow-y-auto space-y-6 text-xs text-slate-300">
+          {/* Lab Assignment Description Assigned by Instructor */}
+          {assignment.description && (
+            <div
+              className={`p-4 rounded-2xl border text-xs leading-relaxed ${
+                isMechanics
+                  ? 'bg-[#071610] border-emerald-500/25 text-emerald-100/90'
+                  : 'bg-[#081224] border-sky-500/25 text-sky-100/90'
+              }`}
+            >
+              <div className="text-[10px] font-mono uppercase tracking-wider font-bold mb-1 opacity-80 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Instructor Assignment Description &amp; Directives</span>
+              </div>
+              <div>{assignment.description}</div>
+            </div>
+          )}
+
           {/* Graded Feedback Banner (if graded) */}
           {isGraded && initialSubmission?.feedback && (
             <div className="p-4 rounded-xl bg-emerald-950/40 border border-emerald-700/60 space-y-2">
@@ -270,11 +322,17 @@ export const GuidedLabModal: React.FC<GuidedLabModalProps> = ({
                 Fixed Parameters
               </span>
               <div className="flex items-center space-x-3 text-slate-200 font-mono">
-                <span>q₁ = +{assignment.fixedParameters.q1Micro} μC</span>
-                <span>·</span>
-                <span>q₂ = {assignment.fixedParameters.q2Micro} μC</span>
-                <span>·</span>
-                <span>k = 8.99×10⁹ N·m²/C²</span>
+                {assignment.fixedParameters ? (
+                  <>
+                    <span>q₁ = +{assignment.fixedParameters.q1Micro} μC</span>
+                    <span>·</span>
+                    <span>q₂ = {assignment.fixedParameters.q2Micro} μC</span>
+                    <span>·</span>
+                    <span>k = 8.99×10⁹ N·m²/C²</span>
+                  </>
+                ) : (
+                  <span>Standard Laboratory Calibration Constants</span>
+                )}
               </div>
             </div>
             <div className="text-[11px] text-cyan-400 bg-cyan-950/40 px-2.5 py-1 rounded-lg border border-cyan-800/50">
@@ -420,10 +478,79 @@ export const GuidedLabModal: React.FC<GuidedLabModalProps> = ({
             />
           </div>
 
+          {/* Section 5: Student Comments & Dialogue with Instructor */}
+          <div className="space-y-3 pt-3 border-t border-white/10">
+            <div className="flex items-center justify-between">
+              <label className="font-semibold text-slate-200 uppercase tracking-wide text-[11px] flex items-center gap-1.5">
+                <MessageSquare className="w-3.5 h-3.5 text-amber-400" />
+                <span>5. Submission Comments &amp; Dialogue with Instructor</span>
+              </label>
+              <span className="text-[10px] text-slate-400">Ask questions or provide notes to your instructor</span>
+            </div>
+
+            {/* Existing Comment Feed */}
+            {initialSubmission?.comments && initialSubmission.comments.length > 0 && (
+              <div className="space-y-2 p-3 rounded-2xl bg-black/40 border border-white/10 max-h-48 overflow-y-auto">
+                {initialSubmission.comments.map(c => (
+                  <div
+                    key={c.id}
+                    className={`p-2.5 rounded-xl text-xs space-y-1 ${
+                      c.authorRole === 'instructor'
+                        ? 'bg-amber-500/10 border border-amber-500/20 text-amber-200'
+                        : isMechanics
+                        ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-200'
+                        : 'bg-sky-500/10 border border-sky-500/20 text-sky-200'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between text-[10px] font-mono text-slate-400">
+                      <span className="font-bold text-white flex items-center gap-1">
+                        {c.authorRole === 'instructor' ? '👨‍🏫 Instructor:' : '🧑‍🎓 Student:'} {c.authorName}
+                      </span>
+                      <span>{new Date(c.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                    <p className="text-slate-200 leading-relaxed">{c.text}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Add Comment Input */}
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newCommentText}
+                onChange={e => setNewCommentText(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handlePostStudentComment();
+                  }
+                }}
+                className={`flex-1 px-3 py-2 bg-black/50 border rounded-xl text-white text-xs placeholder-slate-500 focus:outline-none ${
+                  isMechanics ? 'border-emerald-500/30 focus:border-emerald-400' : 'border-sky-500/30 focus:border-sky-400'
+                }`}
+                placeholder="Add a comment or inquiry about your lab report..."
+              />
+              <button
+                type="button"
+                onClick={handlePostStudentComment}
+                disabled={!newCommentText.trim()}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition disabled:opacity-50 flex items-center gap-1.5 ${
+                  isMechanics
+                    ? 'bg-emerald-400 hover:bg-emerald-300 text-slate-950'
+                    : 'bg-sky-400 hover:bg-sky-300 text-slate-950'
+                }`}
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>Post</span>
+              </button>
+            </div>
+          </div>
+
           {/* Snapshot Notice */}
-          <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-[11px] flex items-center justify-between text-slate-400">
+          <div className="p-3 rounded-xl bg-black/40 border border-white/10 text-[11px] flex items-center justify-between text-slate-400">
             <div className="flex items-center space-x-2">
-              <Camera className="w-4 h-4 text-cyan-400" />
+              <Camera className={`w-4 h-4 ${isMechanics ? 'text-emerald-400' : 'text-sky-400'}`} />
               <span>
                 On submission, an exact frozen 3D scene snapshot will be attached for instructor verification.
               </span>
@@ -437,7 +564,7 @@ export const GuidedLabModal: React.FC<GuidedLabModalProps> = ({
         </div>
 
         {/* Footer Actions */}
-        <div className="px-6 py-3.5 border-t border-slate-800 bg-slate-950/90 flex items-center justify-between">
+        <div className="px-6 py-3.5 border-t border-white/10 bg-black/60 flex items-center justify-between">
           <div className="text-[11px] text-slate-400">
             Student: <span className="text-white font-medium">{currentUser.name}</span> ({currentUser.className})
           </div>
@@ -446,7 +573,7 @@ export const GuidedLabModal: React.FC<GuidedLabModalProps> = ({
             {!isSubmitted && (
               <button
                 onClick={handleSaveDraft}
-                className="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 font-semibold transition flex items-center space-x-1.5"
+                className="px-3.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 font-semibold transition flex items-center space-x-1.5"
               >
                 <Save className="w-3.5 h-3.5" />
                 <span>Save Draft</span>
@@ -456,7 +583,11 @@ export const GuidedLabModal: React.FC<GuidedLabModalProps> = ({
             {!isSubmitted ? (
               <button
                 onClick={handleSubmit}
-                className="px-4 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-bold transition flex items-center space-x-1.5 shadow-md shadow-cyan-600/30"
+                className={`px-4 py-1.5 rounded-xl font-bold transition flex items-center space-x-1.5 shadow-md ${
+                  isMechanics
+                    ? 'bg-emerald-400 hover:bg-emerald-300 text-slate-950 shadow-emerald-600/30'
+                    : 'bg-sky-400 hover:bg-sky-300 text-slate-950 shadow-sky-600/30'
+                }`}
               >
                 <Send className="w-3.5 h-3.5" />
                 <span>Submit Final Lab</span>
@@ -464,7 +595,7 @@ export const GuidedLabModal: React.FC<GuidedLabModalProps> = ({
             ) : (
               <button
                 onClick={onClose}
-                className="px-4 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition"
+                className="px-4 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 text-slate-200 transition"
               >
                 Close Lab Card
               </button>
