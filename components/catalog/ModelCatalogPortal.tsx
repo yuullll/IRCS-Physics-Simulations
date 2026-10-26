@@ -29,7 +29,7 @@ export interface PhysicsModelSlot {
   equation: string;
   description: string;
   status: 'live' | 'blank';
-  simulationMode?: 'field' | 'circuit' | 'projectile';
+  simulationMode?: 'field' | 'circuit' | 'projectile' | 'coulomb';
   accentColor: 'cyan' | 'amber' | 'emerald' | 'rose' | 'sky';
   metrics: string[];
 }
@@ -54,7 +54,7 @@ export interface PhysicsUnitModule {
   subtopics: PhysicsSubtopic[];
 }
 
-export const LIVE_SIMULATION_SLOTS: Record<'projectile' | 'field' | 'circuit', PhysicsModelSlot> = {
+export const LIVE_SIMULATION_SLOTS: Record<'projectile' | 'field' | 'circuit' | 'coulomb', PhysicsModelSlot> = {
   projectile: {
     id: 'mech-kinematics-drag',
     course: 'mechanics',
@@ -69,6 +69,21 @@ export const LIVE_SIMULATION_SLOTS: Record<'projectile' | 'field' | 'circuit', P
     simulationMode: 'projectile',
     accentColor: 'emerald',
     metrics: ['Live 3D RK4 Integrator', '5 Kinematics Formulas Proof', 'Impact Flags & FBD'],
+  },
+  coulomb: {
+    id: 'model-coulomb-force',
+    course: 'em',
+    code: '8.1',
+    title: 'Electric Charge & Coulomb Force Workbench',
+    subtitle: 'Inverse-Square Dynamics, Permittivity & Gravitational Comparison',
+    unit: 'Unit 8 · Electric Charges, Fields, and Gauss’s Law (8.1 Electric Charge & Electric Force)',
+    equation: '|F_E| = 1/(4πε) · |q₁q₂|/r² · F_G = G m₁m₂/r²',
+    description:
+      'Comprehensive AP Physics C Topic 8.1 investigation of Coulomb’s law, multi-charge vector superposition (up to 4 charges), dielectric medium permittivity (ε = κε₀), and direct quantitative comparison with gravitational force (F_E vs F_G).',
+    status: 'live',
+    simulationMode: 'coulomb',
+    accentColor: 'cyan',
+    metrics: ['Coulomb & Gravity Dual Solver', 'Dielectric Permittivity Slider', '4-Body Vector Superposition'],
   },
   field: {
     id: 'model-field',
@@ -262,6 +277,7 @@ export const EM_UNITS: PhysicsUnitModule[] = [
         id: 'sub-8-1',
         code: '8.1',
         title: '8.1 Electric Charge and Electric Force',
+        simulation: LIVE_SIMULATION_SLOTS.coulomb,
       },
       {
         id: 'sub-8-2',
@@ -427,6 +443,7 @@ export const PHYSICS_MODEL_SLOTS: PhysicsModelSlot[] = [
   LIVE_SIMULATION_SLOTS.projectile,
   LIVE_SIMULATION_SLOTS.field,
   LIVE_SIMULATION_SLOTS.circuit,
+  LIVE_SIMULATION_SLOTS.coulomb,
 ];
 
 /**
@@ -654,25 +671,22 @@ const UnitCursorInteraction: React.FC<{
     }
 
     case 5: {
-      // Unit 5: Torque and Rotational Dynamics — Pivoted lever arm with perpendicular tail pointing toward cursor
+      // Unit 5: Torque and Rotational Dynamics — Pivoted lever arm with perpendicular tail pointing toward cursor position
       const pivX = 85;
-      const pivY = 50;
+      const pivY = 46;
       const distToPiv = Math.hypot(targetX - pivX, targetY - pivY);
-      // Line connecting pivot to moving particle changes length based on cursor distance (clamped to [22, 38] so particle is never off-screen)
-      const armLen = isHovered ? Math.max(22, Math.min(38, 18 + distToPiv * 0.26)) : 32;
-      const angle = Math.atan2(targetY - pivY, targetX - pivX);
-      const endX = pivX + Math.cos(angle) * armLen;
-      const endY = pivY + Math.sin(angle) * armLen;
+      // Line connecting pivot to moving particle changes length noticeably based on cursor distance (16px to 46px)
+      const armLen = isHovered ? Math.max(16, Math.min(46, 12 + distToPiv * 0.44)) : 28;
+      const cursorAngle = Math.atan2(targetY - pivY, targetX - pivX);
+      const armAngle = cursorAngle * 0.72; // slight angular lag so cursor position creates a stable non-zero perpendicular offset
+      const endX = pivX + Math.cos(armAngle) * armLen;
+      const endY = pivY + Math.sin(armAngle) * armLen;
 
-      // Tail MUST be perpendicular to circular path (tangent to circle):
-      // The two perpendicular unit vectors are (-sin(angle), cos(angle)) and (sin(angle), -cos(angle))
-      // Choose the direction that points toward the cursor
-      const toCurX = targetX - endX;
-      const toCurY = targetY - endY;
-      const dot = (-Math.sin(angle)) * toCurX + Math.cos(angle) * toCurY;
-      const sign = dot >= 0 ? 1 : -1;
-      const tanX = sign * (-Math.sin(angle));
-      const tanY = sign * Math.cos(angle);
+      // Tail MUST be perpendicular to circular path (tangent to circle), pointing toward cursor position:
+      const perpProj = (-Math.sin(armAngle)) * (targetX - endX) + Math.cos(armAngle) * (targetY - endY);
+      const sign = perpProj >= 0 ? 1 : -1;
+      const tanX = sign * (-Math.sin(armAngle));
+      const tanY = sign * Math.cos(armAngle);
 
       // Tail length changes based on speed of cursor (faster = longer)
       const tailLen = isHovered ? Math.max(12, Math.min(48, 14 + cursorSpeed * 0.45)) : 18;
@@ -683,9 +697,9 @@ const UnitCursorInteraction: React.FC<{
         <svg viewBox="0 0 260 92" className="w-full h-24 rounded-xl bg-black/50 border border-white/10 overflow-hidden">
           {/* Circular path guide with current radius */}
           <circle cx={pivX} cy={pivY} r={armLen} fill="none" stroke="#1e293b" strokeWidth="1.2" strokeDasharray="3 3" />
-          {/* Lever Arm r connecting pivot to swing particle (length adapts to cursor distance) */}
+          {/* Lever Arm r connecting pivot to swing particle (noticeable length change) */}
           <line x1={pivX} y1={pivY} x2={endX} y2={endY} stroke="#10b981" strokeWidth="3" strokeLinecap="round" />
-          {/* Perpendicular Tail: strictly perpendicular to circular path, points towards cursor, scales with speed */}
+          {/* Perpendicular Tail: strictly perpendicular to circular path, points towards cursor position, scales with speed */}
           <line x1={endX} y1={endY} x2={tailEndX} y2={tailEndY} stroke="#f59e0b" strokeWidth="2.5" strokeLinecap="round" />
           <circle cx={tailEndX} cy={tailEndY} r="2.2" fill="#fbbf24" />
           {/* Pivot point */}
@@ -704,19 +718,18 @@ const UnitCursorInteraction: React.FC<{
       const cX = 125;
       const cY = 46;
       const distToCenter = Math.hypot(targetX - cX, targetY - cY);
-      // Line connecting center and moving particle changes length with cursor distance (clamped to [20, 38] to stay visible)
-      const r = isHovered ? Math.max(20, Math.min(38, 18 + distToCenter * 0.26)) : 28;
-      const ang = Math.atan2(targetY - cY, targetX - cX);
-      const satX = cX + Math.cos(ang) * r;
-      const satY = cY + Math.sin(ang) * r;
+      // Line connecting center and moving particle changes length with cursor distance (18px to 44px)
+      const r = isHovered ? Math.max(18, Math.min(44, 14 + distToCenter * 0.38)) : 28;
+      const cursorAng = Math.atan2(targetY - cY, targetX - cX);
+      const orbitAng = cursorAng * 0.72; // slight angular lag so cursor position creates a stable non-zero perpendicular offset
+      const satX = cX + Math.cos(orbitAng) * r;
+      const satY = cY + Math.sin(orbitAng) * r;
 
-      // Tail MUST be perpendicular to circular path (tangent to orbit), pointing towards cursor
-      const toCurX = targetX - satX;
-      const toCurY = targetY - satY;
-      const dot = (-Math.sin(ang)) * toCurX + Math.cos(ang) * toCurY;
-      const sign = dot >= 0 ? 1 : -1;
-      const tanX = sign * (-Math.sin(ang));
-      const tanY = sign * Math.cos(ang);
+      // Tail MUST be perpendicular to circular path (tangent to orbit), pointing toward cursor position
+      const perpProj = (-Math.sin(orbitAng)) * (targetX - satX) + Math.cos(orbitAng) * (targetY - satY);
+      const sign = perpProj >= 0 ? 1 : -1;
+      const tanX = sign * (-Math.sin(orbitAng));
+      const tanY = sign * Math.cos(orbitAng);
 
       // Tail length changes based on speed of cursor (faster = longer)
       const tailLen = isHovered ? Math.max(12, Math.min(48, 14 + cursorSpeed * 0.45)) : 18;
@@ -730,10 +743,10 @@ const UnitCursorInteraction: React.FC<{
           <circle cx={cX} cy={cY} r="6" fill="#0ea5e9" />
           {/* Radial line attaching particle to central pivot (length adapts to cursor distance) */}
           <line x1={cX} y1={cY} x2={satX} y2={satY} stroke="#64748b" strokeWidth="1.5" />
-          {/* Perpendicular Tail: strictly perpendicular to circular path, points towards cursor, scales with speed */}
+          {/* Perpendicular Tail: strictly perpendicular to circular path, points towards cursor position, scales with speed */}
           <line x1={satX} y1={satY} x2={tailEndX} y2={tailEndY} stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" />
           <circle cx={tailEndX} cy={tailEndY} r="2.2" fill="#34d399" />
-          {/* Swing particle */}
+          {/* Moving particle */}
           <circle cx={satX} cy={satY} r="4.5" fill="#34d399" />
           <text x="178" y="18" fill="#7dd3fc" fontSize="9" fontFamily="monospace">
             L = Iω = const

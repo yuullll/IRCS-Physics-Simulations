@@ -37,6 +37,7 @@ import {
 } from '@/components/simulation/CircuitWorkbench';
 import { Oscilloscope, DataPoint } from '@/components/ui/Oscilloscope';
 import { ProjectileSandbox } from '@/components/simulation/ProjectileSandbox';
+import { CoulombForceWorkbench } from '@/components/simulation/CoulombForceWorkbench';
 import { CalculusTheoryModal } from '@/components/ui/CalculusTheoryModal';
 import { UserRoleBar } from '@/components/auth/UserRoleBar';
 import { AuthModal } from '@/components/auth/AuthModal';
@@ -68,7 +69,7 @@ type LayerRoute =
   | { layer: 'unit'; unit: PhysicsUnitModule }
   | {
       layer: 'workspace';
-      mode: 'field' | 'circuit' | 'projectile';
+      mode: 'field' | 'circuit' | 'projectile' | 'coulomb';
       modelTitle: string;
       unit?: PhysicsUnitModule;
     }
@@ -85,7 +86,7 @@ export default function SimulationCockpit() {
   ]);
   const [navIndex, setNavIndex] = useState<number>(0);
   // Active simulation mode when in workspace layer
-  const [activeMode, setActiveMode] = useState<'field' | 'circuit' | 'projectile'>('projectile');
+  const [activeMode, setActiveMode] = useState<'field' | 'circuit' | 'projectile' | 'coulomb'>('projectile');
   const [projectileViewMode, setProjectileViewMode] = useState<'3d' | '2d'>('3d');
 
   const currentRoute = navHistory[navIndex] || { layer: 'catalog', course: 'mechanics' };
@@ -98,6 +99,8 @@ export default function SimulationCockpit() {
       ? currentRoute.unit.course
       : currentRoute.layer === 'workspace' && (currentRoute.mode === 'projectile' || activeMode === 'projectile')
       ? 'mechanics'
+      : currentRoute.layer === 'workspace' && (currentRoute.mode === 'coulomb' || activeMode === 'coulomb' || currentRoute.mode === 'field' || activeMode === 'field' || currentRoute.mode === 'circuit' || activeMode === 'circuit')
+      ? 'em'
       : currentRoute.layer === 'slot-detail'
       ? currentRoute.slot.course || 'mechanics'
       : 'mechanics';
@@ -289,7 +292,23 @@ export default function SimulationCockpit() {
         };
       }
 
-      if (activeMode === 'field') {
+      if (activeMode === 'coulomb') {
+        return {
+          id,
+          version: '1.0',
+          timestamp: now,
+          title,
+          mode: 'coulomb',
+        };
+      } else if (activeMode === 'projectile') {
+        return {
+          id,
+          version: '1.0',
+          timestamp: now,
+          title,
+          mode: 'projectile',
+        };
+      } else if (activeMode === 'field') {
         const fieldSnap = (window as any).__fieldSandbox?.getSnapshot?.();
         const cam = (window as any).__fieldSandbox?.getCameraState?.();
         return {
@@ -1443,6 +1462,8 @@ export default function SimulationCockpit() {
                 onOscilloscopeSample={handleCircuitScopeSample}
                 onToast={showToast}
               />
+            ) : activeMode === 'coulomb' ? (
+              <CoulombForceWorkbench onToast={showToast} />
             ) : (
               <ProjectileSandbox
                 onToast={showToast}
@@ -1455,7 +1476,7 @@ export default function SimulationCockpit() {
           {/* ========================================================================= */}
           {/* FLOATING LEFT SIMULATION PARAMETERS DOCK                                  */}
           {/* ========================================================================= */}
-          {activeMode !== 'projectile' && (
+          {(activeMode === 'field' || activeMode === 'circuit') && (
             <div className="absolute top-20 left-4 z-20 w-80 max-h-[calc(100vh-6.5rem)] overflow-y-auto bg-[#080e1e]/85 backdrop-blur-xl border border-white/10 rounded-2xl p-4 flex flex-col space-y-3.5 shadow-2xl">
             <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
               <div className="flex items-center gap-2">
@@ -2518,7 +2539,7 @@ export default function SimulationCockpit() {
           {/* ========================================================================= */}
           {/* BOTTOM OSCILLOSCOPE DOCK                                                  */}
           {/* ========================================================================= */}
-          {activeMode !== 'projectile' && (
+          {(activeMode === 'field' || activeMode === 'circuit') && (
             <div className="absolute bottom-4 right-4 z-10 w-96 max-w-[calc(100vw-2rem)]">
             {activeMode === 'field' ? (
               <Oscilloscope
