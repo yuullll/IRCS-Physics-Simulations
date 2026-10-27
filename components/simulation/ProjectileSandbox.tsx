@@ -207,6 +207,8 @@ export const ProjectileSandbox: React.FC<ProjectileSandboxProps> = ({
   const [isPlaying, setIsPlaying] = useState<boolean>(true);
   const [simTime, setSimTime] = useState<number>(0);
   const [selectedFormulaIndex, setSelectedFormulaIndex] = useState<number>(0);
+  const [repAxis, setRepAxis] = useState<'y' | 'x'>('y');
+  const [repTab, setRepTab] = useState<'pos' | 'vel' | 'acc' | 'diagram'>('vel');
 
   // Saved Projectile Shots & Impact Flags Memory
   const [savedShots, setSavedShots] = useState<SavedProjectileShot[]>([]);
@@ -1613,21 +1615,27 @@ export const ProjectileSandbox: React.FC<ProjectileSandboxProps> = ({
               }
               className="w-full accent-purple-400 cursor-pointer"
             />
-            <div className="grid grid-cols-4 gap-1 text-[10px] font-mono">
+            <div className="grid grid-cols-5 gap-1 text-[10px] font-mono">
               {[
+                { label: 'AP 10.0', g: 10.0 },
+                { label: 'Earth 9.81', g: 9.81 },
+                { label: 'Earth 9.8', g: 9.8 },
                 { label: 'Moon 1.62', g: 1.62 },
                 { label: 'Mars 3.72', g: 3.72 },
-                { label: 'Earth 9.81', g: 9.81 },
-                { label: 'Jup 24.79', g: 24.79 },
               ].map(planet => (
                 <button
                   key={planet.label}
                   onClick={() => setControls(prev => ({ ...prev, gravity: planet.g }))}
                   className={`py-0.5 px-1 rounded truncate ${
-                    Math.abs(controls.gravity - planet.g) < 0.05
+                    Math.abs(controls.gravity - planet.g) < 0.03
                       ? 'bg-purple-500/30 text-purple-200 font-bold border border-purple-500/40'
                       : 'bg-white/5 hover:bg-white/10 text-slate-400'
                   }`}
+                  title={
+                    planet.g === 10.0
+                      ? 'AP Physics C Exam Standard Approximation: g ≈ 10 m/s² (LO 1.3.A.3)'
+                      : `Set g = ${planet.g} m/s²`
+                  }
                 >
                   {planet.label}
                 </button>
@@ -1890,7 +1898,7 @@ export const ProjectileSandbox: React.FC<ProjectileSandboxProps> = ({
           <div className="flex items-center justify-between pt-1">
             <span className="text-slate-300">Camera View Mode</span>
             <div className="flex gap-1 text-[10px]">
-              {(['3d', 'side', 'top'] as const).map(vm => (
+              {(['3d', 'side'] as const).map(vm => (
                 <button
                   key={vm}
                   onClick={() => {
@@ -1899,13 +1907,13 @@ export const ProjectileSandbox: React.FC<ProjectileSandboxProps> = ({
                       onViewModeChange(vm === 'side' ? '2d' : '3d');
                     }
                   }}
-                  className={`px-2 py-0.5 rounded font-bold uppercase transition ${
-                    effectiveViewMode === vm
+                  className={`px-2.5 py-0.5 rounded font-bold uppercase transition ${
+                    (vm === 'side' ? effectiveViewMode !== '3d' : effectiveViewMode === '3d')
                       ? 'bg-emerald-400 text-slate-950 shadow-sm'
                       : 'bg-white/5 text-slate-400 hover:text-white'
                   }`}
                 >
-                  {vm === 'side' ? '2D View' : vm}
+                  {vm === 'side' ? '2D' : '3D'}
                 </button>
               ))}
             </div>
@@ -2546,6 +2554,403 @@ export const ProjectileSandbox: React.FC<ProjectileSandboxProps> = ({
             </div>
           </div>
         </div>
+
+        {/* ===================================================================== */}
+        {/* TOPIC 1.3 REPRESENTING MOTION: GRAPHS (TANGENT SLOPE & AREA UNDER     */}
+        {/* CURVE), STROBOSCOPIC MOTION DIAGRAM & NARRATIVE DESCRIPTION           */}
+        {/* ===================================================================== */}
+        {auditedSummary && auditedSummary.points.length > 1 && (() => {
+          const pts = auditedSummary.points;
+          const totalT = Math.max(0.05, auditedSummary.flightTime);
+          const curPt = currentPoint || pts[0];
+          const curT = curPt.time;
+
+          // Axis selection: 'y' (Vertical Motion) or 'x' (Horizontal Motion)
+          const isY = repAxis === 'y';
+          const posVal = isY ? curPt.y : curPt.x;
+          const velVal = isY ? curPt.vy : curPt.vx;
+          const accVal = isY ? curPt.ay : curPt.ax;
+          const v0Val = isY ? pts[0].vy : pts[0].vx;
+          const deltaPos = posVal - (isY ? pts[0].y : pts[0].x);
+          const deltaVel = velVal - v0Val;
+
+          // SVG Graph Geometry (280 x 130)
+          const gW = 280;
+          const gH = 130;
+          const padL = 32;
+          const padR = 12;
+          const padT = 14;
+          const padB = 20;
+          const plotW = gW - padL - padR;
+          const plotH = gH - padT - padB;
+
+          const toGX = (tVal: number) => padL + Math.min(1, Math.max(0, tVal / totalT)) * plotW;
+
+          // Narrative Description Generator (LO 1.3.A.1)
+          const apexT = auditedSummary.apex.time;
+          const phaseDesc =
+            curT < 0.05
+              ? 'Initial Launch (t ≈ 0s): Object leaves the origin with maximum initial speed.'
+              : Math.abs(curT - apexT) < 0.12
+              ? 'Turning Point / Apex: Vertical velocity v_y passes through zero while downward gravitational acceleration remains non-zero.'
+              : curPt.vy > 0
+              ? 'Ascent Phase (v_y > 0, a_y < 0): Velocity and vertical acceleration have opposite signs, so vertical speed decreases.'
+              : 'Descent Phase (v_y < 0, a_y < 0): Velocity and vertical acceleration have the same downward sign, so vertical speed increases.';
+
+          return (
+            <div className="p-3 rounded-2xl bg-[#050811]/90 border border-emerald-500/35 space-y-2.5 text-xs">
+              <div className="flex items-center justify-between border-b border-white/10 pb-1.5">
+                <div className="flex items-center gap-1.5">
+                  <Activity className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="font-bold text-white">
+                    Topic 1.3 Motion Representations
+                  </span>
+                </div>
+                <div className="flex items-center bg-black/60 p-0.5 rounded-lg border border-white/10 text-[10px] font-mono">
+                  <button
+                    onClick={() => setRepAxis('y')}
+                    className={`px-2 py-0.5 rounded transition ${
+                      repAxis === 'y'
+                        ? 'bg-emerald-400 text-slate-950 font-bold'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Vertical (y)
+                  </button>
+                  <button
+                    onClick={() => setRepAxis('x')}
+                    className={`px-2 py-0.5 rounded transition ${
+                      repAxis === 'x'
+                        ? 'bg-sky-400 text-slate-950 font-bold'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Horiz (x)
+                  </button>
+                </div>
+              </div>
+
+              {/* Representation Mode Tabs */}
+              <div className="grid grid-cols-4 gap-1 bg-black/50 p-1 rounded-xl border border-white/10 text-[10px] font-mono">
+                <button
+                  onClick={() => setRepTab('pos')}
+                  className={`py-1 rounded-lg transition ${
+                    repTab === 'pos'
+                      ? 'bg-emerald-400 text-slate-950 font-bold'
+                      : 'text-slate-300 hover:text-white'
+                  }`}
+                >
+                  {isY ? 'y(t) Slope' : 'x(t) Slope'}
+                </button>
+                <button
+                  onClick={() => setRepTab('vel')}
+                  className={`py-1 rounded-lg transition ${
+                    repTab === 'vel'
+                      ? 'bg-sky-400 text-slate-950 font-bold'
+                      : 'text-slate-300 hover:text-white'
+                  }`}
+                >
+                  {isY ? 'v_y(t) Area' : 'v_x(t) Area'}
+                </button>
+                <button
+                  onClick={() => setRepTab('acc')}
+                  className={`py-1 rounded-lg transition ${
+                    repTab === 'acc'
+                      ? 'bg-rose-400 text-slate-950 font-bold'
+                      : 'text-slate-300 hover:text-white'
+                  }`}
+                >
+                  {isY ? 'a_y(t) Area' : 'a_x(t) Area'}
+                </button>
+                <button
+                  onClick={() => setRepTab('diagram')}
+                  className={`py-1 rounded-lg transition ${
+                    repTab === 'diagram'
+                      ? 'bg-amber-400 text-slate-950 font-bold'
+                      : 'text-slate-300 hover:text-white'
+                  }`}
+                >
+                  Strobe Dots
+                </button>
+              </div>
+
+              {/* Graph / Stroboscopic Diagram Canvas */}
+              {repTab !== 'diagram' ? (() => {
+                const values = pts.map(p =>
+                  repTab === 'pos'
+                    ? isY
+                      ? p.y
+                      : p.x
+                    : repTab === 'vel'
+                    ? isY
+                      ? p.vy
+                      : p.vx
+                    : isY
+                    ? p.ay
+                    : p.ax
+                );
+                const minV = Math.min(0, ...values);
+                const maxV = Math.max(0.1, ...values);
+                const spanV = Math.max(1e-3, maxV - minV);
+                const toGY = (v: number) => padT + plotH - ((v - minV) / spanV) * plotH;
+                const zeroY = toGY(0);
+
+                // Downsample points for smooth SVG path
+                const step = Math.max(1, Math.floor(pts.length / 60));
+                const sampled = pts.filter((_, i) => i % step === 0 || i === pts.length - 1);
+                const polyPoints = sampled
+                  .map(p => {
+                    const v =
+                      repTab === 'pos'
+                        ? isY
+                          ? p.y
+                          : p.x
+                        : repTab === 'vel'
+                        ? isY
+                          ? p.vy
+                          : p.vx
+                        : isY
+                        ? p.ay
+                        : p.ax;
+                    return `${toGX(p.time).toFixed(1)},${toGY(v).toFixed(1)}`;
+                  })
+                  .join(' ');
+
+                // Shaded integral area polygon from t = 0 to current time t (for v(t) and a(t), LO 1.3.A.4.iii & iv)
+                const activeSampled = sampled.filter(p => p.time <= curT + 0.01);
+                const areaPolygon =
+                  activeSampled.length > 0
+                    ? `${toGX(0).toFixed(1)},${zeroY.toFixed(1)} ` +
+                      activeSampled
+                        .map(p => {
+                          const v =
+                            repTab === 'vel'
+                              ? isY
+                                ? p.vy
+                                : p.vx
+                              : isY
+                              ? p.ay
+                              : p.ax;
+                          return `${toGX(p.time).toFixed(1)},${toGY(v).toFixed(1)}`;
+                        })
+                        .join(' ') +
+                      ` ${toGX(curT).toFixed(1)},${zeroY.toFixed(1)}`
+                    : '';
+
+                // Instantaneous point & tangent line (LO 1.3.A.4.i & ii)
+                const curVal =
+                  repTab === 'pos' ? posVal : repTab === 'vel' ? velVal : accVal;
+                const curDeriv =
+                  repTab === 'pos' ? velVal : repTab === 'vel' ? accVal : 0;
+                const cx = toGX(curT);
+                const cy = toGY(curVal);
+                const dtSpan = totalT * 0.18;
+                const t1 = Math.max(0, curT - dtSpan);
+                const t2 = Math.min(totalT, curT + dtSpan);
+                const tanY1 = toGY(curVal + curDeriv * (t1 - curT));
+                const tanY2 = toGY(curVal + curDeriv * (t2 - curT));
+
+                return (
+                  <div className="space-y-1.5">
+                    <div className="p-2 rounded-xl bg-black/60 border border-white/10">
+                      <svg viewBox={`0 0 ${gW} ${gH}`} className="w-full h-32 overflow-visible">
+                        {/* Zero horizontal axis */}
+                        <line
+                          x1={padL}
+                          y1={zeroY}
+                          x2={gW - padR}
+                          y2={zeroY}
+                          stroke="#475569"
+                          strokeWidth="1"
+                          strokeDasharray="3 2"
+                        />
+                        {/* Vertical axis */}
+                        <line
+                          x1={padL}
+                          y1={padT}
+                          x2={padL}
+                          y2={gH - padB}
+                          stroke="#64748b"
+                          strokeWidth="1.2"
+                        />
+
+                        {/* Shaded Area Under Curve for Velocity or Acceleration (LO 1.3.A.4.iii & iv) */}
+                        {(repTab === 'vel' || repTab === 'acc') && areaPolygon && (
+                          <polygon
+                            points={areaPolygon}
+                            fill={
+                              repTab === 'vel'
+                                ? 'rgba(56, 189, 248, 0.25)'
+                                : 'rgba(244, 63, 94, 0.25)'
+                            }
+                          />
+                        )}
+
+                        {/* Function Curve */}
+                        <polyline
+                          fill="none"
+                          stroke={
+                            repTab === 'pos'
+                              ? '#10b981'
+                              : repTab === 'vel'
+                              ? '#38bdf8'
+                              : '#f43f5e'
+                          }
+                          strokeWidth="2.2"
+                          points={polyPoints}
+                        />
+
+                        {/* Tangent Line Showing Instantaneous Rate of Change (LO 1.3.A.4.i & ii) */}
+                        {(repTab === 'pos' || repTab === 'vel') && (
+                          <line
+                            x1={toGX(t1)}
+                            y1={Math.max(padT, Math.min(gH - padB, tanY1))}
+                            x2={toGX(t2)}
+                            y2={Math.max(padT, Math.min(gH - padB, tanY2))}
+                            stroke="#facc15"
+                            strokeWidth="2"
+                          />
+                        )}
+
+                        {/* Current Time Point */}
+                        <circle
+                          cx={cx}
+                          cy={cy}
+                          r="4"
+                          fill="#facc15"
+                          stroke="#050811"
+                          strokeWidth="1.5"
+                        />
+
+                        {/* Axis Labels */}
+                        <text x="4" y={padT + 6} fill="#94a3b8" fontSize="8" fontFamily="monospace">
+                          {maxV.toFixed(1)}
+                        </text>
+                        <text x="4" y={gH - padB} fill="#94a3b8" fontSize="8" fontFamily="monospace">
+                          {minV.toFixed(1)}
+                        </text>
+                        <text
+                          x={gW - padR}
+                          y={gH - 4}
+                          textAnchor="end"
+                          fill="#94a3b8"
+                          fontSize="8"
+                          fontFamily="monospace"
+                        >
+                          t ({totalT.toFixed(1)}s)
+                        </text>
+                      </svg>
+                    </div>
+
+                    {/* Calculus & Graphical Interpretation Readout (LO 1.3.A.4.i - iv) */}
+                    <div className="p-2 rounded-xl bg-black/50 border border-white/5 font-mono text-[10px] space-y-1">
+                      {repTab === 'pos' && (
+                        <>
+                          <div className="flex justify-between text-amber-300 font-bold">
+                            <span>Tangent Slope d{repAxis}/dt = v_{repAxis}(t) [1.3.A.4.i]:</span>
+                            <span>{velVal.toFixed(2)} m/s</span>
+                          </div>
+                          <div className="flex justify-between text-slate-400">
+                            <span>Instantaneous Position {repAxis}(t):</span>
+                            <span className="text-emerald-300">{posVal.toFixed(2)} m</span>
+                          </div>
+                        </>
+                      )}
+                      {repTab === 'vel' && (
+                        <>
+                          <div className="flex justify-between text-amber-300 font-bold">
+                            <span>Tangent Slope dv_{repAxis}/dt = a_{repAxis}(t) [1.3.A.4.ii]:</span>
+                            <span>{accVal.toFixed(2)} m/s²</span>
+                          </div>
+                          <div className="flex justify-between text-sky-300 font-bold">
+                            <span>Shaded Area ∫v_{repAxis} dt = Δ{repAxis} [1.3.A.4.iii]:</span>
+                            <span>{deltaPos.toFixed(2)} m</span>
+                          </div>
+                        </>
+                      )}
+                      {repTab === 'acc' && (
+                        <>
+                          <div className="flex justify-between text-rose-300 font-bold">
+                            <span>Shaded Area ∫a_{repAxis} dt = Δv_{repAxis} [1.3.A.4.iv]:</span>
+                            <span>{deltaVel.toFixed(2)} m/s</span>
+                          </div>
+                          <div className="flex justify-between text-slate-400">
+                            <span>Instantaneous Accel a_{repAxis}(t):</span>
+                            <span className="text-white">{accVal.toFixed(2)} m/s²</span>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })() : (() => {
+                // Stroboscopic Motion Diagram (Equal Δt Snapshots with v and a vectors, LO 1.3.A.1)
+                const numDots = 9;
+                const maxX = Math.max(10, auditedSummary.maxRange);
+                const maxY = Math.max(5, auditedSummary.maxHeight * 1.25);
+                const strobeSamples = Array.from({ length: numDots }).map((_, idx) => {
+                  const pIdx = Math.min(
+                    pts.length - 1,
+                    Math.floor((idx / (numDots - 1)) * (pts.length - 1))
+                  );
+                  return pts[pIdx];
+                });
+
+                return (
+                  <div className="space-y-1.5">
+                    <div className="p-2 rounded-xl bg-black/60 border border-white/10">
+                      <svg viewBox="0 0 280 120" className="w-full h-28 overflow-visible">
+                        <line x1="16" y1="104" x2="268" y2="104" stroke="#334155" strokeWidth="1.2" />
+                        {strobeSamples.map((sp, idx) => {
+                          const rHoriz = Math.hypot(sp.x, sp.z);
+                          const sx = 20 + (rHoriz / maxX) * 236;
+                          const sy = 102 - (Math.max(0, sp.y) / maxY) * 82;
+                          const vxLen = (Math.hypot(sp.vx, sp.vz) / Math.max(1, activeLaunchParams.speed)) * 18;
+                          const vyLen = (-sp.vy / Math.max(1, activeLaunchParams.speed)) * 18;
+                          return (
+                            <g key={idx}>
+                              {/* Velocity Vector at Equal Δt Snapshot */}
+                              <line
+                                x1={sx}
+                                y1={sy}
+                                x2={sx + vxLen}
+                                y2={sy + vyLen}
+                                stroke="#10b981"
+                                strokeWidth="1.6"
+                              />
+                              {/* Downward Acceleration Vector at Snapshot */}
+                              <line
+                                x1={sx}
+                                y1={sy}
+                                x2={sx}
+                                y2={sy + 12}
+                                stroke="#f43f5e"
+                                strokeWidth="1.4"
+                              />
+                              <circle cx={sx} cy={sy} r="3.2" fill="#38bdf8" stroke="#fff" strokeWidth="1" />
+                            </g>
+                          );
+                        })}
+                      </svg>
+                      <div className="flex justify-between text-[9px] font-mono text-slate-400 pt-1">
+                        <span>Equal Δt = {(totalT / 8).toFixed(2)}s snapshots</span>
+                        <span className="text-emerald-400">Green: v⃗ · Red: a⃗</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Narrative Motion Description (LO 1.3.A.1) */}
+              <div className="p-2 rounded-xl bg-emerald-950/30 border border-emerald-500/25 text-[10px] text-slate-200 leading-relaxed">
+                <span className="font-bold text-emerald-300 uppercase font-mono mr-1">
+                  Narrative (1.3.A.1):
+                </span>
+                {phaseDesc}
+              </div>
+            </div>
+          );
+        })()}
         </>
         )}
       </div>

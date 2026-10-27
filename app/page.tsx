@@ -834,6 +834,8 @@ export default function SimulationCockpit() {
                     ? '8.3 Electric Fields Sandbox'
                     : activeMode === 'circuit'
                     ? 'Unit 11 Circuit Workbench'
+                    : activeMode === 'coulomb'
+                    ? '8.1 Electric Charge & Coulomb Force'
                     : '1.3 Projectile & Drag Ballistics'}
                 </span>
               </>
@@ -873,7 +875,9 @@ export default function SimulationCockpit() {
               {/* 3D / 2D Camera Toggle (Synchronized with current simulation) */}
               <div className="hidden md:flex items-center bg-[#050811] p-0.5 rounded-xl border border-white/10 text-[11px]">
                 <button
+                  disabled={activeMode === 'coulomb'}
                   onClick={() => {
+                    if (activeMode === 'coulomb') return;
                     if (activeMode === 'field')
                       setFieldControls(prev => ({ ...prev, viewMode: '3d' }));
                     else if (activeMode === 'circuit')
@@ -882,19 +886,27 @@ export default function SimulationCockpit() {
                       setProjectileViewMode('3d');
                   }}
                   className={`px-2.5 py-1 rounded-lg font-medium transition ${
-                    (activeMode === 'projectile'
-                      ? projectileViewMode === '3d'
-                      : (activeMode === 'field' ? fieldControls.viewMode : circuitControls.viewMode) === '3d')
+                    activeMode === 'coulomb'
+                      ? 'text-slate-600 bg-white/[0.02] cursor-not-allowed opacity-45'
+                      : (activeMode === 'projectile'
+                          ? projectileViewMode === '3d'
+                          : (activeMode === 'field' ? fieldControls.viewMode : circuitControls.viewMode) === '3d')
                       ? isCurrentMechanics
                         ? 'bg-emerald-400 text-slate-950 font-bold shadow-lg shadow-emerald-500/20'
                         : 'bg-sky-400 text-slate-950 font-bold shadow-lg shadow-sky-500/20'
                       : 'text-slate-400 hover:text-white'
                   }`}
+                  title={
+                    activeMode === 'coulomb'
+                      ? 'Topic 8.1 Workbench is a 2D simulation'
+                      : '3D Perspective View'
+                  }
                 >
                   3D
                 </button>
                 <button
                   onClick={() => {
+                    if (activeMode === 'coulomb') return;
                     if (activeMode === 'field')
                       setFieldControls(prev => ({ ...prev, viewMode: 'top' }));
                     else if (activeMode === 'circuit')
@@ -903,6 +915,7 @@ export default function SimulationCockpit() {
                       setProjectileViewMode('2d');
                   }}
                   className={`px-2.5 py-1 rounded-lg font-medium transition ${
+                    activeMode === 'coulomb' ||
                     (activeMode === 'projectile'
                       ? projectileViewMode === '2d'
                       : (activeMode === 'field' ? fieldControls.viewMode : circuitControls.viewMode) === 'top')
@@ -911,13 +924,9 @@ export default function SimulationCockpit() {
                         : 'bg-sky-400 text-slate-950 font-bold shadow-lg shadow-sky-500/20'
                       : 'text-slate-400 hover:text-white'
                   }`}
-                  title={
-                    activeMode === 'projectile'
-                      ? 'Lock 2D vantage point perpendicular to projectile motion'
-                      : '2D Orthographic Top-Down Projection'
-                  }
+                  title="2D View"
                 >
-                  {activeMode === 'projectile' ? '2D View' : '2D Top'}
+                  2D
                 </button>
               </div>
 
@@ -1519,6 +1528,8 @@ export default function SimulationCockpit() {
                       <option value="capacitor">Preset: Parallel Plate Capacitor</option>
                       <option value="grounded_plane">Preset: Point near Grounded Plane</option>
                       <option value="repulsion">Preset: Like Charges (Repulsion)</option>
+                      <option value="conductor_sphere">8.3.B.1: Charged Conducting Sphere (E_in = 0)</option>
+                      <option value="insulator_sphere">8.3.B.2: Charged Insulating Sphere (E_in ≠ 0)</option>
                     </select>
                   </div>
 
@@ -2385,7 +2396,7 @@ export default function SimulationCockpit() {
           {/* ========================================================================= */}
           {/* FLOATING RIGHT TELEMETRY POD                                              */}
           {/* ========================================================================= */}
-          {activeMode !== 'projectile' && (
+          {(activeMode === 'field' || activeMode === 'circuit') && (
             <div
               className={`absolute top-20 right-4 z-10 bg-[#080e1e]/85 backdrop-blur-xl border border-white/10 rounded-2xl p-4 ${
                 isRightPanelCollapsed ? 'w-56' : 'w-72'

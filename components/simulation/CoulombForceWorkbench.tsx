@@ -2,7 +2,6 @@
 
 import React, { useState, useRef, useCallback, useMemo } from 'react';
 import {
-  Zap,
   Sliders,
   Scale,
   Sparkles,
@@ -13,6 +12,9 @@ import {
   Activity,
   CheckCircle2,
   Plus,
+  Crosshair,
+  Bookmark,
+  Navigation,
 } from 'lucide-react';
 
 // Physical Constants
@@ -23,6 +25,10 @@ const ELEMENTARY_CHARGE = 1.602176634e-19; // Coulombs
 const PROTON_MASS = 1.67262192e-27; // kg
 const ELECTRON_MASS = 9.1093837e-31; // kg
 const ALPHA_MASS = 6.6446572e-27; // kg
+
+// Strict Charge Colors: Positive is ALWAYS Red, Negative is ALWAYS Blue
+const POSITIVE_RED = '#ef4444';
+const NEGATIVE_BLUE = '#3b82f6';
 
 export type ParticleArchetype =
   | 'proton'
@@ -44,6 +50,14 @@ export interface CoulombCharge {
   x: number; // meters in simulation space (-11.5 to +11.5)
   y: number; // meters in simulation space (-6.5 to +6.5)
   color: string;
+}
+
+export interface StoredForcePoint {
+  id: string;
+  label: string;
+  x: number;
+  y: number;
+  saved: boolean;
 }
 
 export interface DielectricMedium {
@@ -112,6 +126,7 @@ interface CoulombForceWorkbenchProps {
 
 export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ onToast }) => {
   // Charges state (2 to 4 charges, fulfilling AP Physics C limit)
+  // Positive charges are ALWAYS Red (#ef4444), Negative charges are ALWAYS Blue (#3b82f6)
   const [charges, setCharges] = useState<CoulombCharge[]>([
     {
       id: 'q1',
@@ -123,7 +138,7 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
       massKg: 0.001,
       x: -4.0,
       y: 0.0,
-      color: '#f43f5e', // Ruby / Positive
+      color: POSITIVE_RED,
     },
     {
       id: 'q2',
@@ -135,7 +150,7 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
       massKg: 0.001,
       x: 4.0,
       y: 0.0,
-      color: '#38bdf8', // Sky / Negative
+      color: NEGATIVE_BLUE,
     },
   ]);
 
@@ -143,12 +158,23 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
   const [selectedMediumId, setSelectedMediumId] = useState<string>('vacuum');
   const [customKappa, setCustomKappa] = useState<number>(1.0);
   const [showGravitationalComparison] = useState<boolean>(true);
-  const [showSuperpositionVectors, setShowSuperpositionVectors] = useState<boolean>(true);
   const [showDetailsDrawer, setShowDetailsDrawer] = useState<boolean>(false);
   const [scaleMode, setScaleMode] = useState<'macro' | 'atomic'>('macro');
 
+  // Force arrows display on selected charge: toggle + mode ('net' vs 'individual')
+  const [showSelectedChargeForces, setShowSelectedChargeForces] = useState<boolean>(true);
+  const [forceVectorDisplayMode, setForceVectorDisplayMode] = useState<'net' | 'individual'>('individual');
+
+  // Click-on-plane force probe points & stored points state
+  const [probePoints, setProbePoints] = useState<StoredForcePoint[]>([
+    { id: 'pt_1', label: 'P1', x: 0.0, y: 2.5, saved: true },
+  ]);
+  const [selectedProbeId, setSelectedProbeId] = useState<string | null>('pt_1');
+  const [nextProbeCounter, setNextProbeCounter] = useState<number>(2);
+
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [draggingChargeId, setDraggingChargeId] = useState<string | null>(null);
+  const didDragRef = useRef<boolean>(false);
 
   // Active medium permittivity kappa
   const activeMedium = DIELECTRIC_PRESETS.find(m => m.id === selectedMediumId) || DIELECTRIC_PRESETS[0];
@@ -170,7 +196,9 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
   const pairwiseInteractions = useMemo(() => {
     const list: {
       fromId: string;
+      fromName: string;
       toId: string;
+      toName: string;
       r: number;
       feMag: number;
       fgMag: number;
@@ -211,7 +239,9 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
 
         list.push({
           fromId: c1.id,
+          fromName: c1.name.split(' ')[0],
           toId: c2.id,
+          toName: c2.name.split(' ')[0],
           r,
           feMag,
           fgMag,
@@ -226,18 +256,69 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
 
   // Compute Net Force on each charge (Vector Superposition: F_net = sum F_ij)
   const netForces = useMemo(() => {
-    const map = new Map<string, { fx: number; fy: number; mag: number }>();
+    const map = new Map<string, { fx: number; fy: number; mag: number; angleDeg: number }>();
     charges.forEach(c => {
       const incoming = pairwiseInteractions.filter(p => p.toId === c.id);
       const fx = incoming.reduce((acc, p) => acc + p.feVec.x, 0);
       const fy = incoming.reduce((acc, p) => acc + p.feVec.y, 0);
       const mag = Math.hypot(fx, fy);
-      map.set(c.id, { fx, fy, mag });
+      const angleDeg = (Math.atan2(fy, fx) * 180) / Math.PI;
+      map.set(c.id, { fx, fy, mag, angleDeg });
     });
     return map;
   }, [charges, pairwiseInteractions]);
 
-  // Coordinate Conversion (Pure math on 1000x600 SVG viewBox, no ref reads during render)
+  // Calculate electrostatic force at any probed point (x, y) on the plane
+  // Uses a standard unit positive test charge at the point (+1 μC in macro mode, +1e in atomic mode)
+  const computeForceAtPoint = useCallback(
+    (px: number, py: number) => {
+      const qProbe = scaleMode === 'atomic' ? ELEMENTARY_CHARGE : 1.0e-6;
+      const mProbe = scaleMode === 'atomic' ? PROTON_MASS : 0.001;
+      let fx = 0;
+      let fy = 0;
+      let fgTotal = 0;
+
+      charges.forEach(c => {
+        const dx = px - c.x;
+        const dy = py - c.y;
+        const r = Math.max(0.15, Math.hypot(dx, dy));
+        const qSource = getChargeCoulombs(c);
+        // F = k * qSource * qProbe / r^2 along (px - c.x, py - c.y)
+        const fSigned = (effectiveCoulombK * qSource * qProbe) / (r * r);
+        fx += (dx / r) * fSigned;
+        fy += (dy / r) * fSigned;
+
+        fgTotal += (GRAVITATIONAL_G * c.massKg * mProbe) / (r * r);
+      });
+
+      const mag = Math.hypot(fx, fy);
+      const eFieldMag = mag / qProbe;
+      const angleDeg = (Math.atan2(fy, fx) * 180) / Math.PI;
+      const ratio = fgTotal > 0 ? mag / fgTotal : Infinity;
+
+      return {
+        fx,
+        fy,
+        mag,
+        eFieldMag,
+        angleDeg,
+        fgTotal,
+        ratio,
+        probeUnitLabel: scaleMode === 'atomic' ? '+1e' : '+1.0 μC',
+      };
+    },
+    [charges, effectiveCoulombK, getChargeCoulombs, scaleMode]
+  );
+
+  const selectedProbePoint =
+    probePoints.find(p => p.id === selectedProbeId) || probePoints[probePoints.length - 1] || null;
+
+  const selectedProbeForce = useMemo(() => {
+    if (!selectedProbePoint) return null;
+    return computeForceAtPoint(selectedProbePoint.x, selectedProbePoint.y);
+  }, [selectedProbePoint, computeForceAtPoint]);
+
+  // Coordinate Conversion (Pure math on 1000x600 SVG viewBox)
   const toSvgX = (xMeters: number) => 500 + (xMeters / 12) * 450;
   const toSvgY = (yMeters: number) => 300 - (yMeters / 7) * 260;
 
@@ -246,10 +327,12 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
     e.stopPropagation();
     setSelectedChargeId(id);
     setDraggingChargeId(id);
+    didDragRef.current = false;
   };
 
   const handleMouseMoveCanvas = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!draggingChargeId || !containerRef.current) return;
+    didDragRef.current = true;
     const rect = containerRef.current.getBoundingClientRect();
     const pixelX = e.clientX - rect.left;
     const pixelY = e.clientY - rect.top;
@@ -277,6 +360,69 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
     }
   };
 
+  // Click on plane to probe force at that point and create/select a labeled point
+  const handleClickPlane = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (draggingChargeId || didDragRef.current) {
+      didDragRef.current = false;
+      return;
+    }
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const pixelX = e.clientX - rect.left;
+    const pixelY = e.clientY - rect.top;
+
+    const meterX = parseFloat(
+      Math.max(-11.5, Math.min(11.5, ((pixelX - rect.width / 2) / (rect.width * 0.45)) * 12)).toFixed(2)
+    );
+    const meterY = parseFloat(
+      Math.max(-6.5, Math.min(6.5, -(((pixelY - rect.height / 2) / (rect.height * 0.433)) * 7))).toFixed(2)
+    );
+
+    // Replace any unsaved temporary point or create a new labeled point
+    const existingUnsaved = probePoints.find(p => !p.saved);
+    if (existingUnsaved) {
+      const updatedId = existingUnsaved.id;
+      setProbePoints(prev =>
+        prev.map(p => (p.id === updatedId ? { ...p, x: meterX, y: meterY } : p))
+      );
+      setSelectedProbeId(updatedId);
+    } else {
+      const newId = `pt_${Date.now()}`;
+      const newLabel = `P${nextProbeCounter}`;
+      setNextProbeCounter(prev => prev + 1);
+      setProbePoints(prev => [
+        ...prev,
+        { id: newId, label: newLabel, x: meterX, y: meterY, saved: false },
+      ]);
+      setSelectedProbeId(newId);
+    }
+  };
+
+  const handleStoreCurrentPoint = () => {
+    if (!selectedProbePoint) return;
+    if (selectedProbePoint.saved) {
+      onToast?.(`Point ${selectedProbePoint.label} is already stored.`);
+      return;
+    }
+    setProbePoints(prev =>
+      prev.map(p => (p.id === selectedProbePoint.id ? { ...p, saved: true } : p))
+    );
+    onToast?.(
+      `Stored point ${selectedProbePoint.label} at (${selectedProbePoint.x.toFixed(2)}m, ${selectedProbePoint.y.toFixed(2)}m)`
+    );
+  };
+
+  const handleDeleteProbePoint = (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setProbePoints(prev => {
+      const next = prev.filter(p => p.id !== id);
+      if (selectedProbeId === id) {
+        setSelectedProbeId(next.length > 0 ? next[next.length - 1].id : null);
+      }
+      return next;
+    });
+  };
+
   // Add / Remove Charge handlers (capped at 4 charges per CED boundary statement)
   const handleAddCharge = () => {
     if (charges.length >= 4) {
@@ -295,7 +441,7 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
       massKg: scaleMode === 'atomic' ? (sign > 0 ? PROTON_MASS : ELECTRON_MASS) : 0.001,
       x: (charges.length - 1.5) * 3,
       y: charges.length % 2 === 0 ? 3 : -3,
-      color: sign > 0 ? '#10b981' : '#f59e0b',
+      color: sign > 0 ? POSITIVE_RED : NEGATIVE_BLUE,
     };
     setCharges(prev => [...prev, newCharge]);
     setSelectedChargeId(newId);
@@ -313,7 +459,7 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
     }
   };
 
-  // Archetype selection
+  // Archetype selection (strictly Red for positive, Blue for negative)
   const handleApplyArchetype = (cId: string, arch: ParticleArchetype) => {
     setCharges(prev =>
       prev.map(c => {
@@ -327,7 +473,7 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
               qElementary: 1,
               qMicro: ELEMENTARY_CHARGE * 1e6,
               massKg: PROTON_MASS,
-              color: '#ef4444',
+              color: POSITIVE_RED,
             };
           case 'electron':
             return {
@@ -337,7 +483,7 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
               qElementary: -1,
               qMicro: -(ELEMENTARY_CHARGE * 1e6),
               massKg: ELECTRON_MASS,
-              color: '#0ea5e9',
+              color: NEGATIVE_BLUE,
             };
           case 'alpha':
             return {
@@ -347,7 +493,7 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
               qElementary: 2,
               qMicro: 2 * ELEMENTARY_CHARGE * 1e6,
               massKg: ALPHA_MASS,
-              color: '#a855f7',
+              color: POSITIVE_RED,
             };
           case 'positron':
             return {
@@ -357,7 +503,7 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
               qElementary: 1,
               qMicro: ELEMENTARY_CHARGE * 1e6,
               massKg: ELECTRON_MASS,
-              color: '#ec4899',
+              color: POSITIVE_RED,
             };
           case 'macro_pos':
             return {
@@ -367,7 +513,7 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
               qMicro: 5.0,
               qElementary: Math.round(5.0e-6 / ELEMENTARY_CHARGE),
               massKg: 0.001,
-              color: '#f43f5e',
+              color: POSITIVE_RED,
             };
           case 'macro_neg':
             return {
@@ -377,7 +523,7 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
               qMicro: -5.0,
               qElementary: -Math.round(5.0e-6 / ELEMENTARY_CHARGE),
               massKg: 0.001,
-              color: '#38bdf8',
+              color: NEGATIVE_BLUE,
             };
           default:
             return c;
@@ -385,15 +531,6 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
       })
     );
   };
-
-  // Primary pair (q1 and q2) for direct 1-to-1 analysis
-  const primaryPair =
-    pairwiseInteractions.find(p => p.fromId === 'q1' && p.toId === 'q2') ||
-    pairwiseInteractions[0];
-  const separationR = primaryPair ? primaryPair.r : 5.0;
-  const primaryFE = primaryPair ? primaryPair.feMag : 0;
-  const primaryFG = primaryPair ? primaryPair.fgMag : 0;
-  const primaryRatio = primaryPair ? primaryPair.ratio : 0;
 
   // Format numbers nicely in scientific notation
   const formatSci = (val: number, unit = ''): string => {
@@ -405,6 +542,16 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
     return `${mantissa} × 10${exponent.replace('+', '')} ${unit}`.trim();
   };
 
+  // Incoming individual forces on the currently selected charge
+  const selectedChargeIncomingForces = useMemo(() => {
+    if (!selectedCharge) return [];
+    return pairwiseInteractions.filter(p => p.toId === selectedCharge.id);
+  }, [pairwiseInteractions, selectedCharge]);
+
+  const selectedChargeNetForce = selectedCharge
+    ? netForces.get(selectedCharge.id) || { fx: 0, fy: 0, mag: 0, angleDeg: 0 }
+    : { fx: 0, fy: 0, mag: 0, angleDeg: 0 };
+
   return (
     <div
       className="relative w-full h-full flex flex-col bg-[#050811] text-slate-100 overflow-hidden select-none font-sans"
@@ -412,126 +559,6 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
       onMouseUp={handleMouseUpCanvas}
       onMouseLeave={handleMouseUpCanvas}
     >
-      {/* Top Pedagogical Breadcrumb Bar */}
-      <div className="px-5 py-3 border-b border-white/10 bg-[#070b18]/90 backdrop-blur-md flex flex-wrap items-center justify-between gap-3 shrink-0 z-20">
-        <div className="flex items-center space-x-3">
-          <div className="p-2 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400">
-            <Zap className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="flex items-center space-x-2.5">
-              <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-cyan-400 bg-cyan-950/60 px-2 py-0.5 rounded-md border border-cyan-800/40">
-                AP Physics C: E&amp;M · Topic 8.1
-              </span>
-              <h1 className="text-sm font-bold text-white tracking-tight">
-                Electric Charge &amp; Coulomb Force Workbench
-              </h1>
-            </div>
-            <p className="text-[11px] text-slate-400 mt-0.5">
-              Inverse-Square Law · Dielectric Permittivity (ε = κε₀) · Newton&apos;s Third Law · Gravitational Comparison (F_E vs F_G)
-            </p>
-          </div>
-        </div>
-
-        {/* Quick Presets Menu */}
-        <div className="flex items-center space-x-2">
-          <div className="flex items-center bg-[#0b1328] p-1 rounded-xl border border-white/10 text-xs">
-            <button
-              onClick={() => {
-                setScaleMode('macro');
-                setCharges([
-                  {
-                    id: 'q1',
-                    name: 'q₁ (+3.0 μC)',
-                    archetype: 'macro_pos',
-                    qMicro: 3.0,
-                    useElementaryUnits: false,
-                    qElementary: Math.round(3.0e-6 / ELEMENTARY_CHARGE),
-                    massKg: 0.001,
-                    x: -4.0,
-                    y: 0.0,
-                    color: '#f43f5e',
-                  },
-                  {
-                    id: 'q2',
-                    name: 'q₂ (-3.0 μC)',
-                    archetype: 'macro_neg',
-                    qMicro: -3.0,
-                    useElementaryUnits: false,
-                    qElementary: -Math.round(3.0e-6 / ELEMENTARY_CHARGE),
-                    massKg: 0.001,
-                    x: 4.0,
-                    y: 0.0,
-                    color: '#38bdf8',
-                  },
-                ]);
-                setSelectedMediumId('vacuum');
-                onToast?.('Loaded Macro Dipole (+3μC / -3μC)');
-              }}
-              className={`px-3 py-1 rounded-lg font-semibold transition ${
-                scaleMode === 'macro'
-                  ? 'bg-cyan-500 text-slate-950'
-                  : 'text-slate-300 hover:text-white'
-              }`}
-            >
-              Macro Charges (μC)
-            </button>
-            <button
-              onClick={() => {
-                setScaleMode('atomic');
-                setCharges([
-                  {
-                    id: 'q1',
-                    name: 'Proton p₁ (+1e)',
-                    archetype: 'proton',
-                    qMicro: ELEMENTARY_CHARGE * 1e6,
-                    useElementaryUnits: true,
-                    qElementary: 1,
-                    massKg: PROTON_MASS,
-                    x: -3.0,
-                    y: 0.0,
-                    color: '#ef4444',
-                  },
-                  {
-                    id: 'q2',
-                    name: 'Proton p₂ (+1e)',
-                    archetype: 'proton',
-                    qMicro: ELEMENTARY_CHARGE * 1e6,
-                    useElementaryUnits: true,
-                    qElementary: 1,
-                    massKg: PROTON_MASS,
-                    x: 3.0,
-                    y: 0.0,
-                    color: '#ef4444',
-                  },
-                ]);
-                setSelectedMediumId('vacuum');
-                onToast?.('Loaded Quantum Subatomic: Two Protons (FE / FG = 1.24×10³⁶)');
-              }}
-              className={`px-3 py-1 rounded-lg font-semibold transition ${
-                scaleMode === 'atomic'
-                  ? 'bg-cyan-500 text-slate-950'
-                  : 'text-slate-300 hover:text-white'
-              }`}
-            >
-              Subatomic Particles (e)
-            </button>
-          </div>
-
-          <button
-            onClick={() => setShowDetailsDrawer(prev => !prev)}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold border flex items-center space-x-1.5 transition ${
-              showDetailsDrawer
-                ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
-                : 'bg-white/5 text-slate-300 border-white/10 hover:bg-white/10'
-            }`}
-          >
-            <Info className="w-3.5 h-3.5 text-cyan-400" />
-            <span>AP Theory &amp; Formulas</span>
-          </button>
-        </div>
-      </div>
-
       {/* Main Interactive Stage */}
       <div className="flex-1 flex overflow-hidden relative">
         {/* Left Interactive 2D Coordinate Grid Stage */}
@@ -555,7 +582,11 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
           />
 
           {/* Pure SVG Vector & Charges Canvas (1000x600 viewBox) */}
-          <svg viewBox="0 0 1000 600" className="absolute inset-0 w-full h-full select-none">
+          <svg
+            viewBox="0 0 1000 600"
+            onClick={handleClickPlane}
+            className="absolute inset-0 w-full h-full select-none cursor-crosshair"
+          >
             <defs>
               <pattern id="gridMinor" width="25" height="25" patternUnits="userSpaceOnUse">
                 <path d="M 25 0 L 0 0 0 25" fill="none" stroke="rgba(255, 255, 255, 0.04)" strokeWidth="1" />
@@ -573,7 +604,7 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
                 markerHeight="6"
                 orient="auto-start-reverse"
               >
-                <path d="M 0 1 L 10 5 L 0 9 z" fill="#f43f5e" />
+                <path d="M 0 1 L 10 5 L 0 9 z" fill="#ef4444" />
               </marker>
               <marker
                 id="arrowAttractive"
@@ -584,7 +615,7 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
                 markerHeight="6"
                 orient="auto-start-reverse"
               >
-                <path d="M 0 1 L 10 5 L 0 9 z" fill="#38bdf8" />
+                <path d="M 0 1 L 10 5 L 0 9 z" fill="#3b82f6" />
               </marker>
               <marker
                 id="arrowNet"
@@ -596,6 +627,28 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
                 orient="auto-start-reverse"
               >
                 <path d="M 0 1 L 10 5 L 0 9 z" fill="#34d399" />
+              </marker>
+              <marker
+                id="arrowIndiv"
+                viewBox="0 0 10 10"
+                refX="8"
+                refY="5"
+                markerWidth="6"
+                markerHeight="6"
+                orient="auto-start-reverse"
+              >
+                <path d="M 0 1 L 10 5 L 0 9 z" fill="#f59e0b" />
+              </marker>
+              <marker
+                id="arrowProbe"
+                viewBox="0 0 10 10"
+                refX="8"
+                refY="5"
+                markerWidth="6"
+                markerHeight="6"
+                orient="auto-start-reverse"
+              >
+                <path d="M 0 1 L 10 5 L 0 9 z" fill="#22d3ee" />
               </marker>
             </defs>
 
@@ -614,8 +667,8 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
                   return (
                     <g key={idx} transform={`translate(${px}, ${py})`}>
                       <ellipse rx="16" ry="8" fill="none" stroke="rgba(56,189,248,0.3)" strokeDasharray="2 2" />
-                      <circle cx="-7" cy="0" r="3.5" fill="#38bdf8" opacity="0.7" />
-                      <circle cx="7" cy="0" r="3.5" fill="#f43f5e" opacity="0.7" />
+                      <circle cx="-7" cy="0" r="3.5" fill={NEGATIVE_BLUE} opacity="0.7" />
+                      <circle cx="7" cy="0" r="3.5" fill={POSITIVE_RED} opacity="0.7" />
                       <text x="-9" y="3" fontSize="8" fill="#fff" fontFamily="monospace">-</text>
                       <text x="5" y="3" fontSize="8" fill="#fff" fontFamily="monospace">+</text>
                     </g>
@@ -624,7 +677,7 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
               </g>
             )}
 
-            {/* Pairwise Lines of Separation & Newton's 3rd Law Force Vectors */}
+            {/* Pairwise Dashed Lines of Separation & Distance Labels */}
             {charges.map((c1, i) =>
               charges.slice(i + 1).map(c2 => {
                 const x1 = toSvgX(c1.x);
@@ -637,28 +690,10 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
                 const pInteraction = pairwiseInteractions.find(
                   p => p.fromId === c1.id && p.toId === c2.id
                 );
-                const isRepulsive = pInteraction?.isRepulsive ?? true;
                 const r = pInteraction?.r || 1.0;
 
-                // Compute vector arrow length (normalized for clear visualization)
-                const vLen = Math.min(
-                  80,
-                  Math.max(26, 20 + Math.log10(pInteraction?.feMag || 1) * 5)
-                );
-                const angle = Math.atan2(y2 - y1, x2 - x1);
-
-                // Direction along line of separation
-                const arrow1Dir = isRepulsive ? angle + Math.PI : angle;
-                const arrow2Dir = isRepulsive ? angle : angle + Math.PI;
-
-                const f1TipX = x1 + Math.cos(arrow1Dir) * vLen;
-                const f1TipY = y1 + Math.sin(arrow1Dir) * vLen;
-                const f2TipX = x2 + Math.cos(arrow2Dir) * vLen;
-                const f2TipY = y2 + Math.sin(arrow2Dir) * vLen;
-
                 return (
-                  <g key={`${c1.id}-${c2.id}`}>
-                    {/* Dashed line of separation */}
+                  <g key={`sep-${c1.id}-${c2.id}`}>
                     <line
                       x1={x1}
                       y1={y1}
@@ -669,30 +704,6 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
                       strokeDasharray="4 4"
                       opacity="0.65"
                     />
-
-                    {/* Force Vector 1 (on c1 due to c2): F_21 */}
-                    <line
-                      x1={x1}
-                      y1={y1}
-                      x2={f1TipX}
-                      y2={f1TipY}
-                      stroke={isRepulsive ? '#f43f5e' : '#38bdf8'}
-                      strokeWidth="3.2"
-                      markerEnd={isRepulsive ? 'url(#arrowRepulsive)' : 'url(#arrowAttractive)'}
-                    />
-
-                    {/* Force Vector 2 (on c2 due to c1): F_12 = -F_21 (Newton's 3rd Law) */}
-                    <line
-                      x1={x2}
-                      y1={y2}
-                      x2={f2TipX}
-                      y2={f2TipY}
-                      stroke={isRepulsive ? '#f43f5e' : '#38bdf8'}
-                      strokeWidth="3.2"
-                      markerEnd={isRepulsive ? 'url(#arrowRepulsive)' : 'url(#arrowAttractive)'}
-                    />
-
-                    {/* Separation Distance Label Callout */}
                     <g transform={`translate(${midX}, ${midY - 14})`}>
                       <rect
                         x="-38"
@@ -722,58 +733,224 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
               })
             )}
 
-            {/* Net Force Vectors when Superposition is enabled */}
-            {showSuperpositionVectors &&
-              charges.length > 2 &&
-              charges.map(c => {
-                const cx = toSvgX(c.x);
-                const cy = toSvgY(c.y);
-                const net = netForces.get(c.id);
+            {/* Electrostatic Forces Acting Upon Selected Charge (Net vs Individual Toggle) */}
+            {showSelectedChargeForces && selectedCharge && (() => {
+              const cx = toSvgX(selectedCharge.x);
+              const cy = toSvgY(selectedCharge.y);
+
+              if (forceVectorDisplayMode === 'net') {
+                const net = netForces.get(selectedCharge.id);
                 if (!net || net.mag === 0) return null;
 
-                const netAngle = Math.atan2(-net.fy, net.fx);
-                const netLen = Math.min(90, Math.max(30, 24 + Math.log10(net.mag) * 5));
-                const tipX = cx + Math.cos(netAngle) * netLen;
-                const tipY = cy + Math.sin(netAngle) * netLen;
+                // Note: SVG Y is inverted relative to Cartesian Y
+                const svgAngle = Math.atan2(-net.fy, net.fx);
+                const netLen = Math.min(130, Math.max(36, 35 + Math.log10(net.mag + 1e-30) * 6));
+                const tipX = cx + Math.cos(svgAngle) * netLen;
+                const tipY = cy + Math.sin(svgAngle) * netLen;
 
                 return (
-                  <g key={`net-${c.id}`}>
+                  <g key={`net-selected-${selectedCharge.id}`}>
                     <line
                       x1={cx}
                       y1={cy}
                       x2={tipX}
                       y2={tipY}
                       stroke="#34d399"
-                      strokeWidth="3.6"
+                      strokeWidth="3.8"
                       markerEnd="url(#arrowNet)"
                     />
+                    <g transform={`translate(${tipX + Math.cos(svgAngle) * 28}, ${tipY + Math.sin(svgAngle) * 18})`}>
+                      <rect
+                        x="-46"
+                        y="-10"
+                        width="92"
+                        height="20"
+                        rx="5"
+                        fill="#061512"
+                        stroke="#34d399"
+                        strokeWidth="1.2"
+                      />
+                      <text
+                        x="0"
+                        y="4"
+                        textAnchor="middle"
+                        fill="#6ee7b7"
+                        fontSize="10"
+                        fontFamily="monospace"
+                        fontWeight="bold"
+                      >
+                        F_net ({selectedCharge.id})
+                      </text>
+                    </g>
+                  </g>
+                );
+              } else {
+                // Individual Forces acting upon the selected charge from all other charges
+                const incoming = pairwiseInteractions.filter(p => p.toId === selectedCharge.id);
+                const maxMag = Math.max(...incoming.map(p => p.feMag), 1e-30);
+                const minMag = Math.min(...incoming.map(p => p.feMag), maxMag);
+
+                return (
+                  <g key={`indiv-selected-${selectedCharge.id}`}>
+                    {incoming.map(p => {
+                      const svgAngle = Math.atan2(-p.feVec.y, p.feVec.x);
+                      // Scale arrow length proportionally to relative force magnitude
+                      const ratio = maxMag > minMag ? p.feMag / maxMag : 1.0;
+                      const arrowLen = Math.min(135, Math.max(36, 40 + ratio * 75));
+                      const tipX = cx + Math.cos(svgAngle) * arrowLen;
+                      const tipY = cy + Math.sin(svgAngle) * arrowLen;
+                      const strokeColor = p.isRepulsive ? POSITIVE_RED : NEGATIVE_BLUE;
+                      const markerId = p.isRepulsive ? 'url(#arrowRepulsive)' : 'url(#arrowAttractive)';
+
+                      return (
+                        <g key={`indiv-${p.fromId}-to-${p.toId}`}>
+                          <line
+                            x1={cx}
+                            y1={cy}
+                            x2={tipX}
+                            y2={tipY}
+                            stroke={strokeColor}
+                            strokeWidth="3.4"
+                            markerEnd={markerId}
+                          />
+                          <g
+                            transform={`translate(${tipX + Math.cos(svgAngle) * 26}, ${
+                              tipY + Math.sin(svgAngle) * 16
+                            })`}
+                          >
+                            <rect
+                              x="-34"
+                              y="-9"
+                              width="68"
+                              height="18"
+                              rx="5"
+                              fill="#080e20"
+                              stroke={strokeColor}
+                              strokeWidth="1.2"
+                            />
+                            <text
+                              x="0"
+                              y="3.5"
+                              textAnchor="middle"
+                              fill="#ffffff"
+                              fontSize="9.5"
+                              fontFamily="monospace"
+                              fontWeight="bold"
+                            >
+                              F_{p.fromId}→{p.toId}
+                            </text>
+                          </g>
+                        </g>
+                      );
+                    })}
+                  </g>
+                );
+              }
+            })()}
+
+            {/* Clicked / Stored Force Probe Points on Plane */}
+            {probePoints.map(pt => {
+              const sx = toSvgX(pt.x);
+              const sy = toSvgY(pt.y);
+              const isSelected = pt.id === selectedProbeId;
+              const fData = computeForceAtPoint(pt.x, pt.y);
+              const svgAngle = Math.atan2(-fData.fy, fData.fx);
+              const vecLen = Math.min(75, Math.max(24, 24 + Math.log10(fData.mag + 1e-30) * 4));
+              const tipX = sx + Math.cos(svgAngle) * vecLen;
+              const tipY = sy + Math.sin(svgAngle) * vecLen;
+
+              return (
+                <g
+                  key={pt.id}
+                  onClick={e => {
+                    e.stopPropagation();
+                    setSelectedProbeId(pt.id);
+                  }}
+                  className="cursor-pointer"
+                >
+                  {/* Force vector arrow at selected probe point */}
+                  {isSelected && fData.mag > 0 && (
+                    <line
+                      x1={sx}
+                      y1={sy}
+                      x2={tipX}
+                      y2={tipY}
+                      stroke="#22d3ee"
+                      strokeWidth="2.5"
+                      strokeDasharray="3 2"
+                      markerEnd="url(#arrowProbe)"
+                    />
+                  )}
+
+                  {/* Outer pulse ring if selected */}
+                  {isSelected && (
+                    <circle
+                      cx={sx}
+                      cy={sy}
+                      r="14"
+                      fill="rgba(34, 211, 238, 0.15)"
+                      stroke="#22d3ee"
+                      strokeWidth="1.5"
+                      strokeDasharray="3 2"
+                    />
+                  )}
+
+                  {/* Point Crosshair & Dot */}
+                  <circle
+                    cx={sx}
+                    cy={sy}
+                    r="5.5"
+                    fill={pt.saved ? '#22d3ee' : '#facc15'}
+                    stroke="#050811"
+                    strokeWidth="2"
+                  />
+
+                  {/* Clickable Small Point Label on Plane */}
+                  <g transform={`translate(${sx}, ${sy - 20})`}>
+                    <rect
+                      x="-52"
+                      y="-10"
+                      width="104"
+                      height="20"
+                      rx="6"
+                      fill={isSelected ? '#083344' : '#091022'}
+                      stroke={isSelected ? '#22d3ee' : pt.saved ? '#38bdf8' : '#facc15'}
+                      strokeWidth={isSelected ? '1.8' : '1.1'}
+                    />
                     <text
-                      x={tipX + 8}
-                      y={tipY + 4}
-                      fill="#34d399"
-                      fontSize="11"
+                      x="0"
+                      y="3.5"
+                      textAnchor="middle"
+                      fill={isSelected ? '#ecfeff' : '#cbd5e1'}
+                      fontSize="10"
                       fontFamily="monospace"
                       fontWeight="bold"
                     >
-                      ∑F_E
+                      {pt.label} ({pt.x.toFixed(1)}, {pt.y.toFixed(1)})
                     </text>
                   </g>
-                );
-              })}
+                </g>
+              );
+            })}
 
-            {/* Draggable Point Charges */}
+            {/* Draggable Point Charges (Strictly Red for +, Blue for -) */}
             {charges.map(c => {
               const cx = toSvgX(c.x);
               const cy = toSvgY(c.y);
               const isSelected = c.id === selectedChargeId;
               const qVal = getChargeCoulombs(c);
-              const isPositive = qVal > 0;
+              const isPositive = qVal >= 0;
+              const strictColor = isPositive ? POSITIVE_RED : NEGATIVE_BLUE;
 
               return (
                 <g
                   key={c.id}
                   transform={`translate(${cx}, ${cy})`}
                   onMouseDown={e => handleMouseDownOnCharge(c.id, e)}
+                  onClick={e => {
+                    e.stopPropagation();
+                    setSelectedChargeId(c.id);
+                  }}
                   className="cursor-grab active:cursor-grabbing"
                 >
                   {/* Outer selection ring */}
@@ -784,14 +961,14 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
                       stroke="#ffffff"
                       strokeWidth="2"
                       strokeDasharray="4 3"
-                      opacity="0.8"
+                      opacity="0.85"
                     />
                   )}
 
                   {/* Main Particle Sphere */}
                   <circle
                     r="20"
-                    fill={c.color}
+                    fill={strictColor}
                     stroke={isSelected ? '#ffffff' : 'rgba(255,255,255,0.5)'}
                     strokeWidth={isSelected ? 3 : 1.5}
                   />
@@ -813,28 +990,28 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
                   {/* Charge Label Pill */}
                   <g transform="translate(0, 36)" pointerEvents="none">
                     <rect
-                      x="-42"
+                      x="-44"
                       y="-9"
-                      width="84"
+                      width="88"
                       height="18"
                       rx="6"
                       fill="#080e20"
-                      stroke={isSelected ? '#38bdf8' : 'rgba(255,255,255,0.2)'}
+                      stroke={isSelected ? '#ffffff' : strictColor}
                       strokeWidth="1.2"
                     />
                     <text
                       x="0"
                       y="4"
                       textAnchor="middle"
-                      fill={isPositive ? '#6ee7b7' : '#7dd3fc'}
+                      fill={isPositive ? '#fca5a5' : '#93c5fd'}
                       fontSize="10"
                       fontFamily="monospace"
                       fontWeight="bold"
                     >
-                      {c.name.split(' ')[0]}:{' '}
+                      {c.id}:{' '}
                       {c.useElementaryUnits
                         ? `${c.qElementary > 0 ? '+' : ''}${c.qElementary}e`
-                        : `${c.qMicro.toFixed(1)}μC`}
+                        : `${c.qMicro > 0 ? '+' : ''}${c.qMicro.toFixed(1)}μC`}
                     </text>
                   </g>
                 </g>
@@ -849,39 +1026,137 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
                 <Scale className="w-3.5 h-3.5 text-cyan-400" />
                 <span>Coulomb Force Interactions (LO 8.1.A.3)</span>
               </div>
-              <div className="flex items-center gap-4 text-slate-300 pt-1">
+              <div className="flex flex-wrap items-center gap-4 text-slate-300 pt-1">
                 <span className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#f43f5e]" />
-                  <span>Repulsive Force (Like Signs)</span>
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#ef4444]" />
+                  <span>Positive (+q) / Repulsive</span>
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#38bdf8]" />
-                  <span>Attractive Force (Opposite)</span>
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#3b82f6]" />
+                  <span>Negative (−q) / Attractive</span>
                 </span>
-                {charges.length > 2 && (
-                  <span className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-[#34d399]" />
-                    <span>Net Resultant Vector (∑ F_E)</span>
-                  </span>
-                )}
-              </div>
-              <div className="text-[10px] text-slate-400 pt-0.5 font-mono">
-                Newton&apos;s 3rd Law: F₁₂ = -F₂₁ · Line of separation = line of force
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#34d399]" />
+                  <span>Net Force (∑ F_E)</span>
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#22d3ee]" />
+                  <span>Probed Plane Point</span>
+                </span>
               </div>
             </div>
           </div>
 
-          {/* Floating Instruction Banner */}
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 bg-[#070e20]/80 backdrop-blur-md px-4 py-1.5 rounded-full border border-white/10 text-xs text-slate-300 pointer-events-none flex items-center gap-2">
-            <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+          {/* Floating Instruction Banner (Positioned below global top bar) */}
+          <div className="absolute top-20 left-1/2 -translate-x-1/2 z-10 bg-[#070e20]/85 backdrop-blur-md px-4 py-1.5 rounded-full border border-white/10 text-xs text-slate-300 pointer-events-none flex items-center gap-2 shadow-lg">
+            <Sparkles className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
             <span>
-              Drag charges on the grid to change separation <strong>r</strong>. Watch force vectors update in real time.
+              Click any point on the plane to probe &amp; store force strength, or drag charges to adjust <strong>r</strong>.
             </span>
           </div>
         </div>
 
-        {/* Right Cockpit Parameter & Telemetry Controls Dock */}
-        <div className="w-96 border-l border-white/10 bg-[#060a16] flex flex-col overflow-y-auto shrink-0 z-20">
+        {/* Right Cockpit Parameter & Telemetry Controls Dock (with top padding for global menu bar) */}
+        <div className="w-96 border-l border-white/10 bg-[#060a16] flex flex-col overflow-y-auto shrink-0 z-20 pt-16">
+          {/* Relocated Scale Mode & AP Theory Buttons (Above Laboratory Cockpit) */}
+          <div className="p-3.5 border-b border-white/10 bg-[#070c1a] space-y-2">
+            <div className="grid grid-cols-2 gap-1.5 bg-[#0b1328] p-1 rounded-xl border border-white/10 text-[11px]">
+              <button
+                onClick={() => {
+                  setScaleMode('macro');
+                  setCharges([
+                    {
+                      id: 'q1',
+                      name: 'Charge 1 (q₁)',
+                      archetype: 'macro_pos',
+                      qMicro: 3.0,
+                      useElementaryUnits: false,
+                      qElementary: Math.round(3.0e-6 / ELEMENTARY_CHARGE),
+                      massKg: 0.001,
+                      x: -4.0,
+                      y: 0.0,
+                      color: POSITIVE_RED,
+                    },
+                    {
+                      id: 'q2',
+                      name: 'Charge 2 (q₂)',
+                      archetype: 'macro_neg',
+                      qMicro: -3.0,
+                      useElementaryUnits: false,
+                      qElementary: -Math.round(3.0e-6 / ELEMENTARY_CHARGE),
+                      massKg: 0.001,
+                      x: 4.0,
+                      y: 0.0,
+                      color: NEGATIVE_BLUE,
+                    },
+                  ]);
+                  setSelectedMediumId('vacuum');
+                  onToast?.('Loaded Macro Dipole (+3.0 μC / -3.0 μC)');
+                }}
+                className={`py-1.5 px-2 rounded-lg font-semibold transition ${
+                  scaleMode === 'macro'
+                    ? 'bg-cyan-500 text-slate-950 font-bold'
+                    : 'text-slate-300 hover:text-white'
+                }`}
+              >
+                Macro Charges (μC)
+              </button>
+              <button
+                onClick={() => {
+                  setScaleMode('atomic');
+                  setCharges([
+                    {
+                      id: 'q1',
+                      name: 'Proton p₁ (+1e)',
+                      archetype: 'proton',
+                      qMicro: ELEMENTARY_CHARGE * 1e6,
+                      useElementaryUnits: true,
+                      qElementary: 1,
+                      massKg: PROTON_MASS,
+                      x: -3.0,
+                      y: 0.0,
+                      color: POSITIVE_RED,
+                    },
+                    {
+                      id: 'q2',
+                      name: 'Proton p₂ (+1e)',
+                      archetype: 'proton',
+                      qMicro: ELEMENTARY_CHARGE * 1e6,
+                      useElementaryUnits: true,
+                      qElementary: 1,
+                      massKg: PROTON_MASS,
+                      x: 3.0,
+                      y: 0.0,
+                      color: POSITIVE_RED,
+                    },
+                  ]);
+                  setSelectedMediumId('vacuum');
+                  onToast?.('Loaded Subatomic Particles: Two Protons (F_E / F_G = 1.24×10³⁶)');
+                }}
+                className={`py-1.5 px-2 rounded-lg font-semibold transition ${
+                  scaleMode === 'atomic'
+                    ? 'bg-cyan-500 text-slate-950 font-bold'
+                    : 'text-slate-300 hover:text-white'
+                }`}
+              >
+                Subatomic Particles (e)
+              </button>
+            </div>
+
+            <button
+              onClick={() => setShowDetailsDrawer(prev => !prev)}
+              className={`w-full py-1.5 px-3 rounded-xl text-xs font-semibold border flex items-center justify-center space-x-1.5 transition ${
+                showDetailsDrawer
+                  ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
+                  : 'bg-white/5 text-slate-300 border-white/10 hover:bg-white/10'
+              }`}
+            >
+              <Info className="w-3.5 h-3.5 text-cyan-400" />
+              <span>AP Theory &amp; Formulas</span>
+            </button>
+          </div>
+
+          {/* Laboratory Cockpit Header */}
           <div className="p-4 border-b border-white/10 bg-[#080e20] flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Sliders className="w-4 h-4 text-cyan-400" />
@@ -900,64 +1175,381 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
             </button>
           </div>
 
-          <div className="p-4 space-y-5 text-xs text-slate-300">
-            {/* Live Primary Interaction Quantitative Telemetry */}
-            <div className="p-4 rounded-2xl bg-[#091226] border border-cyan-500/30 space-y-3 shadow-lg">
+          <div className="p-4 space-y-4 text-xs text-slate-300">
+            {/* 1. Clicked Plane Point Force Readout & Stored Points */}
+            <div className="p-3.5 rounded-2xl bg-[#091226] border border-cyan-500/30 space-y-3 shadow-lg">
               <div className="flex items-center justify-between border-b border-white/10 pb-2">
                 <span className="font-bold text-cyan-300 flex items-center gap-1.5">
-                  <Activity className="w-3.5 h-3.5" />
-                  <span>Calculated Force Readout</span>
+                  <Crosshair className="w-3.5 h-3.5" />
+                  <span>Point Force Probe</span>
                 </span>
-                <span className="text-[10px] font-mono text-slate-400">
-                  r = {separationR.toFixed(2)} m
-                </span>
+                {selectedProbePoint && (
+                  <button
+                    onClick={handleStoreCurrentPoint}
+                    disabled={selectedProbePoint.saved}
+                    className={`px-2 py-0.5 rounded-lg text-[10px] font-bold flex items-center gap-1 transition ${
+                      selectedProbePoint.saved
+                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 cursor-default'
+                        : 'bg-cyan-400 hover:bg-cyan-300 text-slate-950'
+                    }`}
+                  >
+                    <Bookmark className="w-3 h-3" />
+                    <span>{selectedProbePoint.saved ? 'Stored' : 'Store Point'}</span>
+                  </button>
+                )}
               </div>
 
-              {/* Electrostatic Force Magnitude |F_E| */}
-              <div className="space-y-1">
-                <div className="flex justify-between text-[11px] text-slate-400">
-                  <span>Coulomb Electrostatic Force |F_E|:</span>
-                  <span className={primaryPair?.isRepulsive ? 'text-rose-400' : 'text-sky-400'}>
-                    {primaryPair?.isRepulsive ? 'Repulsive' : 'Attractive'}
-                  </span>
-                </div>
-                <div className="text-2xl font-black font-mono text-cyan-300 tracking-tight">
-                  {formatSci(primaryFE, 'N')}
-                </div>
-                <div className="text-[10px] text-slate-400 font-mono">
-                  Formula: |F_E| = k·|q₁q₂| / (κ · r²)
-                </div>
-              </div>
+              {selectedProbePoint && selectedProbeForce ? (
+                <>
+                  <div className="flex items-center justify-between text-[11px] bg-black/40 px-2.5 py-1.5 rounded-xl border border-white/5 font-mono">
+                    <span className="text-cyan-300 font-bold">
+                      {selectedProbePoint.label} ({selectedProbePoint.x.toFixed(2)}m,{' '}
+                      {selectedProbePoint.y.toFixed(2)}m)
+                    </span>
+                    <span className="text-[10px] text-slate-400">
+                      Ref: {selectedProbeForce.probeUnitLabel}
+                    </span>
+                  </div>
 
-              {/* Gravitational Comparison (Learning Objective 8.1.B) */}
-              {showGravitationalComparison && (
-                <div className="pt-2 border-t border-white/10 space-y-1.5">
-                  <div className="flex justify-between text-[11px] text-slate-400">
-                    <span>Gravitational Force F_G:</span>
-                    <span className="text-emerald-400 font-medium">Always Attractive</span>
-                  </div>
-                  <div className="text-sm font-bold font-mono text-emerald-300">
-                    {formatSci(primaryFG, 'N')}
-                  </div>
-                  <div className="p-2 rounded-xl bg-black/40 border border-white/5 space-y-1 mt-1">
-                    <div className="flex justify-between text-[11px]">
-                      <span className="text-slate-400">Strength Ratio (F_E / F_G):</span>
-                      <span className="font-mono font-bold text-amber-300">
-                        {primaryRatio > 1e6 ? formatSci(primaryRatio) : primaryRatio.toFixed(1)}×
+                  {/* Electrostatic Force Strength at Selected Point */}
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-[11px] text-slate-400">
+                      <span>Force Strength at {selectedProbePoint.label} (|F_E|):</span>
+                      <span className="text-cyan-300 font-mono">
+                        θ = {selectedProbeForce.angleDeg.toFixed(1)}°
                       </span>
                     </div>
-                    <p className="text-[10px] text-slate-400 leading-relaxed italic">
-                      {scaleMode === 'atomic'
-                        ? 'At quantum scales, electrostatic force is ~10³⁶ times stronger than gravity! Gravity only dominates macroscopic worlds because net charge cancels to zero.'
-                        : 'For macroscopic 1g masses, electrostatic forces easily overwhelm gravitation by billions of times.'}
-                    </p>
+                    <div className="text-2xl font-black font-mono text-cyan-300 tracking-tight">
+                      {formatSci(selectedProbeForce.mag, 'N')}
+                    </div>
+                    <div className="grid grid-cols-2 gap-1.5 pt-1 font-mono text-[10px]">
+                      <div className="p-1.5 rounded-lg bg-black/40 border border-white/5">
+                        <span className="text-slate-400 block">F_x Component:</span>
+                        <span className="text-white font-bold">
+                          {formatSci(selectedProbeForce.fx, 'N')}
+                        </span>
+                      </div>
+                      <div className="p-1.5 rounded-lg bg-black/40 border border-white/5">
+                        <span className="text-slate-400 block">F_y Component:</span>
+                        <span className="text-white font-bold">
+                          {formatSci(selectedProbeForce.fy, 'N')}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Gravitational Comparison at Probed Point */}
+                  {showGravitationalComparison && (
+                    <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[11px]">
+                      <span className="text-slate-400">Gravity Ratio (F_E / F_G):</span>
+                      <span className="font-mono font-bold text-amber-300">
+                        {selectedProbeForce.ratio > 1e6
+                          ? formatSci(selectedProbeForce.ratio)
+                          : selectedProbeForce.ratio.toFixed(1)}
+                        ×
+                      </span>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-[11px] text-slate-400 italic py-2 text-center">
+                  Click anywhere on the 2D coordinate plane to calculate and store the electrostatic force strength at that point.
+                </div>
+              )}
+
+              {/* Stored Points Selector Pills */}
+              {probePoints.length > 0 && (
+                <div className="pt-2 border-t border-white/10 space-y-1.5">
+                  <div className="flex items-center justify-between text-[10px] font-mono text-slate-400">
+                    <span>CLICKED / STORED POINTS ({probePoints.length}):</span>
+                    {probePoints.length > 1 && (
+                      <button
+                        onClick={() => {
+                          setProbePoints([]);
+                          setSelectedProbeId(null);
+                        }}
+                        className="text-rose-400 hover:text-rose-300 underline"
+                      >
+                        Clear All
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {probePoints.map(pt => {
+                      const isSel = pt.id === selectedProbeId;
+                      return (
+                        <div
+                          key={pt.id}
+                          onClick={() => setSelectedProbeId(pt.id)}
+                          className={`cursor-pointer px-2 py-1 rounded-lg text-[10px] font-mono flex items-center gap-1.5 border transition ${
+                            isSel
+                              ? 'bg-cyan-500/25 border-cyan-400 text-white font-bold'
+                              : 'bg-black/40 border-white/10 text-slate-300 hover:bg-white/10'
+                          }`}
+                        >
+                          <span
+                            className={`w-2 h-2 rounded-full ${
+                              pt.saved ? 'bg-cyan-400' : 'bg-amber-400'
+                            }`}
+                          />
+                          <span>
+                            {pt.label} ({pt.x.toFixed(1)}, {pt.y.toFixed(1)})
+                          </span>
+                          <button
+                            onClick={e => handleDeleteProbePoint(pt.id, e)}
+                            className="text-slate-400 hover:text-rose-400 ml-0.5"
+                            title="Remove point"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Dielectric Permittivity Section (Learning Objective 8.1.C) */}
-            <div className="space-y-2">
+            {/* 2. Force Vectors on Selected Charge Control (Net vs Individual) */}
+            <div className="p-3.5 rounded-2xl bg-[#091124] border border-white/10 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Navigation className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="font-bold text-white text-xs">
+                    Force Arrows on Selected Charge
+                  </span>
+                </div>
+                <button
+                  onClick={() => setShowSelectedChargeForces(prev => !prev)}
+                  className={`px-2.5 py-0.5 rounded-lg text-[10px] font-bold transition ${
+                    showSelectedChargeForces
+                      ? 'bg-emerald-400 text-slate-950'
+                      : 'bg-white/10 text-slate-400'
+                  }`}
+                >
+                  {showSelectedChargeForces ? 'Displayed' : 'Hidden'}
+                </button>
+              </div>
+
+              {showSelectedChargeForces && (
+                <div className="grid grid-cols-2 gap-1.5 bg-black/40 p-1 rounded-xl border border-white/10 text-[11px]">
+                  <button
+                    onClick={() => setForceVectorDisplayMode('individual')}
+                    className={`py-1.5 px-2 rounded-lg font-semibold transition ${
+                      forceVectorDisplayMode === 'individual'
+                        ? 'bg-cyan-400 text-slate-950 font-bold'
+                        : 'text-slate-300 hover:text-white'
+                    }`}
+                  >
+                    Individual Forces
+                  </button>
+                  <button
+                    onClick={() => setForceVectorDisplayMode('net')}
+                    className={`py-1.5 px-2 rounded-lg font-semibold transition ${
+                      forceVectorDisplayMode === 'net'
+                        ? 'bg-emerald-400 text-slate-950 font-bold'
+                        : 'text-slate-300 hover:text-white'
+                    }`}
+                  >
+                    Net Force (∑ F)
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* 3. Selected Charge Inspector + Net Force Magnitude Display */}
+            {selectedCharge && (
+              <div className="p-3.5 rounded-2xl bg-[#091124] border border-white/15 space-y-3">
+                <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                  <span className="font-bold text-white flex items-center gap-1.5">
+                    <span
+                      className="w-3 h-3 rounded-full"
+                      style={{
+                        backgroundColor:
+                          getChargeCoulombs(selectedCharge) >= 0 ? POSITIVE_RED : NEGATIVE_BLUE,
+                      }}
+                    />
+                    <span>Selected: {selectedCharge.name}</span>
+                  </span>
+                  {charges.length > 2 && (
+                    <button
+                      onClick={() => handleRemoveCharge(selectedCharge.id)}
+                      className="p-1 rounded-lg hover:bg-rose-500/20 text-rose-400 transition"
+                      title="Remove charge"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Net Force Magnitude Acting on Selected Charge */}
+                <div className="p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/35 space-y-1.5">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-emerald-300 font-bold flex items-center gap-1">
+                      <Activity className="w-3.5 h-3.5" />
+                      <span>Net Force on {selectedCharge.id} (|F_net|):</span>
+                    </span>
+                    <span className="font-mono text-[10px] text-slate-400">
+                      θ = {selectedChargeNetForce.angleDeg.toFixed(1)}°
+                    </span>
+                  </div>
+                  <div className="text-xl font-black font-mono text-emerald-300">
+                    {formatSci(selectedChargeNetForce.mag, 'N')}
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5 font-mono text-[10px] text-slate-300 pt-0.5">
+                    <div>F_net,x: {formatSci(selectedChargeNetForce.fx, 'N')}</div>
+                    <div>F_net,y: {formatSci(selectedChargeNetForce.fy, 'N')}</div>
+                  </div>
+
+                  {/* Individual Forces Breakdown */}
+                  {selectedChargeIncomingForces.length > 0 && (
+                    <div className="pt-1.5 mt-1 border-t border-white/10 space-y-1">
+                      <div className="text-[10px] font-mono text-slate-400 uppercase">
+                        Individual Forces on {selectedCharge.id}:
+                      </div>
+                      {selectedChargeIncomingForces.map(p => (
+                        <div
+                          key={`${p.fromId}->${p.toId}`}
+                          className="flex items-center justify-between text-[10px] font-mono"
+                        >
+                          <span className={p.isRepulsive ? 'text-rose-300' : 'text-sky-300'}>
+                            |F_{p.fromId}→{p.toId}| ({p.isRepulsive ? 'Repulsive' : 'Attractive'}, r=
+                            {p.r.toFixed(2)}m):
+                          </span>
+                          <span className="text-white font-bold">{formatSci(p.feMag, 'N')}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Particle Archetype Buttons */}
+                <div>
+                  <span className="block text-[11px] text-slate-400 mb-1.5">
+                    Particle Archetype:
+                  </span>
+                  <div className="grid grid-cols-3 gap-1.5 text-[10px]">
+                    <button
+                      onClick={() => handleApplyArchetype(selectedCharge.id, 'proton')}
+                      className={`p-1.5 rounded-lg border font-semibold transition ${
+                        selectedCharge.archetype === 'proton'
+                          ? 'bg-red-500/20 text-red-300 border-red-500/50'
+                          : 'bg-white/5 text-slate-300 border-white/10'
+                      }`}
+                    >
+                      Proton (+1e)
+                    </button>
+                    <button
+                      onClick={() => handleApplyArchetype(selectedCharge.id, 'electron')}
+                      className={`p-1.5 rounded-lg border font-semibold transition ${
+                        selectedCharge.archetype === 'electron'
+                          ? 'bg-blue-500/20 text-blue-300 border-blue-500/50'
+                          : 'bg-white/5 text-slate-300 border-white/10'
+                      }`}
+                    >
+                      Electron (−1e)
+                    </button>
+                    <button
+                      onClick={() => handleApplyArchetype(selectedCharge.id, 'alpha')}
+                      className={`p-1.5 rounded-lg border font-semibold transition ${
+                        selectedCharge.archetype === 'alpha'
+                          ? 'bg-red-500/20 text-red-300 border-red-500/50'
+                          : 'bg-white/5 text-slate-300 border-white/10'
+                      }`}
+                    >
+                      Alpha (+2e)
+                    </button>
+                  </div>
+                </div>
+
+                {/* Magnitude Slider */}
+                {selectedCharge.useElementaryUnits ? (
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-[11px] text-slate-400">
+                      <span>Elementary Charge (e):</span>
+                      <span className="font-mono font-bold text-cyan-300">
+                        {selectedCharge.qElementary > 0 ? '+' : ''}
+                        {selectedCharge.qElementary} e
+                      </span>
+                    </div>
+                    <div className="flex gap-2">
+                      {[-2, -1, 1, 2, 3].map(val => (
+                        <button
+                          key={val}
+                          onClick={() =>
+                            setCharges(prev =>
+                              prev.map(c =>
+                                c.id === selectedCharge.id
+                                  ? {
+                                      ...c,
+                                      qElementary: val,
+                                      color: val >= 0 ? POSITIVE_RED : NEGATIVE_BLUE,
+                                    }
+                                  : c
+                              )
+                            )
+                          }
+                          className={`flex-1 py-1 rounded-lg border text-xs font-mono font-bold transition ${
+                            selectedCharge.qElementary === val
+                              ? 'bg-cyan-500 text-slate-950 border-cyan-400'
+                              : 'bg-black/30 border-white/10 text-slate-300'
+                          }`}
+                        >
+                          {val > 0 ? `+${val}` : val}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-[11px] text-slate-400">
+                      <span>Charge Magnitude (q):</span>
+                      <span className="font-mono font-bold text-cyan-300">
+                        {selectedCharge.qMicro > 0 ? '+' : ''}
+                        {selectedCharge.qMicro.toFixed(1)} μC
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="-10"
+                      max="10"
+                      step="0.5"
+                      value={selectedCharge.qMicro}
+                      onChange={e => {
+                        const val = parseFloat(e.target.value);
+                        setCharges(prev =>
+                          prev.map(c =>
+                            c.id === selectedCharge.id
+                              ? {
+                                  ...c,
+                                  qMicro: val,
+                                  color: val >= 0 ? POSITIVE_RED : NEGATIVE_BLUE,
+                                }
+                              : c
+                          )
+                        );
+                      }}
+                      className="w-full accent-cyan-400"
+                    />
+                  </div>
+                )}
+
+                {/* Spatial Coordinates Readout */}
+                <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
+                  <div className="p-2 rounded-xl bg-black/40 border border-white/5">
+                    <span className="text-slate-400 block text-[10px]">Pos X:</span>
+                    <span className="text-white font-bold">{selectedCharge.x.toFixed(2)} m</span>
+                  </div>
+                  <div className="p-2 rounded-xl bg-black/40 border border-white/5">
+                    <span className="text-slate-400 block text-[10px]">Pos Y:</span>
+                    <span className="text-white font-bold">{selectedCharge.y.toFixed(2)} m</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 4. Dielectric Permittivity Section (Learning Objective 8.1.C) */}
+            <div className="space-y-2 pt-1">
               <div className="flex items-center justify-between">
                 <label className="font-bold text-white flex items-center gap-1.5">
                   <Shield className="w-3.5 h-3.5 text-cyan-400" />
@@ -1005,177 +1597,6 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
                 {activeMedium.description}
               </p>
             </div>
-
-            {/* Selected Charge Attributes Editor */}
-            {selectedCharge && (
-              <div className="p-3.5 rounded-2xl bg-[#091124] border border-white/10 space-y-3">
-                <div className="flex items-center justify-between border-b border-white/10 pb-2">
-                  <span className="font-bold text-white flex items-center gap-1.5">
-                    <span
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: selectedCharge.color }}
-                    />
-                    <span>Configure {selectedCharge.name}</span>
-                  </span>
-                  {charges.length > 2 && (
-                    <button
-                      onClick={() => handleRemoveCharge(selectedCharge.id)}
-                      className="p-1 rounded-lg hover:bg-rose-500/20 text-rose-400 transition"
-                      title="Remove charge"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-
-                {/* Particle Archetype Buttons */}
-                <div>
-                  <span className="block text-[11px] text-slate-400 mb-1.5">
-                    Particle Archetype:
-                  </span>
-                  <div className="grid grid-cols-3 gap-1.5 text-[10px]">
-                    <button
-                      onClick={() => handleApplyArchetype(selectedCharge.id, 'proton')}
-                      className={`p-1.5 rounded-lg border font-semibold transition ${
-                        selectedCharge.archetype === 'proton'
-                          ? 'bg-rose-500/20 text-rose-300 border-rose-500/50'
-                          : 'bg-white/5 text-slate-300 border-white/10'
-                      }`}
-                    >
-                      Proton (+1e)
-                    </button>
-                    <button
-                      onClick={() => handleApplyArchetype(selectedCharge.id, 'electron')}
-                      className={`p-1.5 rounded-lg border font-semibold transition ${
-                        selectedCharge.archetype === 'electron'
-                          ? 'bg-sky-500/20 text-sky-300 border-sky-500/50'
-                          : 'bg-white/5 text-slate-300 border-white/10'
-                      }`}
-                    >
-                      Electron (−1e)
-                    </button>
-                    <button
-                      onClick={() => handleApplyArchetype(selectedCharge.id, 'alpha')}
-                      className={`p-1.5 rounded-lg border font-semibold transition ${
-                        selectedCharge.archetype === 'alpha'
-                          ? 'bg-purple-500/20 text-purple-300 border-purple-500/50'
-                          : 'bg-white/5 text-slate-300 border-white/10'
-                      }`}
-                    >
-                      Alpha (+2e)
-                    </button>
-                  </div>
-                </div>
-
-                {/* Magnitude Slider */}
-                {selectedCharge.useElementaryUnits ? (
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between text-[11px] text-slate-400">
-                      <span>Elementary Charge (e):</span>
-                      <span className="font-mono font-bold text-cyan-300">
-                        {selectedCharge.qElementary > 0 ? '+' : ''}
-                        {selectedCharge.qElementary} e
-                      </span>
-                    </div>
-                    <div className="flex gap-2">
-                      {[-2, -1, 1, 2, 3].map(val => (
-                        <button
-                          key={val}
-                          onClick={() =>
-                            setCharges(prev =>
-                              prev.map(c =>
-                                c.id === selectedCharge.id
-                                  ? {
-                                      ...c,
-                                      qElementary: val,
-                                      color: val > 0 ? '#ef4444' : '#0ea5e9',
-                                    }
-                                  : c
-                              )
-                            )
-                          }
-                          className={`flex-1 py-1 rounded-lg border text-xs font-mono font-bold transition ${
-                            selectedCharge.qElementary === val
-                              ? 'bg-cyan-500 text-slate-950 border-cyan-400'
-                              : 'bg-black/30 border-white/10 text-slate-300'
-                          }`}
-                        >
-                          {val > 0 ? `+${val}` : val}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between text-[11px] text-slate-400">
-                      <span>Charge Magnitude (q):</span>
-                      <span className="font-mono font-bold text-cyan-300">
-                        {selectedCharge.qMicro > 0 ? '+' : ''}
-                        {selectedCharge.qMicro.toFixed(1)} μC
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min="-10"
-                      max="10"
-                      step="0.5"
-                      value={selectedCharge.qMicro}
-                      onChange={e => {
-                        const val = parseFloat(e.target.value);
-                        setCharges(prev =>
-                          prev.map(c =>
-                            c.id === selectedCharge.id
-                              ? {
-                                  ...c,
-                                  qMicro: val,
-                                  color: val >= 0 ? '#f43f5e' : '#38bdf8',
-                                }
-                              : c
-                          )
-                        );
-                      }}
-                      className="w-full accent-cyan-400"
-                    />
-                  </div>
-                )}
-
-                {/* Spatial Coordinates Readout */}
-                <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
-                  <div className="p-2 rounded-xl bg-black/40 border border-white/5">
-                    <span className="text-slate-400 block text-[10px]">Pos X:</span>
-                    <span className="text-white font-bold">{selectedCharge.x.toFixed(2)} m</span>
-                  </div>
-                  <div className="p-2 rounded-xl bg-black/40 border border-white/5">
-                    <span className="text-slate-400 block text-[10px]">Pos Y:</span>
-                    <span className="text-white font-bold">{selectedCharge.y.toFixed(2)} m</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Superposition Switcher for 3+ charges */}
-            {charges.length > 2 && (
-              <div className="p-3 bg-[#0a1224] rounded-2xl border border-emerald-500/25 flex items-center justify-between">
-                <div>
-                  <span className="font-bold text-emerald-400 block text-xs">
-                    Vector Superposition
-                  </span>
-                  <span className="text-[10px] text-slate-400">
-                    Display resultant ∑ F on each charge
-                  </span>
-                </div>
-                <button
-                  onClick={() => setShowSuperpositionVectors(prev => !prev)}
-                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition ${
-                    showSuperpositionVectors
-                      ? 'bg-emerald-500 text-slate-950'
-                      : 'bg-white/10 text-slate-400'
-                  }`}
-                >
-                  {showSuperpositionVectors ? 'Active' : 'Off'}
-                </button>
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -1232,7 +1653,7 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
             </div>
 
             <div className="p-3.5 rounded-xl bg-black/40 border border-white/10 space-y-1.5">
-              <div className="font-bold text-purple-300 text-[11px] flex items-center gap-1.5">
+              <div className="font-bold text-sky-300 text-[11px] flex items-center gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 <span>8.1.C: Dielectric Permittivity</span>
               </div>
@@ -1241,7 +1662,7 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
                 Electron rearrangement forms induced opposing dipoles, attenuating force: F = F_vac /
                 κ.
               </p>
-              <div className="pt-1 text-purple-400 font-mono text-[11px]">
+              <div className="pt-1 text-sky-400 font-mono text-[11px]">
                 ε = κε₀ · F_E = 1/(4πε) · |q₁q₂|/r²
               </div>
             </div>
