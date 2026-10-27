@@ -38,6 +38,7 @@ import {
 import { Oscilloscope, DataPoint } from '@/components/ui/Oscilloscope';
 import { ProjectileSandbox } from '@/components/simulation/ProjectileSandbox';
 import { CoulombForceWorkbench } from '@/components/simulation/CoulombForceWorkbench';
+import { ScalarsVectorsWorkbench } from '@/components/simulation/ScalarsVectorsWorkbench';
 import { CalculusTheoryModal } from '@/components/ui/CalculusTheoryModal';
 import { UserRoleBar } from '@/components/auth/UserRoleBar';
 import { AuthModal } from '@/components/auth/AuthModal';
@@ -69,7 +70,7 @@ type LayerRoute =
   | { layer: 'unit'; unit: PhysicsUnitModule }
   | {
       layer: 'workspace';
-      mode: 'field' | 'circuit' | 'projectile' | 'coulomb';
+      mode: 'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors';
       modelTitle: string;
       unit?: PhysicsUnitModule;
     }
@@ -86,8 +87,9 @@ export default function SimulationCockpit() {
   ]);
   const [navIndex, setNavIndex] = useState<number>(0);
   // Active simulation mode when in workspace layer
-  const [activeMode, setActiveMode] = useState<'field' | 'circuit' | 'projectile' | 'coulomb'>('projectile');
+  const [activeMode, setActiveMode] = useState<'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors'>('projectile');
   const [projectileViewMode, setProjectileViewMode] = useState<'3d' | '2d'>('3d');
+  const [vectorsViewMode, setVectorsViewMode] = useState<'3d' | '2d'>('3d');
 
   const currentRoute = navHistory[navIndex] || { layer: 'catalog', course: 'mechanics' };
   const activeCourse: PhysicsCourseId =
@@ -97,7 +99,7 @@ export default function SimulationCockpit() {
       ? currentRoute.unit.course
       : currentRoute.layer === 'workspace' && currentRoute.unit
       ? currentRoute.unit.course
-      : currentRoute.layer === 'workspace' && (currentRoute.mode === 'projectile' || activeMode === 'projectile')
+      : currentRoute.layer === 'workspace' && (currentRoute.mode === 'projectile' || activeMode === 'projectile' || currentRoute.mode === 'vectors' || activeMode === 'vectors')
       ? 'mechanics'
       : currentRoute.layer === 'workspace' && (currentRoute.mode === 'coulomb' || activeMode === 'coulomb' || currentRoute.mode === 'field' || activeMode === 'field' || currentRoute.mode === 'circuit' || activeMode === 'circuit')
       ? 'em'
@@ -107,7 +109,7 @@ export default function SimulationCockpit() {
 
   const isCurrentMechanics =
     activeCourse === 'mechanics' ||
-    (currentRoute.layer === 'workspace' && activeMode === 'projectile');
+    (currentRoute.layer === 'workspace' && (activeMode === 'projectile' || activeMode === 'vectors'));
 
   // Header visibility on catalog scroll (disappears on scroll down, reappears on scroll up)
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
@@ -299,6 +301,14 @@ export default function SimulationCockpit() {
           timestamp: now,
           title,
           mode: 'coulomb',
+        };
+      } else if (activeMode === 'vectors') {
+        return {
+          id,
+          version: '1.0',
+          timestamp: now,
+          title,
+          mode: 'vectors',
         };
       } else if (activeMode === 'projectile') {
         return {
@@ -836,6 +846,8 @@ export default function SimulationCockpit() {
                     ? 'Unit 11 Circuit Workbench'
                     : activeMode === 'coulomb'
                     ? '8.1 Electric Charge & Coulomb Force'
+                    : activeMode === 'vectors'
+                    ? '1.1 Scalars and Vectors'
                     : '1.3 Projectile & Drag Ballistics'}
                 </span>
               </>
@@ -882,6 +894,8 @@ export default function SimulationCockpit() {
                       setFieldControls(prev => ({ ...prev, viewMode: '3d' }));
                     else if (activeMode === 'circuit')
                       setCircuitControls(prev => ({ ...prev, viewMode: '3d' }));
+                    else if (activeMode === 'vectors')
+                      setVectorsViewMode('3d');
                     else
                       setProjectileViewMode('3d');
                   }}
@@ -890,6 +904,8 @@ export default function SimulationCockpit() {
                       ? 'text-slate-600 bg-white/[0.02] cursor-not-allowed opacity-45'
                       : (activeMode === 'projectile'
                           ? projectileViewMode === '3d'
+                          : activeMode === 'vectors'
+                          ? vectorsViewMode === '3d'
                           : (activeMode === 'field' ? fieldControls.viewMode : circuitControls.viewMode) === '3d')
                       ? isCurrentMechanics
                         ? 'bg-emerald-400 text-slate-950 font-bold shadow-lg shadow-emerald-500/20'
@@ -911,6 +927,8 @@ export default function SimulationCockpit() {
                       setFieldControls(prev => ({ ...prev, viewMode: 'top' }));
                     else if (activeMode === 'circuit')
                       setCircuitControls(prev => ({ ...prev, viewMode: 'top' }));
+                    else if (activeMode === 'vectors')
+                      setVectorsViewMode('2d');
                     else
                       setProjectileViewMode('2d');
                   }}
@@ -918,6 +936,8 @@ export default function SimulationCockpit() {
                     activeMode === 'coulomb' ||
                     (activeMode === 'projectile'
                       ? projectileViewMode === '2d'
+                      : activeMode === 'vectors'
+                      ? vectorsViewMode === '2d'
                       : (activeMode === 'field' ? fieldControls.viewMode : circuitControls.viewMode) === 'top')
                       ? isCurrentMechanics
                         ? 'bg-emerald-400 text-slate-950 font-bold shadow-lg shadow-emerald-500/20'
@@ -1473,6 +1493,12 @@ export default function SimulationCockpit() {
               />
             ) : activeMode === 'coulomb' ? (
               <CoulombForceWorkbench onToast={showToast} />
+            ) : activeMode === 'vectors' ? (
+              <ScalarsVectorsWorkbench
+                onToast={showToast}
+                externalViewMode={vectorsViewMode}
+                onViewModeChange={setVectorsViewMode}
+              />
             ) : (
               <ProjectileSandbox
                 onToast={showToast}

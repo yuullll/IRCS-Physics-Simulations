@@ -633,7 +633,7 @@ class LabStorageService {
   // Auto-Save across refreshes
   public saveAutoSave(
     userId: string,
-    mode: 'field' | 'circuit' | 'projectile' | 'coulomb',
+    mode: 'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors',
     snapshot: SceneSnapshot
   ): void {
     const key = `${userId}_${mode}`;
@@ -649,7 +649,7 @@ class LabStorageService {
 
   public getAutoSave(
     userId: string,
-    mode: 'field' | 'circuit' | 'projectile' | 'coulomb'
+    mode: 'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors'
   ): SceneSnapshot | null {
     const key = `${userId}_${mode}`;
     if (this.memoryAutoSaves[key]) return this.memoryAutoSaves[key];

@@ -23,15 +23,18 @@ const COULOMB_K_VACUUM = 1 / (4 * Math.PI * EPSILON_0); // ~8.98755e9 N·m^2/C^2
 const GRAVITATIONAL_G = 6.6743e-11; // N·m^2/kg^2
 const ELEMENTARY_CHARGE = 1.602176634e-19; // Coulombs
 const PROTON_MASS = 1.67262192e-27; // kg
+const NEUTRON_MASS = 1.6749275e-27; // kg
 const ELECTRON_MASS = 9.1093837e-31; // kg
 const ALPHA_MASS = 6.6446572e-27; // kg
 
 // Strict Charge Colors: Positive is ALWAYS Red, Negative is ALWAYS Blue
 const POSITIVE_RED = '#ef4444';
 const NEGATIVE_BLUE = '#3b82f6';
+const NEUTRAL_SLATE = '#64748b';
 
 export type ParticleArchetype =
   | 'proton'
+  | 'neutron'
   | 'electron'
   | 'alpha'
   | 'positron'
@@ -45,7 +48,7 @@ export interface CoulombCharge {
   archetype: ParticleArchetype;
   qMicro: number; // in microCoulombs
   useElementaryUnits: boolean;
-  qElementary: number; // in units of e (e.g. +1, -1, +2)
+  qElementary: number; // in units of e (e.g. +1, -1, 0, +2)
   massKg: number; // mass in kilograms
   x: number; // meters in simulation space (-11.5 to +11.5)
   y: number; // meters in simulation space (-6.5 to +6.5)
@@ -165,6 +168,11 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
   const [showSelectedChargeForces, setShowSelectedChargeForces] = useState<boolean>(true);
   const [forceVectorDisplayMode, setForceVectorDisplayMode] = useState<'net' | 'individual'>('individual');
 
+  // Functional Dependence / Factor-of-Change Predictor state (Suggested Skill 2.D & LO 8.1.A.2)
+  const [scaleMultQ1, setScaleMultQ1] = useState<number>(2);
+  const [scaleMultQ2, setScaleMultQ2] = useState<number>(1);
+  const [scaleMultR, setScaleMultR] = useState<number>(2);
+
   // Click-on-plane force probe points & stored points state
   const [probePoints, setProbePoints] = useState<StoredForcePoint[]>([
     { id: 'pt_1', label: 'P1', x: 0.0, y: 2.5, saved: true },
@@ -231,7 +239,7 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
         // If same sign (q1 * q2 > 0): repulsive, points away from c1 along (c2 - c1)
         // If opposite sign (q1 * q2 < 0): attractive, points toward c1 along -(c2 - c1)
         const isRepulsive = q1 * q2 > 0;
-        const dirSign = isRepulsive ? 1 : -1;
+        const dirSign = q1 * q2 === 0 ? 0 : isRepulsive ? 1 : -1;
         const feVec = {
           x: dirSign * (dx / r) * feMag,
           y: dirSign * (dy / r) * feMag,
@@ -459,7 +467,7 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
     }
   };
 
-  // Archetype selection (strictly Red for positive, Blue for negative)
+  // Archetype selection (strictly Red for positive, Blue for negative, Neutral Slate for 0e Neutron)
   const handleApplyArchetype = (cId: string, arch: ParticleArchetype) => {
     setCharges(prev =>
       prev.map(c => {
@@ -474,6 +482,16 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
               qMicro: ELEMENTARY_CHARGE * 1e6,
               massKg: PROTON_MASS,
               color: POSITIVE_RED,
+            };
+          case 'neutron':
+            return {
+              ...c,
+              archetype: 'neutron',
+              useElementaryUnits: true,
+              qElementary: 0,
+              qMicro: 0,
+              massKg: NEUTRON_MASS,
+              color: NEUTRAL_SLATE,
             };
           case 'electron':
             return {
@@ -551,6 +569,11 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
   const selectedChargeNetForce = selectedCharge
     ? netForces.get(selectedCharge.id) || { fx: 0, fy: 0, mag: 0, angleDeg: 0 }
     : { fx: 0, fy: 0, mag: 0, angleDeg: 0 };
+
+  // Functional Dependence Factor of Change (Skill 2.D)
+  const factorOfChange = (scaleMultQ1 * scaleMultQ2) / (scaleMultR * scaleMultR);
+  const primaryPairForce = pairwiseInteractions[0]?.feMag || 0;
+  const predictedScaledForce = primaryPairForce * factorOfChange;
 
   return (
     <div
@@ -786,7 +809,7 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
                 );
               } else {
                 // Individual Forces acting upon the selected charge from all other charges
-                const incoming = pairwiseInteractions.filter(p => p.toId === selectedCharge.id);
+                const incoming = pairwiseInteractions.filter(p => p.toId === selectedCharge.id && p.feMag > 0);
                 const maxMag = Math.max(...incoming.map(p => p.feMag), 1e-30);
                 const minMag = Math.min(...incoming.map(p => p.feMag), maxMag);
 
@@ -869,7 +892,7 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
                   className="cursor-pointer"
                 >
                   {/* Force vector arrow at selected probe point */}
-                  {isSelected && fData.mag > 0 && (
+                  {isSelected && fData.mag > 1e-25 && (
                     <line
                       x1={sx}
                       y1={sy}
@@ -933,14 +956,19 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
               );
             })}
 
-            {/* Draggable Point Charges (Strictly Red for +, Blue for -) */}
+            {/* Draggable Point Charges (Strictly Red for +, Blue for -, Slate for 0e Neutron) */}
             {charges.map(c => {
               const cx = toSvgX(c.x);
               const cy = toSvgY(c.y);
               const isSelected = c.id === selectedChargeId;
               const qVal = getChargeCoulombs(c);
-              const isPositive = qVal >= 0;
-              const strictColor = isPositive ? POSITIVE_RED : NEGATIVE_BLUE;
+              const isNeutral = qVal === 0;
+              const isPositive = qVal > 0;
+              const strictColor = isNeutral
+                ? NEUTRAL_SLATE
+                : isPositive
+                ? POSITIVE_RED
+                : NEGATIVE_BLUE;
 
               return (
                 <g
@@ -984,7 +1012,7 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
                     fontWeight="900"
                     pointerEvents="none"
                   >
-                    {isPositive ? '+' : '−'}
+                    {isNeutral ? '0' : isPositive ? '+' : '−'}
                   </text>
 
                   {/* Charge Label Pill */}
@@ -1003,7 +1031,7 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
                       x="0"
                       y="4"
                       textAnchor="middle"
-                      fill={isPositive ? '#fca5a5' : '#93c5fd'}
+                      fill={isNeutral ? '#cbd5e1' : isPositive ? '#fca5a5' : '#93c5fd'}
                       fontSize="10"
                       fontFamily="monospace"
                       fontWeight="bold"
@@ -1058,7 +1086,7 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
 
         {/* Right Cockpit Parameter & Telemetry Controls Dock (with top padding for global menu bar) */}
         <div className="w-96 border-l border-white/10 bg-[#060a16] flex flex-col overflow-y-auto shrink-0 z-20 pt-16">
-          {/* Relocated Scale Mode & AP Theory Buttons (Above Laboratory Cockpit) */}
+          {/* Relocated Scale Mode, High-Symmetry Preset & AP Theory Buttons (Above Laboratory Cockpit) */}
           <div className="p-3.5 border-b border-white/10 bg-[#070c1a] space-y-2">
             <div className="grid grid-cols-2 gap-1.5 bg-[#0b1328] p-1 rounded-xl border border-white/10 text-[11px]">
               <button
@@ -1143,17 +1171,85 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
               </button>
             </div>
 
-            <button
-              onClick={() => setShowDetailsDrawer(prev => !prev)}
-              className={`w-full py-1.5 px-3 rounded-xl text-xs font-semibold border flex items-center justify-center space-x-1.5 transition ${
-                showDetailsDrawer
-                  ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
-                  : 'bg-white/5 text-slate-300 border-white/10 hover:bg-white/10'
-              }`}
-            >
-              <Info className="w-3.5 h-3.5 text-cyan-400" />
-              <span>AP Theory &amp; Formulas</span>
-            </button>
+            {/* High-Symmetry Multi-Charge Cancellation Preset (CED Boundary Statement) */}
+            <div className="grid grid-cols-2 gap-1.5">
+              <button
+                onClick={() => {
+                  setScaleMode('macro');
+                  setCharges([
+                    {
+                      id: 'q1',
+                      name: 'Corner 1 (+4μC)',
+                      archetype: 'macro_pos',
+                      qMicro: 4.0,
+                      useElementaryUnits: false,
+                      qElementary: 1,
+                      massKg: 0.001,
+                      x: -4.0,
+                      y: 4.0,
+                      color: POSITIVE_RED,
+                    },
+                    {
+                      id: 'q2',
+                      name: 'Corner 2 (+4μC)',
+                      archetype: 'macro_pos',
+                      qMicro: 4.0,
+                      useElementaryUnits: false,
+                      qElementary: 1,
+                      massKg: 0.001,
+                      x: 4.0,
+                      y: 4.0,
+                      color: POSITIVE_RED,
+                    },
+                    {
+                      id: 'q3',
+                      name: 'Corner 3 (+4μC)',
+                      archetype: 'macro_pos',
+                      qMicro: 4.0,
+                      useElementaryUnits: false,
+                      qElementary: 1,
+                      massKg: 0.001,
+                      x: 4.0,
+                      y: -4.0,
+                      color: POSITIVE_RED,
+                    },
+                    {
+                      id: 'q4',
+                      name: 'Corner 4 (+4μC)',
+                      archetype: 'macro_pos',
+                      qMicro: 4.0,
+                      useElementaryUnits: false,
+                      qElementary: 1,
+                      massKg: 0.001,
+                      x: -4.0,
+                      y: -4.0,
+                      color: POSITIVE_RED,
+                    },
+                  ]);
+                  setProbePoints([
+                    { id: 'pt_sym', label: 'Center', x: 0.0, y: 0.0, saved: true },
+                  ]);
+                  setSelectedProbeId('pt_sym');
+                  onToast?.('Loaded High-Symmetry Square: Net Force at Center (0,0) = 0 N!');
+                }}
+                className="py-1.5 px-2 rounded-xl text-[11px] font-semibold bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 transition"
+                title="CED Boundary Statement: High-symmetry charge configuration with ∑F_E = 0 at center"
+              >
+                High-Symmetry (∑F=0)
+              </button>
+
+              <button
+                onClick={() => setShowDetailsDrawer(prev => !prev)}
+                className={`py-1.5 px-2 rounded-xl text-[11px] font-semibold border flex items-center justify-center space-x-1 transition ${
+                  showDetailsDrawer
+                    ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
+                    : 'bg-white/5 text-slate-300 border-white/10 hover:bg-white/10'
+                }`}
+              >
+                <Info className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                <span>AP Theory &amp; Formulas</span>
+              </button>
+            </div>
           </div>
 
           {/* Laboratory Cockpit Header */}
@@ -1366,7 +1462,11 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
                       className="w-3 h-3 rounded-full"
                       style={{
                         backgroundColor:
-                          getChargeCoulombs(selectedCharge) >= 0 ? POSITIVE_RED : NEGATIVE_BLUE,
+                          getChargeCoulombs(selectedCharge) === 0
+                            ? NEUTRAL_SLATE
+                            : getChargeCoulombs(selectedCharge) > 0
+                            ? POSITIVE_RED
+                            : NEGATIVE_BLUE,
                       }}
                     />
                     <span>Selected: {selectedCharge.name}</span>
@@ -1412,9 +1512,22 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
                           key={`${p.fromId}->${p.toId}`}
                           className="flex items-center justify-between text-[10px] font-mono"
                         >
-                          <span className={p.isRepulsive ? 'text-rose-300' : 'text-sky-300'}>
-                            |F_{p.fromId}→{p.toId}| ({p.isRepulsive ? 'Repulsive' : 'Attractive'}, r=
-                            {p.r.toFixed(2)}m):
+                          <span
+                            className={
+                              p.feMag === 0
+                                ? 'text-slate-400'
+                                : p.isRepulsive
+                                ? 'text-rose-300'
+                                : 'text-sky-300'
+                            }
+                          >
+                            |F_{p.fromId}→{p.toId}| (
+                            {p.feMag === 0
+                              ? 'Neutral q=0'
+                              : p.isRepulsive
+                              ? 'Repulsive'
+                              : 'Attractive'}
+                            , r={p.r.toFixed(2)}m):
                           </span>
                           <span className="text-white font-bold">{formatSci(p.feMag, 'N')}</span>
                         </div>
@@ -1423,12 +1536,12 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
                   )}
                 </div>
 
-                {/* Particle Archetype Buttons */}
+                {/* Particle Archetype Buttons (Including Neutron 0e per 8.1.A.1.iii) */}
                 <div>
                   <span className="block text-[11px] text-slate-400 mb-1.5">
-                    Particle Archetype:
+                    Particle Archetype (8.1.A.1.iii):
                   </span>
-                  <div className="grid grid-cols-3 gap-1.5 text-[10px]">
+                  <div className="grid grid-cols-2 gap-1.5 text-[10px]">
                     <button
                       onClick={() => handleApplyArchetype(selectedCharge.id, 'proton')}
                       className={`p-1.5 rounded-lg border font-semibold transition ${
@@ -1450,6 +1563,16 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
                       Electron (−1e)
                     </button>
                     <button
+                      onClick={() => handleApplyArchetype(selectedCharge.id, 'neutron')}
+                      className={`p-1.5 rounded-lg border font-semibold transition ${
+                        selectedCharge.archetype === 'neutron'
+                          ? 'bg-slate-500/30 text-slate-200 border-slate-400/60'
+                          : 'bg-white/5 text-slate-300 border-white/10'
+                      }`}
+                    >
+                      Neutron (0e, Neutral)
+                    </button>
+                    <button
                       onClick={() => handleApplyArchetype(selectedCharge.id, 'alpha')}
                       className={`p-1.5 rounded-lg border font-semibold transition ${
                         selectedCharge.archetype === 'alpha'
@@ -1466,14 +1589,14 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
                 {selectedCharge.useElementaryUnits ? (
                   <div className="space-y-1.5">
                     <div className="flex justify-between text-[11px] text-slate-400">
-                      <span>Elementary Charge (e):</span>
+                      <span>Elementary Charge (e = 1.602×10⁻¹⁹ C):</span>
                       <span className="font-mono font-bold text-cyan-300">
                         {selectedCharge.qElementary > 0 ? '+' : ''}
                         {selectedCharge.qElementary} e
                       </span>
                     </div>
-                    <div className="flex gap-2">
-                      {[-2, -1, 1, 2, 3].map(val => (
+                    <div className="flex gap-1.5">
+                      {[-2, -1, 0, 1, 2, 3].map(val => (
                         <button
                           key={val}
                           onClick={() =>
@@ -1483,7 +1606,12 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
                                   ? {
                                       ...c,
                                       qElementary: val,
-                                      color: val >= 0 ? POSITIVE_RED : NEGATIVE_BLUE,
+                                      color:
+                                        val === 0
+                                          ? NEUTRAL_SLATE
+                                          : val > 0
+                                          ? POSITIVE_RED
+                                          : NEGATIVE_BLUE,
                                     }
                                   : c
                               )
@@ -1503,7 +1631,7 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
                 ) : (
                   <div className="space-y-1.5">
                     <div className="flex justify-between text-[11px] text-slate-400">
-                      <span>Charge Magnitude (q):</span>
+                      <span>Scalar Charge Magnitude (q):</span>
                       <span className="font-mono font-bold text-cyan-300">
                         {selectedCharge.qMicro > 0 ? '+' : ''}
                         {selectedCharge.qMicro.toFixed(1)} μC
@@ -1523,7 +1651,12 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
                               ? {
                                   ...c,
                                   qMicro: val,
-                                  color: val >= 0 ? POSITIVE_RED : NEGATIVE_BLUE,
+                                  color:
+                                    val === 0
+                                      ? NEUTRAL_SLATE
+                                      : val > 0
+                                      ? POSITIVE_RED
+                                      : NEGATIVE_BLUE,
                                 }
                               : c
                           )
@@ -1533,6 +1666,20 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
                     />
                   </div>
                 )}
+
+                {/* Quantization N = q/e & Point Charge Approximation Check (8.1.A.1.i, ii, iv) */}
+                <div className="p-2.5 rounded-xl bg-black/40 border border-white/5 space-y-1 text-[10px] font-mono">
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Quantized Units (N = q/e):</span>
+                    <span className="text-cyan-300 font-bold">
+                      {formatSci(getChargeCoulombs(selectedCharge) / ELEMENTARY_CHARGE, 'e')}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Point-Charge Model (d_obj ≪ r):</span>
+                    <span className="text-emerald-400 font-bold">Valid (R/r &lt; 0.005)</span>
+                  </div>
+                </div>
 
                 {/* Spatial Coordinates Readout */}
                 <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
@@ -1548,7 +1695,93 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
               </div>
             )}
 
-            {/* 4. Dielectric Permittivity Section (Learning Objective 8.1.C) */}
+            {/* 4. Functional Dependence / Factor-of-Change Predictor (Suggested Skill 2.D & 8.1.A.2) */}
+            <div className="p-3.5 rounded-2xl bg-[#091124] border border-cyan-500/25 space-y-2.5">
+              <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                <span className="font-bold text-cyan-300 text-xs">
+                  Factor-of-Change Predictor (Skill 2.D)
+                </span>
+                <span className="text-[10px] font-mono text-slate-400">
+                  F&apos; / F = (n₁·n₂) / k²
+                </span>
+              </div>
+
+              <div className="space-y-2 text-[10px]">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400 font-mono">Scale q₁ (×n₁):</span>
+                  <div className="flex gap-1">
+                    {[0.5, 1, 2, 3, 4].map(m => (
+                      <button
+                        key={m}
+                        onClick={() => setScaleMultQ1(m)}
+                        className={`px-1.5 py-0.5 rounded font-mono font-bold border ${
+                          scaleMultQ1 === m
+                            ? 'bg-cyan-400 text-slate-950 border-cyan-300'
+                            : 'bg-black/40 text-slate-300 border-white/10'
+                        }`}
+                      >
+                        ×{m}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400 font-mono">Scale q₂ (×n₂):</span>
+                  <div className="flex gap-1">
+                    {[0.5, 1, 2, 3, 4].map(m => (
+                      <button
+                        key={m}
+                        onClick={() => setScaleMultQ2(m)}
+                        className={`px-1.5 py-0.5 rounded font-mono font-bold border ${
+                          scaleMultQ2 === m
+                            ? 'bg-cyan-400 text-slate-950 border-cyan-300'
+                            : 'bg-black/40 text-slate-300 border-white/10'
+                        }`}
+                      >
+                        ×{m}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400 font-mono">Scale Distance r (×k):</span>
+                  <div className="flex gap-1">
+                    {[0.5, 1, 2, 3, 4].map(m => (
+                      <button
+                        key={m}
+                        onClick={() => setScaleMultR(m)}
+                        className={`px-1.5 py-0.5 rounded font-mono font-bold border ${
+                          scaleMultR === m
+                            ? 'bg-amber-400 text-slate-950 border-amber-300'
+                            : 'bg-black/40 text-slate-300 border-white/10'
+                        }`}
+                      >
+                        ×{m}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-black/50 border border-white/10 flex items-center justify-between font-mono text-[11px]">
+                <div>
+                  <span className="text-slate-400 block text-[10px]">Force Multiplier:</span>
+                  <span className="text-amber-300 font-bold text-sm">
+                    ×{factorOfChange.toFixed(3)} ({scaleMultQ1 * scaleMultQ2}/{scaleMultR * scaleMultR})
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="text-slate-400 block text-[10px]">Predicted |F&apos;₁₂|:</span>
+                  <span className="text-cyan-300 font-bold">
+                    {formatSci(predictedScaledForce, 'N')}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* 5. Dielectric Permittivity & Conductor vs Insulator Mobility (LO 8.1.C.1–4) */}
             <div className="space-y-2 pt-1">
               <div className="flex items-center justify-between">
                 <label className="font-bold text-white flex items-center gap-1.5">
@@ -1593,9 +1826,53 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
                 </div>
               )}
 
-              <p className="text-[11px] text-slate-400 leading-relaxed bg-[#0a1122]/60 p-2.5 rounded-xl border border-white/5">
-                {activeMedium.description}
-              </p>
+              {/* Carrier Mobility Classification (8.1.C.4.i & ii) */}
+              <div className="p-2.5 rounded-xl bg-[#0a1122]/80 border border-white/10 space-y-1 text-[11px]">
+                <div className="flex items-center justify-between font-mono text-[10px]">
+                  <span className="text-slate-400">Carrier Mobility (8.1.C.4):</span>
+                  <span
+                    className={`font-bold ${
+                      selectedMediumId === 'conductor'
+                        ? 'text-amber-300'
+                        : selectedMediumId === 'vacuum'
+                        ? 'text-slate-300'
+                        : 'text-sky-300'
+                    }`}
+                  >
+                    {selectedMediumId === 'conductor'
+                      ? 'Conductor (Free Carriers)'
+                      : selectedMediumId === 'vacuum'
+                      ? 'Free Space (ε₀)'
+                      : 'Insulator / Dielectric (Bound)'}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  {activeMedium.description}
+                </p>
+              </div>
+            </div>
+
+            {/* 6. Macroscopic Contact Forces (8.1.A.4) & Astronomical Neutrality (8.1.B.3) */}
+            <div className="p-3.5 rounded-2xl bg-[#091124] border border-white/10 space-y-2 text-[11px]">
+              <div className="font-bold text-white text-xs">
+                8.1.A.4 &amp; 8.1.B.3: Macroscopic &amp; Cosmic Scales
+              </div>
+              <div className="p-2.5 rounded-xl bg-black/40 border border-white/5 space-y-1">
+                <span className="text-cyan-300 font-bold block text-[10px] font-mono">
+                  8.1.A.4 · EVERYDAY CONTACT FORCES (F_N, F_f, F_T)
+                </span>
+                <p className="text-slate-300 leading-relaxed text-[10px]">
+                  Macroscopic contact forces—<strong>Normal (F_N)</strong>, <strong>Friction (F_f)</strong>, and <strong>Tension (F_T)</strong>—arise from vast numbers of microscopic electrostatic interactions between atomic electron clouds.
+                </p>
+              </div>
+              <div className="p-2.5 rounded-xl bg-black/40 border border-white/5 space-y-1">
+                <span className="text-amber-300 font-bold block text-[10px] font-mono">
+                  8.1.B.3 · WHY GRAVITY DOMINATES AT LARGE SCALES
+                </span>
+                <p className="text-slate-300 leading-relaxed text-[10px]">
+                  Although F_E ≫ F_G between individual particles, astronomical bodies contain nearly equal protons and electrons (<strong>Q_net ≈ 0</strong>), so attractive gravity dominates cosmic motion.
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -1603,14 +1880,14 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
 
       {/* Slide-Up AP Physics C Topic 8.1 Standards & Theory Drawer */}
       {showDetailsDrawer && (
-        <div className="border-t border-cyan-500/30 bg-[#060a16] p-5 max-h-72 overflow-y-auto shrink-0 z-30 space-y-4 text-xs text-slate-300 animate-fadeIn">
+        <div className="border-t border-cyan-500/30 bg-[#060a16] p-5 max-h-80 overflow-y-auto shrink-0 z-30 space-y-4 text-xs text-slate-300 animate-fadeIn">
           <div className="flex items-center justify-between border-b border-white/10 pb-2">
             <div className="flex items-center space-x-2">
               <span className="px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-mono text-[10px] font-bold">
                 AP CED ALIGNMENT
               </span>
               <h3 className="text-sm font-bold text-white">
-                Topic 8.1 Required Course Content &amp; Essential Knowledge
+                Topic 8.1 Required Course Content &amp; Essential Knowledge (8.1.A – 8.1.C)
               </h3>
             </div>
             <button
@@ -1621,16 +1898,14 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3.5">
             <div className="p-3.5 rounded-xl bg-black/40 border border-white/10 space-y-1.5">
               <div className="font-bold text-cyan-300 text-[11px] flex items-center gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>8.1.A: Coulomb&apos;s Law</span>
+                <span>8.1.A.1–3: Charge &amp; Coulomb&apos;s Law</span>
               </div>
               <p className="text-[11px] text-slate-300 leading-relaxed">
-                Electrostatic force is proportional to the product of charges and inversely
-                proportional to r². Like charges exert repulsive forces; opposite charges exert
-                attractive forces strictly along the line of separation.
+                Charge is a quantized scalar (e = 1.602×10⁻¹⁹ C; proton +e, electron −e, neutron 0). Point-charge model applies when object size ≪ r. Force acts along the separation line.
               </p>
               <div className="pt-1 text-cyan-400 font-mono text-[11px]">
                 |F_E| = [1 / (4πε₀)] · |q₁q₂| / r²
@@ -1638,14 +1913,25 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
             </div>
 
             <div className="p-3.5 rounded-xl bg-black/40 border border-white/10 space-y-1.5">
-              <div className="font-bold text-emerald-300 text-[11px] flex items-center gap-1.5">
+              <div className="font-bold text-amber-300 text-[11px] flex items-center gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>8.1.B: Electric vs Gravitational</span>
+                <span>8.1.A.4 &amp; Boundary: Contact &amp; Symmetry</span>
               </div>
               <p className="text-[11px] text-slate-300 leading-relaxed">
-                Electrostatic force can be attractive or repulsive, whereas gravity is strictly
-                attractive. For charged masses, F_E ≫ F_G. Gravity dominates at astronomical scales
-                solely because bulk matter is electrically neutral.
+                Microscopic electric forces produce macroscopic contact forces: Normal (F_N), Friction (F_f), and Tension (F_T). Multi-charge superposition is evaluated for ≤4 charges or high-symmetry arrays.
+              </p>
+              <div className="pt-1 text-amber-400 font-mono text-[11px]">
+                ∑ F_E = 0 at High-Symmetry Center
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-black/40 border border-white/10 space-y-1.5">
+              <div className="font-bold text-emerald-300 text-[11px] flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>8.1.B.1–3: Electric vs Gravitational</span>
+              </div>
+              <p className="text-[11px] text-slate-300 leading-relaxed">
+                Electrostatic force is attractive or repulsive; gravity is always attractive. While F_E ≫ F_G for charged particles, gravity dominates at large scales because bulk systems are electrically neutral.
               </p>
               <div className="pt-1 text-emerald-400 font-mono text-[11px]">
                 F_E / F_G (protons) ≈ 1.24 × 10³⁶
@@ -1655,15 +1941,13 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
             <div className="p-3.5 rounded-xl bg-black/40 border border-white/10 space-y-1.5">
               <div className="font-bold text-sky-300 text-[11px] flex items-center gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>8.1.C: Dielectric Permittivity</span>
+                <span>8.1.C.1–4: Permittivity &amp; Mobility</span>
               </div>
               <p className="text-[11px] text-slate-300 leading-relaxed">
-                Permittivity measures the polarization degree of a medium under electric stress.
-                Electron rearrangement forms induced opposing dipoles, attenuating force: F = F_vac /
-                κ.
+                Permittivity (ε = κε₀ ≥ ε₀) measures induced electron polarization. Conductors allow charge carriers to move easily; insulators restrict carrier motion to local bound polarization.
               </p>
               <div className="pt-1 text-sky-400 font-mono text-[11px]">
-                ε = κε₀ · F_E = 1/(4πε) · |q₁q₂|/r²
+                ε = κε₀ · F_E = F_vac / κ
               </div>
             </div>
           </div>

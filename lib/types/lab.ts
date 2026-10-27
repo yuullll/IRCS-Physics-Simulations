@@ -51,7 +51,7 @@ export interface SceneSnapshot {
   timestamp: string;
   title: string;
   description?: string;
-  mode: 'field' | 'circuit' | 'projectile' | 'coulomb';
+  mode: 'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors';
   fieldData?: FieldSceneData;
   circuitData?: CircuitSceneData;
   camera?: CameraState;

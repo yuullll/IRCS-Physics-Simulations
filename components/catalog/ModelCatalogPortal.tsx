@@ -29,7 +29,7 @@ export interface PhysicsModelSlot {
   equation: string;
   description: string;
   status: 'live' | 'blank';
-  simulationMode?: 'field' | 'circuit' | 'projectile' | 'coulomb';
+  simulationMode?: 'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors';
   accentColor: 'cyan' | 'amber' | 'emerald' | 'rose' | 'sky';
   metrics: string[];
 }
@@ -54,7 +54,25 @@ export interface PhysicsUnitModule {
   subtopics: PhysicsSubtopic[];
 }
 
-export const LIVE_SIMULATION_SLOTS: Record<'projectile' | 'field' | 'circuit' | 'coulomb', PhysicsModelSlot> = {
+export const LIVE_SIMULATION_SLOTS: Record<
+  'vectors' | 'projectile' | 'field' | 'circuit' | 'coulomb',
+  PhysicsModelSlot
+> = {
+  vectors: {
+    id: 'mech-scalars-vectors',
+    course: 'mechanics',
+    code: '1.1',
+    title: 'Scalars, Vectors & Unit Vector Algebra',
+    subtitle: '3D Unit Vectors (î, ĵ, k̂), Resultant Superposition & 1D Sign Conventions',
+    unit: 'Unit 1 · Kinematics (1.1 Scalars and Vectors)',
+    equation: 'r = Aî + Bĵ + Ck̂ · r̂ = r / |r|',
+    description:
+      'Interactive 2D/3D workbench for AP Physics C Topic 1.1: compare scalar quantities (distance, speed) with vectors (position, displacement, velocity, acceleration), construct resultant vector sums C = A + B, inspect unit direction vectors r̂ = r/|r|, and test 1D coordinate sign conventions.',
+    status: 'live',
+    simulationMode: 'vectors',
+    accentColor: 'emerald',
+    metrics: ['3D Unit Vectors (î, ĵ, k̂)', 'Unit Vector r̂ = r/|r|', 'Scalar vs Vector Path Lab'],
+  },
   projectile: {
     id: 'mech-kinematics-drag',
     course: 'mechanics',
@@ -133,6 +151,7 @@ export const MECHANICS_UNITS: PhysicsUnitModule[] = [
         id: 'sub-1-1',
         code: '1.1',
         title: '1.1 Scalars and Vectors',
+        simulation: LIVE_SIMULATION_SLOTS.vectors,
       },
       {
         id: 'sub-1-2',
