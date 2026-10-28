@@ -90,6 +90,7 @@ export default function SimulationCockpit() {
   const [activeMode, setActiveMode] = useState<'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors'>('projectile');
   const [projectileViewMode, setProjectileViewMode] = useState<'3d' | '2d'>('3d');
   const [vectorsViewMode, setVectorsViewMode] = useState<'3d' | '2d'>('3d');
+  const [vectorsSubMode, setVectorsSubMode] = useState<string>('vector_sum');
 
   const currentRoute = navHistory[navIndex] || { layer: 'catalog', course: 'mechanics' };
   const activeCourse: PhysicsCourseId =
@@ -885,70 +886,78 @@ export default function SimulationCockpit() {
           {currentRoute.layer === 'workspace' && (
             <>
               {/* 3D / 2D Camera Toggle (Synchronized with current simulation) */}
-              <div className="hidden md:flex items-center bg-[#050811] p-0.5 rounded-xl border border-white/10 text-[11px]">
-                <button
-                  disabled={activeMode === 'coulomb'}
-                  onClick={() => {
-                    if (activeMode === 'coulomb') return;
-                    if (activeMode === 'field')
-                      setFieldControls(prev => ({ ...prev, viewMode: '3d' }));
-                    else if (activeMode === 'circuit')
-                      setCircuitControls(prev => ({ ...prev, viewMode: '3d' }));
-                    else if (activeMode === 'vectors')
-                      setVectorsViewMode('3d');
-                    else
-                      setProjectileViewMode('3d');
-                  }}
-                  className={`px-2.5 py-1 rounded-lg font-medium transition ${
-                    activeMode === 'coulomb'
-                      ? 'text-slate-600 bg-white/[0.02] cursor-not-allowed opacity-45'
-                      : (activeMode === 'projectile'
-                          ? projectileViewMode === '3d'
-                          : activeMode === 'vectors'
-                          ? vectorsViewMode === '3d'
-                          : (activeMode === 'field' ? fieldControls.viewMode : circuitControls.viewMode) === '3d')
-                      ? isCurrentMechanics
-                        ? 'bg-emerald-400 text-slate-950 font-bold shadow-lg shadow-emerald-500/20'
-                        : 'bg-sky-400 text-slate-950 font-bold shadow-lg shadow-sky-500/20'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                  title={
-                    activeMode === 'coulomb'
-                      ? 'Topic 8.1 Workbench is a 2D simulation'
-                      : '3D Perspective View'
-                  }
-                >
-                  3D
-                </button>
-                <button
-                  onClick={() => {
-                    if (activeMode === 'coulomb') return;
-                    if (activeMode === 'field')
-                      setFieldControls(prev => ({ ...prev, viewMode: 'top' }));
-                    else if (activeMode === 'circuit')
-                      setCircuitControls(prev => ({ ...prev, viewMode: 'top' }));
-                    else if (activeMode === 'vectors')
-                      setVectorsViewMode('2d');
-                    else
-                      setProjectileViewMode('2d');
-                  }}
-                  className={`px-2.5 py-1 rounded-lg font-medium transition ${
-                    activeMode === 'coulomb' ||
-                    (activeMode === 'projectile'
-                      ? projectileViewMode === '2d'
-                      : activeMode === 'vectors'
-                      ? vectorsViewMode === '2d'
-                      : (activeMode === 'field' ? fieldControls.viewMode : circuitControls.viewMode) === 'top')
-                      ? isCurrentMechanics
-                        ? 'bg-emerald-400 text-slate-950 font-bold shadow-lg shadow-emerald-500/20'
-                        : 'bg-sky-400 text-slate-950 font-bold shadow-lg shadow-sky-500/20'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                  title="2D View"
-                >
-                  2D
-                </button>
-              </div>
+              {(() => {
+                const is3DDisabled =
+                  activeMode === 'coulomb' ||
+                  (activeMode === 'vectors' && vectorsSubMode === 'sign_1d');
+                const is3DActive =
+                  !is3DDisabled &&
+                  (activeMode === 'projectile'
+                    ? projectileViewMode === '3d'
+                    : activeMode === 'vectors'
+                    ? vectorsViewMode === '3d'
+                    : (activeMode === 'field' ? fieldControls.viewMode : circuitControls.viewMode) === '3d');
+                const is2DActive = is3DDisabled || !is3DActive;
+
+                return (
+                  <div className="hidden md:flex items-center bg-[#050811] p-0.5 rounded-xl border border-white/10 text-[11px]">
+                    <button
+                      disabled={is3DDisabled}
+                      onClick={() => {
+                        if (is3DDisabled) return;
+                        if (activeMode === 'field')
+                          setFieldControls(prev => ({ ...prev, viewMode: '3d' }));
+                        else if (activeMode === 'circuit')
+                          setCircuitControls(prev => ({ ...prev, viewMode: '3d' }));
+                        else if (activeMode === 'vectors')
+                          setVectorsViewMode('3d');
+                        else
+                          setProjectileViewMode('3d');
+                      }}
+                      className={`px-2.5 py-1 rounded-lg font-medium transition ${
+                        is3DDisabled
+                          ? 'text-slate-600 bg-white/[0.02] cursor-not-allowed opacity-45'
+                          : is3DActive
+                          ? isCurrentMechanics
+                            ? 'bg-emerald-400 text-slate-950 font-bold shadow-lg shadow-emerald-500/20'
+                            : 'bg-sky-400 text-slate-950 font-bold shadow-lg shadow-sky-500/20'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                      title={
+                        activeMode === 'coulomb'
+                          ? 'Topic 8.1 Workbench is a 2D simulation'
+                          : activeMode === 'vectors' && vectorsSubMode === 'sign_1d'
+                          ? '1D Signs (±) mode is a linear 1D/2D axis (3D disabled)'
+                          : '3D Perspective View'
+                      }
+                    >
+                      3D
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (activeMode === 'field')
+                          setFieldControls(prev => ({ ...prev, viewMode: 'top' }));
+                        else if (activeMode === 'circuit')
+                          setCircuitControls(prev => ({ ...prev, viewMode: 'top' }));
+                        else if (activeMode === 'vectors')
+                          setVectorsViewMode('2d');
+                        else
+                          setProjectileViewMode('2d');
+                      }}
+                      className={`px-2.5 py-1 rounded-lg font-medium transition ${
+                        is2DActive
+                          ? isCurrentMechanics
+                            ? 'bg-emerald-400 text-slate-950 font-bold shadow-lg shadow-emerald-500/20'
+                            : 'bg-sky-400 text-slate-950 font-bold shadow-lg shadow-sky-500/20'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                      title="2D View"
+                    >
+                      2D
+                    </button>
+                  </div>
+                );
+              })()}
 
               <button
                 onClick={() => setIsSavedScenesOpen(true)}
@@ -1498,6 +1507,7 @@ export default function SimulationCockpit() {
                 onToast={showToast}
                 externalViewMode={vectorsViewMode}
                 onViewModeChange={setVectorsViewMode}
+                onSubModeChange={setVectorsSubMode}
               />
             ) : (
               <ProjectileSandbox

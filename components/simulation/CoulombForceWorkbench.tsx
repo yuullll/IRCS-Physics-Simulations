@@ -15,6 +15,14 @@ import {
   Crosshair,
   Bookmark,
   Navigation,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
+  Eye,
+  EyeOff,
+  Maximize2,
+  Move,
+  Layers,
 } from 'lucide-react';
 
 // Physical Constants
@@ -164,9 +172,29 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
   const [showDetailsDrawer, setShowDetailsDrawer] = useState<boolean>(false);
   const [scaleMode, setScaleMode] = useState<'macro' | 'atomic'>('macro');
 
-  // Force arrows display on selected charge: toggle + mode ('net' vs 'individual')
+  // Canvas label visibility controls (charges, forces, distances)
+  const [showCanvasLabels, setShowCanvasLabels] = useState<boolean>(true);
+  const [showChargeLabels, setShowChargeLabels] = useState<boolean>(true);
+  const [showForceLabels, setShowForceLabels] = useState<boolean>(true);
+  const [showDistanceLabels, setShowDistanceLabels] = useState<boolean>(true);
+
+  // Force arrows display on selected charge: simultaneous net & individual vectors
   const [showSelectedChargeForces, setShowSelectedChargeForces] = useState<boolean>(true);
-  const [forceVectorDisplayMode, setForceVectorDisplayMode] = useState<'net' | 'individual'>('individual');
+  const [showNetForceArrow, setShowNetForceArrow] = useState<boolean>(true);
+  const [showIndividualForces, setShowIndividualForces] = useState<boolean>(true);
+
+  // Freeform Platform Mode & Zoom / Pan State (unlimited charges & pan/zoom)
+  const [isFreeformMode, setIsFreeformMode] = useState<boolean>(false);
+  const [zoomLevel, setZoomLevel] = useState<number>(1.0);
+  const [panOffset, setPanOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [isPanToolActive, setIsPanToolActive] = useState<boolean>(false);
+  const isDraggingCanvasRef = useRef<boolean>(false);
+  const panStartRef = useRef<{ clientX: number; clientY: number; startPanX: number; startPanY: number }>({
+    clientX: 0,
+    clientY: 0,
+    startPanX: 0,
+    startPanY: 0,
+  });
 
   // Functional Dependence / Factor-of-Change Predictor state (Suggested Skill 2.D & LO 8.1.A.2)
   const [scaleMultQ1, setScaleMultQ1] = useState<number>(2);
@@ -326,11 +354,65 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
     return computeForceAtPoint(selectedProbePoint.x, selectedProbePoint.y);
   }, [selectedProbePoint, computeForceAtPoint]);
 
-  // Coordinate Conversion (Pure math on 1000x600 SVG viewBox)
+  // Dynamic SVG ViewBox for Zoom and Pan
+  const baseW = 1000;
+  const baseH = 600;
+  const viewBoxW = baseW / zoomLevel;
+  const viewBoxH = baseH / zoomLevel;
+  const viewBoxX = 500 - viewBoxW / 2 + panOffset.x;
+  const viewBoxY = 300 - viewBoxH / 2 + panOffset.y;
+
+  // Coordinate Conversion (from simulation meters to SVG canvas space 1000x600)
   const toSvgX = (xMeters: number) => 500 + (xMeters / 12) * 450;
   const toSvgY = (yMeters: number) => 300 - (yMeters / 7) * 260;
 
-  // Handle Dragging Charges on the 2D Coordinate Grid
+  // Convert client mouse coordinates to simulation meter coordinates taking viewBox into account
+  const getMetersFromEvent = useCallback(
+    (clientX: number, clientY: number) => {
+      if (!containerRef.current) return { meterX: 0, meterY: 0 };
+      const rect = containerRef.current.getBoundingClientRect();
+      const pixelX = clientX - rect.left;
+      const pixelY = clientY - rect.top;
+
+      const svgX = viewBoxX + (pixelX / rect.width) * viewBoxW;
+      const svgY = viewBoxY + (pixelY / rect.height) * viewBoxH;
+
+      const meterX = ((svgX - 500) / 450) * 12;
+      const meterY = -(((svgY - 300) / 260) * 7);
+
+      const maxLimit = isFreeformMode ? 35 : 11.5;
+      const maxLimitY = isFreeformMode ? 22 : 6.5;
+
+      return {
+        meterX: parseFloat(Math.max(-maxLimit, Math.min(maxLimit, meterX)).toFixed(2)),
+        meterY: parseFloat(Math.max(-maxLimitY, Math.min(maxLimitY, meterY)).toFixed(2)),
+      };
+    },
+    [viewBoxX, viewBoxY, viewBoxW, viewBoxH, isFreeformMode]
+  );
+
+  // Zoom and Pan Handlers
+  const handleZoomIn = () => {
+    setZoomLevel(prev => Math.min(3.5, parseFloat((prev * 1.25).toFixed(2))));
+  };
+  const handleZoomOut = () => {
+    setZoomLevel(prev => Math.max(0.35, parseFloat((prev / 1.25).toFixed(2))));
+  };
+  const handleResetZoom = () => {
+    setZoomLevel(1.0);
+    setPanOffset({ x: 0, y: 0 });
+  };
+
+  const handleWheel = (e: React.WheelEvent) => {
+    // Zoom via mouse wheel
+    if (isFreeformMode || e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      const factor = e.deltaY < 0 ? 1.12 : 0.89;
+      setZoomLevel(prev => Math.max(0.35, Math.min(3.5, parseFloat((prev * factor).toFixed(2)))));
+    }
+  };
+
+  // Handle Dragging Charges or Panning Canvas
   const handleMouseDownOnCharge = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setSelectedChargeId(id);
@@ -338,53 +420,66 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
     didDragRef.current = false;
   };
 
+  const handleMouseDownCanvas = (e: React.MouseEvent) => {
+    if (isPanToolActive || e.button === 1) {
+      isDraggingCanvasRef.current = true;
+      didDragRef.current = false;
+      panStartRef.current = {
+        clientX: e.clientX,
+        clientY: e.clientY,
+        startPanX: panOffset.x,
+        startPanY: panOffset.y,
+      };
+    }
+  };
+
   const handleMouseMoveCanvas = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!draggingChargeId || !containerRef.current) return;
-    didDragRef.current = true;
-    const rect = containerRef.current.getBoundingClientRect();
-    const pixelX = e.clientX - rect.left;
-    const pixelY = e.clientY - rect.top;
+    if (draggingChargeId && containerRef.current) {
+      didDragRef.current = true;
+      const { meterX, meterY } = getMetersFromEvent(e.clientX, e.clientY);
 
-    // Convert pixel to meter space:
-    const meterX = ((pixelX - rect.width / 2) / (rect.width * 0.45)) * 12;
-    const meterY = -(((pixelY - rect.height / 2) / (rect.height * 0.433)) * 7);
+      setCharges(prev =>
+        prev.map(c =>
+          c.id === draggingChargeId
+            ? {
+                ...c,
+                x: meterX,
+                y: meterY,
+              }
+            : c
+        )
+      );
+    } else if (isDraggingCanvasRef.current && containerRef.current) {
+      didDragRef.current = true;
+      const dxPixels = e.clientX - panStartRef.current.clientX;
+      const dyPixels = e.clientY - panStartRef.current.clientY;
+      const rect = containerRef.current.getBoundingClientRect();
+      const svgDx = (dxPixels / rect.width) * viewBoxW;
+      const svgDy = (dyPixels / rect.height) * viewBoxH;
 
-    setCharges(prev =>
-      prev.map(c =>
-        c.id === draggingChargeId
-          ? {
-              ...c,
-              x: parseFloat(Math.max(-11.5, Math.min(11.5, meterX)).toFixed(2)),
-              y: parseFloat(Math.max(-6.5, Math.min(6.5, meterY)).toFixed(2)),
-            }
-          : c
-      )
-    );
+      setPanOffset({
+        x: panStartRef.current.startPanX - svgDx,
+        y: panStartRef.current.startPanY - svgDy,
+      });
+    }
   };
 
   const handleMouseUpCanvas = () => {
     if (draggingChargeId) {
       setDraggingChargeId(null);
     }
+    if (isDraggingCanvasRef.current) {
+      isDraggingCanvasRef.current = false;
+    }
   };
 
   // Click on plane to probe force at that point and create/select a labeled point
   const handleClickPlane = (e: React.MouseEvent<SVGSVGElement>) => {
-    if (draggingChargeId || didDragRef.current) {
+    if (draggingChargeId || didDragRef.current || isDraggingCanvasRef.current) {
       didDragRef.current = false;
       return;
     }
-    if (!containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    const pixelX = e.clientX - rect.left;
-    const pixelY = e.clientY - rect.top;
-
-    const meterX = parseFloat(
-      Math.max(-11.5, Math.min(11.5, ((pixelX - rect.width / 2) / (rect.width * 0.45)) * 12)).toFixed(2)
-    );
-    const meterY = parseFloat(
-      Math.max(-6.5, Math.min(6.5, -(((pixelY - rect.height / 2) / (rect.height * 0.433)) * 7))).toFixed(2)
-    );
+    const { meterX, meterY } = getMetersFromEvent(e.clientX, e.clientY);
 
     // Replace any unsaved temporary point or create a new labeled point
     const existingUnsaved = probePoints.find(p => !p.saved);
@@ -431,10 +526,10 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
     });
   };
 
-  // Add / Remove Charge handlers (capped at 4 charges per CED boundary statement)
+  // Add / Remove Charge handlers (unlimited in freeform mode; capped at 4 in standard AP mode)
   const handleAddCharge = () => {
-    if (charges.length >= 4) {
-      onToast?.('AP Physics C Scope: Maximum 4 interacting point charges.');
+    if (!isFreeformMode && charges.length >= 4) {
+      onToast?.('AP Physics C Scope: Max 4 interacting point charges. Switch to Freeform Platform for unlimited charges.');
       return;
     }
     const newId = `q${charges.length + 1}`;
@@ -447,8 +542,8 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
       useElementaryUnits: scaleMode === 'atomic',
       qElementary: sign * 1,
       massKg: scaleMode === 'atomic' ? (sign > 0 ? PROTON_MASS : ELECTRON_MASS) : 0.001,
-      x: (charges.length - 1.5) * 3,
-      y: charges.length % 2 === 0 ? 3 : -3,
+      x: ((charges.length % 5) - 2) * 2.5,
+      y: (Math.floor(charges.length / 5) * 2 - 2) * (sign > 0 ? 1 : -1),
       color: sign > 0 ? POSITIVE_RED : NEGATIVE_BLUE,
     };
     setCharges(prev => [...prev, newCharge]);
@@ -456,14 +551,101 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
     onToast?.(`Added ${newCharge.name} to the electrostatic system`);
   };
 
+  // Quick Archetype Spawners for Freeform Sandbox Platform
+  const handleAddQuickParticle = (type: 'pos' | 'neg' | 'proton' | 'electron' | 'neutron') => {
+    const nextIdx = charges.length + 1;
+    const newId = `q${nextIdx}`;
+    const offsetX = (Math.random() - 0.5) * 7;
+    const offsetY = (Math.random() - 0.5) * 5;
+
+    let newCharge: CoulombCharge;
+    if (type === 'pos') {
+      newCharge = {
+        id: newId,
+        name: `Charge ${nextIdx} (+q)`,
+        archetype: 'macro_pos',
+        qMicro: 5.0,
+        useElementaryUnits: false,
+        qElementary: Math.round(5.0e-6 / ELEMENTARY_CHARGE),
+        massKg: 0.001,
+        x: parseFloat(offsetX.toFixed(2)),
+        y: parseFloat(offsetY.toFixed(2)),
+        color: POSITIVE_RED,
+      };
+    } else if (type === 'neg') {
+      newCharge = {
+        id: newId,
+        name: `Charge ${nextIdx} (−q)`,
+        archetype: 'macro_neg',
+        qMicro: -5.0,
+        useElementaryUnits: false,
+        qElementary: -Math.round(5.0e-6 / ELEMENTARY_CHARGE),
+        massKg: 0.001,
+        x: parseFloat(offsetX.toFixed(2)),
+        y: parseFloat(offsetY.toFixed(2)),
+        color: NEGATIVE_BLUE,
+      };
+    } else if (type === 'proton') {
+      newCharge = {
+        id: newId,
+        name: `Proton p${nextIdx} (+1e)`,
+        archetype: 'proton',
+        qMicro: ELEMENTARY_CHARGE * 1e6,
+        useElementaryUnits: true,
+        qElementary: 1,
+        massKg: PROTON_MASS,
+        x: parseFloat(offsetX.toFixed(2)),
+        y: parseFloat(offsetY.toFixed(2)),
+        color: POSITIVE_RED,
+      };
+    } else if (type === 'electron') {
+      newCharge = {
+        id: newId,
+        name: `Electron e${nextIdx} (−1e)`,
+        archetype: 'electron',
+        qMicro: -ELEMENTARY_CHARGE * 1e6,
+        useElementaryUnits: true,
+        qElementary: -1,
+        massKg: ELECTRON_MASS,
+        x: parseFloat(offsetX.toFixed(2)),
+        y: parseFloat(offsetY.toFixed(2)),
+        color: NEGATIVE_BLUE,
+      };
+    } else {
+      // neutron
+      newCharge = {
+        id: newId,
+        name: `Neutron n${nextIdx} (0e)`,
+        archetype: 'neutron',
+        qMicro: 0,
+        useElementaryUnits: true,
+        qElementary: 0,
+        massKg: NEUTRON_MASS,
+        x: parseFloat(offsetX.toFixed(2)),
+        y: parseFloat(offsetY.toFixed(2)),
+        color: NEUTRAL_SLATE,
+      };
+    }
+    setCharges(prev => [...prev, newCharge]);
+    setSelectedChargeId(newId);
+    onToast?.(`Added ${newCharge.name}`);
+  };
+
+  const handleClearAllCharges = () => {
+    setCharges([]);
+    setSelectedChargeId('');
+    onToast?.('Cleared all charges from workbench');
+  };
+
   const handleRemoveCharge = (id: string) => {
-    if (charges.length <= 2) {
-      onToast?.('A minimum of 2 charges is required to observe Coulomb force pairs.');
+    if (!isFreeformMode && charges.length <= 2) {
+      onToast?.('A minimum of 2 charges is required to observe Coulomb force pairs in standard AP mode.');
       return;
     }
-    setCharges(prev => prev.filter(c => c.id !== id));
+    const remaining = charges.filter(c => c.id !== id);
+    setCharges(remaining);
     if (selectedChargeId === id) {
-      setSelectedChargeId(charges.find(c => c.id !== id)?.id || 'q1');
+      setSelectedChargeId(remaining.length > 0 ? remaining[0].id : '');
     }
   };
 
@@ -604,11 +786,15 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
             }}
           />
 
-          {/* Pure SVG Vector & Charges Canvas (1000x600 viewBox) */}
+          {/* Pure SVG Vector & Charges Canvas with Dynamic Zoom & Pan */}
           <svg
-            viewBox="0 0 1000 600"
+            viewBox={`${viewBoxX} ${viewBoxY} ${viewBoxW} ${viewBoxH}`}
             onClick={handleClickPlane}
-            className="absolute inset-0 w-full h-full select-none cursor-crosshair"
+            onMouseDown={handleMouseDownCanvas}
+            onWheel={handleWheel}
+            className={`absolute inset-0 w-full h-full select-none ${
+              isPanToolActive ? 'cursor-grab active:cursor-grabbing' : 'cursor-crosshair'
+            }`}
           >
             <defs>
               <pattern id="gridMinor" width="25" height="25" patternUnits="userSpaceOnUse">
@@ -707,13 +893,20 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
                 const y1 = toSvgY(c1.y);
                 const x2 = toSvgX(c2.x);
                 const y2 = toSvgY(c2.y);
-                const midX = (x1 + x2) / 2;
-                const midY = (y1 + y2) / 2;
 
                 const pInteraction = pairwiseInteractions.find(
                   p => p.fromId === c1.id && p.toId === c2.id
                 );
                 const r = pInteraction?.r || 1.0;
+
+                // Perpendicular offset normal vector so label never sits on top of line or charges
+                const dx = x2 - x1;
+                const dy = y2 - y1;
+                const len = Math.hypot(dx, dy) || 1;
+                const nx = -dy / len;
+                const ny = dx / len;
+                const midX = (x1 + x2) / 2 + nx * 20;
+                const midY = (y1 + y2) / 2 + ny * 20;
 
                 return (
                   <g key={`sep-${c1.id}-${c2.id}`}>
@@ -727,103 +920,65 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
                       strokeDasharray="4 4"
                       opacity="0.65"
                     />
-                    <g transform={`translate(${midX}, ${midY - 14})`}>
-                      <rect
-                        x="-38"
-                        y="-10"
-                        width="76"
-                        height="20"
-                        rx="6"
-                        fill="#0c1428"
-                        stroke="#38bdf8"
-                        strokeWidth="1.2"
-                        opacity="0.95"
-                      />
-                      <text
-                        x="0"
-                        y="4"
-                        textAnchor="middle"
-                        fill="#7dd3fc"
-                        fontSize="11"
-                        fontFamily="monospace"
-                        fontWeight="bold"
-                      >
-                        r = {r.toFixed(2)}m
-                      </text>
-                    </g>
+                    {showCanvasLabels && showDistanceLabels && (
+                      <g transform={`translate(${midX}, ${midY})`}>
+                        <rect
+                          x="-36"
+                          y="-10"
+                          width="72"
+                          height="20"
+                          rx="6"
+                          fill="#0c1428"
+                          stroke="#38bdf8"
+                          strokeWidth="1.2"
+                          opacity="0.95"
+                        />
+                        <text
+                          x="0"
+                          y="4"
+                          textAnchor="middle"
+                          fill="#7dd3fc"
+                          fontSize="11"
+                          fontFamily="monospace"
+                          fontWeight="bold"
+                        >
+                          r = {r.toFixed(2)}m
+                        </text>
+                      </g>
+                    )}
                   </g>
                 );
               })
             )}
 
-            {/* Electrostatic Forces Acting Upon Selected Charge (Net vs Individual Toggle) */}
+            {/* Electrostatic Forces Acting Upon Selected Charge (Simultaneous Net + Individual Force Arrows) */}
             {showSelectedChargeForces && selectedCharge && (() => {
               const cx = toSvgX(selectedCharge.x);
               const cy = toSvgY(selectedCharge.y);
 
-              if (forceVectorDisplayMode === 'net') {
-                const net = netForces.get(selectedCharge.id);
-                if (!net || net.mag === 0) return null;
+              const net = netForces.get(selectedCharge.id);
+              const incoming = pairwiseInteractions.filter(p => p.toId === selectedCharge.id && p.feMag > 0);
+              const maxMag = Math.max(...incoming.map(p => p.feMag), 1e-30);
+              const minMag = Math.min(...incoming.map(p => p.feMag), maxMag);
 
-                // Note: SVG Y is inverted relative to Cartesian Y
-                const svgAngle = Math.atan2(-net.fy, net.fx);
-                const netLen = Math.min(130, Math.max(36, 35 + Math.log10(net.mag + 1e-30) * 6));
-                const tipX = cx + Math.cos(svgAngle) * netLen;
-                const tipY = cy + Math.sin(svgAngle) * netLen;
-
-                return (
-                  <g key={`net-selected-${selectedCharge.id}`}>
-                    <line
-                      x1={cx}
-                      y1={cy}
-                      x2={tipX}
-                      y2={tipY}
-                      stroke="#34d399"
-                      strokeWidth="3.8"
-                      markerEnd="url(#arrowNet)"
-                    />
-                    <g transform={`translate(${tipX + Math.cos(svgAngle) * 28}, ${tipY + Math.sin(svgAngle) * 18})`}>
-                      <rect
-                        x="-46"
-                        y="-10"
-                        width="92"
-                        height="20"
-                        rx="5"
-                        fill="#061512"
-                        stroke="#34d399"
-                        strokeWidth="1.2"
-                      />
-                      <text
-                        x="0"
-                        y="4"
-                        textAnchor="middle"
-                        fill="#6ee7b7"
-                        fontSize="10"
-                        fontFamily="monospace"
-                        fontWeight="bold"
-                      >
-                        F_net ({selectedCharge.id})
-                      </text>
-                    </g>
-                  </g>
-                );
-              } else {
-                // Individual Forces acting upon the selected charge from all other charges
-                const incoming = pairwiseInteractions.filter(p => p.toId === selectedCharge.id && p.feMag > 0);
-                const maxMag = Math.max(...incoming.map(p => p.feMag), 1e-30);
-                const minMag = Math.min(...incoming.map(p => p.feMag), maxMag);
-
-                return (
-                  <g key={`indiv-selected-${selectedCharge.id}`}>
-                    {incoming.map(p => {
+              return (
+                <g key={`forces-selected-${selectedCharge.id}`}>
+                  {/* 1. Individual Forces acting on selected charge from all other charges */}
+                  {showIndividualForces &&
+                    incoming.map(p => {
                       const svgAngle = Math.atan2(-p.feVec.y, p.feVec.x);
-                      // Scale arrow length proportionally to relative force magnitude
                       const ratio = maxMag > minMag ? p.feMag / maxMag : 1.0;
-                      const arrowLen = Math.min(135, Math.max(36, 40 + ratio * 75));
+                      const arrowLen = Math.min(140, Math.max(38, 40 + ratio * 75));
                       const tipX = cx + Math.cos(svgAngle) * arrowLen;
                       const tipY = cy + Math.sin(svgAngle) * arrowLen;
                       const strokeColor = p.isRepulsive ? POSITIVE_RED : NEGATIVE_BLUE;
                       const markerId = p.isRepulsive ? 'url(#arrowRepulsive)' : 'url(#arrowAttractive)';
+
+                      // Perpendicular offset normal so label sits neatly alongside arrow shaft without covering tip or charge
+                      const normX = -Math.sin(svgAngle);
+                      const normY = Math.cos(svgAngle);
+                      const labelX = cx + Math.cos(svgAngle) * (arrowLen * 0.65) + normX * 22;
+                      const labelY = cy + Math.sin(svgAngle) * (arrowLen * 0.65) + normY * 22;
 
                       return (
                         <g key={`indiv-${p.fromId}-to-${p.toId}`}>
@@ -833,42 +988,92 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
                             x2={tipX}
                             y2={tipY}
                             stroke={strokeColor}
-                            strokeWidth="3.4"
+                            strokeWidth="3.2"
                             markerEnd={markerId}
                           />
-                          <g
-                            transform={`translate(${tipX + Math.cos(svgAngle) * 26}, ${
-                              tipY + Math.sin(svgAngle) * 16
-                            })`}
-                          >
-                            <rect
-                              x="-34"
-                              y="-9"
-                              width="68"
-                              height="18"
-                              rx="5"
-                              fill="#080e20"
-                              stroke={strokeColor}
-                              strokeWidth="1.2"
-                            />
-                            <text
-                              x="0"
-                              y="3.5"
-                              textAnchor="middle"
-                              fill="#ffffff"
-                              fontSize="9.5"
-                              fontFamily="monospace"
-                              fontWeight="bold"
-                            >
-                              F_{p.fromId}→{p.toId}
-                            </text>
-                          </g>
+                          {showCanvasLabels && showForceLabels && (
+                            <g transform={`translate(${labelX}, ${labelY})`}>
+                              <rect
+                                x="-34"
+                                y="-9"
+                                width="68"
+                                height="18"
+                                rx="5"
+                                fill="#080e20"
+                                stroke={strokeColor}
+                                strokeWidth="1.2"
+                              />
+                              <text
+                                x="0"
+                                y="3.5"
+                                textAnchor="middle"
+                                fill="#ffffff"
+                                fontSize="9.5"
+                                fontFamily="monospace"
+                                fontWeight="bold"
+                              >
+                                F_{p.fromId}→{p.toId}
+                              </text>
+                            </g>
+                          )}
                         </g>
                       );
                     })}
-                  </g>
-                );
-              }
+
+                  {/* 2. Net Force Arrow (LO 8.1.A.3 Vector Superposition) */}
+                  {showNetForceArrow && net && net.mag > 1e-25 && (() => {
+                    const svgAngle = Math.atan2(-net.fy, net.fx);
+                    const netLen = Math.min(145, Math.max(40, 40 + Math.log10(net.mag + 1e-30) * 6));
+                    const tipX = cx + Math.cos(svgAngle) * netLen;
+                    const tipY = cy + Math.sin(svgAngle) * netLen;
+
+                    // Perpendicular offset normal so label sits cleanly alongside net arrow shaft without covering arrowhead
+                    const normX = -Math.sin(svgAngle);
+                    const normY = Math.cos(svgAngle);
+                    const labelX = cx + Math.cos(svgAngle) * (netLen * 0.65) + normX * 24;
+                    const labelY = cy + Math.sin(svgAngle) * (netLen * 0.65) + normY * 24;
+
+                    return (
+                      <g key={`net-selected-${selectedCharge.id}`}>
+                        <line
+                          x1={cx}
+                          y1={cy}
+                          x2={tipX}
+                          y2={tipY}
+                          stroke="#34d399"
+                          strokeWidth="4"
+                          markerEnd="url(#arrowNet)"
+                        />
+                        {showCanvasLabels && showForceLabels && (
+                          <g transform={`translate(${labelX}, ${labelY})`}>
+                            <rect
+                              x="-46"
+                              y="-10"
+                              width="92"
+                              height="20"
+                              rx="5"
+                              fill="#061512"
+                              stroke="#34d399"
+                              strokeWidth="1.4"
+                            />
+                            <text
+                              x="0"
+                              y="4"
+                              textAnchor="middle"
+                              fill="#6ee7b7"
+                              fontSize="10"
+                              fontFamily="monospace"
+                              fontWeight="bold"
+                            >
+                              F_net ({selectedCharge.id})
+                            </text>
+                          </g>
+                        )}
+                      </g>
+                    );
+                  })()}
+                </g>
+              );
             })()}
 
             {/* Clicked / Stored Force Probe Points on Plane */}
@@ -1016,36 +1221,208 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
                   </text>
 
                   {/* Charge Label Pill */}
-                  <g transform="translate(0, 36)" pointerEvents="none">
-                    <rect
-                      x="-44"
-                      y="-9"
-                      width="88"
-                      height="18"
-                      rx="6"
-                      fill="#080e20"
-                      stroke={isSelected ? '#ffffff' : strictColor}
-                      strokeWidth="1.2"
-                    />
-                    <text
-                      x="0"
-                      y="4"
-                      textAnchor="middle"
-                      fill={isNeutral ? '#cbd5e1' : isPositive ? '#fca5a5' : '#93c5fd'}
-                      fontSize="10"
-                      fontFamily="monospace"
-                      fontWeight="bold"
-                    >
-                      {c.id}:{' '}
-                      {c.useElementaryUnits
-                        ? `${c.qElementary > 0 ? '+' : ''}${c.qElementary}e`
-                        : `${c.qMicro > 0 ? '+' : ''}${c.qMicro.toFixed(1)}μC`}
-                    </text>
-                  </g>
+                  {showCanvasLabels && showChargeLabels && (
+                    <g transform="translate(0, 36)" pointerEvents="none">
+                      <rect
+                        x="-44"
+                        y="-9"
+                        width="88"
+                        height="18"
+                        rx="6"
+                        fill="#080e20"
+                        stroke={isSelected ? '#ffffff' : strictColor}
+                        strokeWidth="1.2"
+                      />
+                      <text
+                        x="0"
+                        y="4"
+                        textAnchor="middle"
+                        fill={isNeutral ? '#cbd5e1' : isPositive ? '#fca5a5' : '#93c5fd'}
+                        fontSize="10"
+                        fontFamily="monospace"
+                        fontWeight="bold"
+                      >
+                        {c.id}:{' '}
+                        {c.useElementaryUnits
+                          ? `${c.qElementary > 0 ? '+' : ''}${c.qElementary}e`
+                          : `${c.qMicro > 0 ? '+' : ''}${c.qMicro.toFixed(1)}μC`}
+                      </text>
+                    </g>
+                  )}
                 </g>
               );
             })}
           </svg>
+
+          {/* Floating Top Canvas Toolbar (Below Global Menu Bar): Mode, Labels & Zoom Controls */}
+          <div className="absolute top-16 left-4 right-4 z-20 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+            {/* Left: Standard AP Scope vs Freeform Platform Mode Switcher */}
+            <div className="flex items-center gap-1 bg-[#091124]/90 backdrop-blur-md p-1 rounded-xl border border-white/10 shadow-lg pointer-events-auto">
+              <button
+                onClick={() => {
+                  setIsFreeformMode(false);
+                  if (charges.length > 4) {
+                    setCharges(charges.slice(0, 4));
+                  }
+                  handleResetZoom();
+                }}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition ${
+                  !isFreeformMode
+                    ? 'bg-cyan-500 text-slate-950 shadow'
+                    : 'text-slate-300 hover:text-white'
+                }`}
+              >
+                AP CED Mode (≤4)
+              </button>
+              <button
+                onClick={() => setIsFreeformMode(true)}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition flex items-center gap-1.5 ${
+                  isFreeformMode
+                    ? 'bg-gradient-to-r from-amber-400 to-cyan-400 text-slate-950 shadow font-extrabold'
+                    : 'text-slate-300 hover:text-white'
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Freeform Platform</span>
+              </button>
+            </div>
+
+            {/* Center: Canvas 2D Text Badges & Labels Toggle (Charges, Force Names, Radii) */}
+            <div className="flex items-center gap-1 bg-[#091124]/90 backdrop-blur-md px-2 py-1 rounded-xl border border-white/10 shadow-lg text-[11px] pointer-events-auto">
+              <button
+                onClick={() => setShowCanvasLabels(prev => !prev)}
+                className={`px-2 py-1 rounded-lg font-bold flex items-center gap-1.5 transition ${
+                  showCanvasLabels
+                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                    : 'bg-white/5 text-slate-400 hover:text-white'
+                }`}
+                title="Toggle displaying labels on the 2D plane"
+              >
+                {showCanvasLabels ? <Eye className="w-3.5 h-3.5 text-cyan-400" /> : <EyeOff className="w-3.5 h-3.5 text-slate-400" />}
+                <span>Labels: {showCanvasLabels ? 'ON' : 'OFF'}</span>
+              </button>
+
+              {showCanvasLabels && (
+                <div className="flex items-center gap-1 pl-1 border-l border-white/10">
+                  <button
+                    onClick={() => setShowChargeLabels(prev => !prev)}
+                    className={`px-1.5 py-0.5 rounded text-[10px] font-mono transition ${
+                      showChargeLabels ? 'bg-white/15 text-white font-bold' : 'text-slate-500 line-through'
+                    }`}
+                    title="Toggle charge magnitude labels on plane"
+                  >
+                    Charges
+                  </button>
+                  <button
+                    onClick={() => setShowForceLabels(prev => !prev)}
+                    className={`px-1.5 py-0.5 rounded text-[10px] font-mono transition ${
+                      showForceLabels ? 'bg-white/15 text-white font-bold' : 'text-slate-500 line-through'
+                    }`}
+                    title="Toggle force vector names on plane"
+                  >
+                    Forces
+                  </button>
+                  <button
+                    onClick={() => setShowDistanceLabels(prev => !prev)}
+                    className={`px-1.5 py-0.5 rounded text-[10px] font-mono transition ${
+                      showDistanceLabels ? 'bg-white/15 text-white font-bold' : 'text-slate-500 line-through'
+                    }`}
+                    title="Toggle distance (r) badges on plane"
+                  >
+                    Radii (r)
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Right: 2D Plane Dynamic Zoom & Pan Toolbar */}
+            <div className="flex items-center gap-1 bg-[#091124]/90 backdrop-blur-md px-2 py-1 rounded-xl border border-white/10 shadow-lg text-[11px] pointer-events-auto">
+              <button
+                onClick={handleZoomOut}
+                className="p-1 rounded-lg hover:bg-white/10 text-slate-300 hover:text-white transition"
+                title="Zoom Out (or scroll down)"
+              >
+                <ZoomOut className="w-3.5 h-3.5" />
+              </button>
+              <span className="font-mono text-[10px] text-cyan-300 px-1 font-bold min-w-[36px] text-center">
+                {Math.round(zoomLevel * 100)}%
+              </span>
+              <button
+                onClick={handleZoomIn}
+                className="p-1 rounded-lg hover:bg-white/10 text-slate-300 hover:text-white transition"
+                title="Zoom In (or scroll up)"
+              >
+                <ZoomIn className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => setIsPanToolActive(prev => !prev)}
+                className={`px-1.5 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 transition ${
+                  isPanToolActive
+                    ? 'bg-amber-400 text-slate-950 font-extrabold'
+                    : 'hover:bg-white/10 text-slate-300'
+                }`}
+                title="Toggle Pan Tool (drag canvas background)"
+              >
+                <Move className="w-3 h-3" />
+                <span>Pan</span>
+              </button>
+              <button
+                onClick={handleResetZoom}
+                className="p-1 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition ml-0.5"
+                title="Reset Zoom & Pan (100%)"
+              >
+                <RotateCcw className="w-3 h-3" />
+              </button>
+            </div>
+          </div>
+
+          {/* Quick Spawner Bar when in Freeform Platform Mode */}
+          {isFreeformMode && (
+            <div className="absolute top-28 left-4 z-20 flex flex-wrap items-center gap-1.5 bg-[#091124]/90 backdrop-blur-md p-1.5 rounded-xl border border-amber-500/30 shadow-xl pointer-events-auto text-[11px]">
+              <span className="text-[10px] font-mono text-amber-300 font-bold px-1.5 flex items-center gap-1">
+                <Sparkles className="w-3 h-3" />
+                <span>FREEFORM ({charges.length} Charges):</span>
+              </span>
+              <button
+                onClick={() => handleAddQuickParticle('pos')}
+                className="px-2 py-0.5 rounded-lg bg-red-500/20 text-red-300 border border-red-500/40 hover:bg-red-500/30 font-bold transition"
+              >
+                + Pos (+5μC)
+              </button>
+              <button
+                onClick={() => handleAddQuickParticle('neg')}
+                className="px-2 py-0.5 rounded-lg bg-blue-500/20 text-blue-300 border border-blue-500/40 hover:bg-blue-500/30 font-bold transition"
+              >
+                + Neg (−5μC)
+              </button>
+              <button
+                onClick={() => handleAddQuickParticle('proton')}
+                className="px-2 py-0.5 rounded-lg bg-red-600/20 text-red-200 border border-red-500/30 hover:bg-red-500/30 font-mono transition"
+              >
+                + Proton (+1e)
+              </button>
+              <button
+                onClick={() => handleAddQuickParticle('electron')}
+                className="px-2 py-0.5 rounded-lg bg-blue-600/20 text-blue-200 border border-blue-500/30 hover:bg-blue-500/30 font-mono transition"
+              >
+                + Electron (−1e)
+              </button>
+              <button
+                onClick={() => handleAddQuickParticle('neutron')}
+                className="px-2 py-0.5 rounded-lg bg-slate-500/20 text-slate-300 border border-slate-500/30 hover:bg-slate-500/30 font-mono transition"
+              >
+                + Neutron (0e)
+              </button>
+              {charges.length > 0 && (
+                <button
+                  onClick={handleClearAllCharges}
+                  className="px-2 py-0.5 rounded-lg bg-rose-500/20 text-rose-300 border border-rose-500/30 hover:bg-rose-500/30 font-bold transition ml-1"
+                >
+                  Clear All
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Bottom Left Canvas Legend & Mode Indicator */}
           <div className="absolute bottom-4 left-4 z-20 flex flex-col gap-2 pointer-events-none">
@@ -1073,14 +1450,6 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
                 </span>
               </div>
             </div>
-          </div>
-
-          {/* Floating Instruction Banner (Positioned below global top bar) */}
-          <div className="absolute top-20 left-1/2 -translate-x-1/2 z-10 bg-[#070e20]/85 backdrop-blur-md px-4 py-1.5 rounded-full border border-white/10 text-xs text-slate-300 pointer-events-none flex items-center gap-2 shadow-lg">
-            <Sparkles className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-            <span>
-              Click any point on the plane to probe &amp; store force strength, or drag charges to adjust <strong>r</strong>.
-            </span>
           </div>
         </div>
 
@@ -1262,12 +1631,18 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
             </div>
             <button
               onClick={handleAddCharge}
-              disabled={charges.length >= 4}
+              disabled={!isFreeformMode && charges.length >= 4}
               className="px-2.5 py-1 rounded-lg bg-cyan-500 hover:bg-cyan-400 disabled:opacity-40 text-slate-950 font-bold text-[11px] transition flex items-center gap-1"
-              title="Add 3rd or 4th point charge for vector superposition"
+              title={
+                isFreeformMode
+                  ? 'Add point charge (unlimited in Freeform mode)'
+                  : 'Add 3rd or 4th point charge for vector superposition'
+              }
             >
               <Plus className="w-3 h-3" />
-              <span>Add Charge ({charges.length}/4)</span>
+              <span>
+                Add Charge {isFreeformMode ? `(${charges.length})` : `(${charges.length}/4)`}
+              </span>
             </button>
           </div>
 
@@ -1406,7 +1781,7 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
               )}
             </div>
 
-            {/* 2. Force Vectors on Selected Charge Control (Net vs Individual) */}
+            {/* 2. Force Vectors on Selected Charge Control (Net & Individual Vector Arrows) */}
             <div className="p-3.5 rounded-2xl bg-[#091124] border border-white/10 space-y-2.5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
@@ -1419,7 +1794,7 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
                   onClick={() => setShowSelectedChargeForces(prev => !prev)}
                   className={`px-2.5 py-0.5 rounded-lg text-[10px] font-bold transition ${
                     showSelectedChargeForces
-                      ? 'bg-emerald-400 text-slate-950'
+                      ? 'bg-emerald-400 text-slate-950 font-bold'
                       : 'bg-white/10 text-slate-400'
                   }`}
                 >
@@ -1428,26 +1803,28 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
               </div>
 
               {showSelectedChargeForces && (
-                <div className="grid grid-cols-2 gap-1.5 bg-black/40 p-1 rounded-xl border border-white/10 text-[11px]">
+                <div className="grid grid-cols-2 gap-1.5 bg-black/40 p-1.5 rounded-xl border border-white/10 text-[11px]">
                   <button
-                    onClick={() => setForceVectorDisplayMode('individual')}
-                    className={`py-1.5 px-2 rounded-lg font-semibold transition ${
-                      forceVectorDisplayMode === 'individual'
-                        ? 'bg-cyan-400 text-slate-950 font-bold'
-                        : 'text-slate-300 hover:text-white'
+                    onClick={() => setShowIndividualForces(prev => !prev)}
+                    className={`py-1.5 px-2 rounded-lg font-semibold transition border ${
+                      showIndividualForces
+                        ? 'bg-cyan-500/25 text-cyan-200 border-cyan-400/60 font-bold'
+                        : 'bg-transparent text-slate-400 border-transparent hover:text-white'
                     }`}
+                    title="Toggle individual force vectors from other charges"
                   >
-                    Individual Forces
+                    {showIndividualForces ? '✓ ' : ''}Individual Forces
                   </button>
                   <button
-                    onClick={() => setForceVectorDisplayMode('net')}
-                    className={`py-1.5 px-2 rounded-lg font-semibold transition ${
-                      forceVectorDisplayMode === 'net'
-                        ? 'bg-emerald-400 text-slate-950 font-bold'
-                        : 'text-slate-300 hover:text-white'
+                    onClick={() => setShowNetForceArrow(prev => !prev)}
+                    className={`py-1.5 px-2 rounded-lg font-semibold transition border ${
+                      showNetForceArrow
+                        ? 'bg-emerald-500/25 text-emerald-200 border-emerald-400/60 font-bold'
+                        : 'bg-transparent text-slate-400 border-transparent hover:text-white'
                     }`}
+                    title="Toggle net force resultant vector arrow"
                   >
-                    Net Force (∑ F)
+                    {showNetForceArrow ? '✓ ' : ''}Net Force (∑ F)
                   </button>
                 </div>
               )}
@@ -1471,7 +1848,7 @@ export const CoulombForceWorkbench: React.FC<CoulombForceWorkbenchProps> = ({ on
                     />
                     <span>Selected: {selectedCharge.name}</span>
                   </span>
-                  {charges.length > 2 && (
+                  {(isFreeformMode ? charges.length > 0 : charges.length > 2) && (
                     <button
                       onClick={() => handleRemoveCharge(selectedCharge.id)}
                       className="p-1 rounded-lg hover:bg-rose-500/20 text-rose-400 transition"

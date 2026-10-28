@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   Compass,
   Sliders,
@@ -15,6 +15,11 @@ import {
   Navigation,
   Sparkles,
   Layers,
+  Trash2,
+  Plus,
+  Activity,
+  Gauge,
+  FastForward,
 } from 'lucide-react';
 
 export interface Vector3D {
@@ -29,15 +34,18 @@ interface ScalarsVectorsWorkbenchProps {
   onToast?: (msg: string) => void;
   externalViewMode?: '3d' | '2d';
   onViewModeChange?: (mode: '3d' | '2d') => void;
+  onSubModeChange?: (mode: VectorLabSubMode) => void;
 }
 
 export const ScalarsVectorsWorkbench: React.FC<ScalarsVectorsWorkbenchProps> = ({
   onToast,
   externalViewMode = '3d',
   onViewModeChange,
+  onSubModeChange,
 }) => {
   const [labMode, setLabMode] = useState<VectorLabSubMode>('addition');
   const [showDetailsDrawer, setShowDetailsDrawer] = useState<boolean>(false);
+  const [showCanvasEquations, setShowCanvasEquations] = useState<boolean>(true);
 
   // 3D Camera Orbit Angles (when in 3D view mode)
   const [camYawDeg, setCamYawDeg] = useState<number>(32);
@@ -55,25 +63,28 @@ export const ScalarsVectorsWorkbench: React.FC<ScalarsVectorsWorkbenchProps> = (
   // Mode 2: Position Vector r & Unit Vector r_hat (1.1.A.4.ii)
   const [posR, setPosR] = useState<Vector3D>({ x: 6.0, y: 4.0, z: 3.0 });
 
-  // Mode 3: Scalar vs Vector Path Lab (1.1.A.1 & 1.1.A.3)
-  const [pathStart] = useState<Vector3D>({ x: -6.0, y: -2.0, z: 0.0 });
-  const [pathMid, setPathMid] = useState<Vector3D>({ x: 2.0, y: 5.0, z: 2.0 });
-  const [pathEnd, setPathEnd] = useState<Vector3D>({ x: 6.0, y: -3.0, z: -1.0 });
+  // Mode 3: Scalar vs Vector Dynamic Waypoints Lab (1.1.A.1 & 1.1.A.3)
+  const [waypoints, setWaypoints] = useState<Vector3D[]>([
+    { x: -6.0, y: -2.0, z: 0.0 }, // Start r0
+    { x: 1.5, y: 4.5, z: 2.0 },   // Turning Point r1
+    { x: 6.0, y: -3.0, z: -1.0 }, // End r2
+  ]);
   const [pathProgress, setPathProgress] = useState<number>(0.65); // 0 to 1 (t / T_total)
   const [isPathPlaying, setIsPathPlaying] = useState<boolean>(false);
   const totalTimeSec = 10.0;
 
-  // Mode 4: 1D Coordinate System Sign Convention (1.1.A.5)
+  // Mode 4: 1D Coordinate System Sign Convention & Real-Time Simulation (1.1.A.5)
   const [axisPositiveRight, setAxisPositiveRight] = useState<boolean>(true);
   const [pos1DPhysical, setPos1DPhysical] = useState<number>(4.0); // physical meters right of origin
   const [vel1DPhysical, setVel1DPhysical] = useState<number>(-3.5); // physical m/s (negative = moving left)
   const [acc1DPhysical, setAcc1DPhysical] = useState<number>(2.0); // physical m/s^2 (positive = pointing right)
+  const [isSimulating1D, setIsSimulating1D] = useState<boolean>(false);
+  const [simTime1D, setSimTime1D] = useState<number>(0);
+  const [simSpeed1D, setSimSpeed1D] = useState<number>(1.0);
 
   // Dragging handles in 2D mode
   const svgContainerRef = useRef<HTMLDivElement | null>(null);
-  const [draggingTarget, setDraggingTarget] = useState<
-    'A' | 'B' | 'R' | 'mid' | 'end' | null
-  >(null);
+  const [draggingTarget, setDraggingTarget] = useState<string | null>(null);
 
   // Animation loop for Scalar vs Vector Path Lab
   useEffect(() => {
@@ -161,6 +172,7 @@ export const ScalarsVectorsWorkbench: React.FC<ScalarsVectorsWorkbenchProps> = (
   // Mouse handlers for 2D vector tip dragging or 3D camera orbit
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     if (draggingTarget) return;
+    if ((e.target as HTMLElement)?.closest('button, input, select, a, textarea')) return;
     if (is3D) {
       isOrbitDraggingRef.current = true;
       lastMousePosRef.current = { x: e.clientX, y: e.clientY };
@@ -189,10 +201,17 @@ export const ScalarsVectorsWorkbench: React.FC<ScalarsVectorsWorkbenchProps> = (
         }
       } else if (draggingTarget === 'R') {
         setPosR(prev => ({ ...prev, x: mx, y: my }));
-      } else if (draggingTarget === 'mid') {
-        setPathMid(prev => ({ ...prev, x: mx, y: my }));
-      } else if (draggingTarget === 'end') {
-        setPathEnd(prev => ({ ...prev, x: mx, y: my }));
+      } else if (typeof draggingTarget === 'string' && draggingTarget.startsWith('wp_')) {
+        const wpIdx = parseInt(draggingTarget.replace('wp_', ''), 10);
+        if (!isNaN(wpIdx)) {
+          setWaypoints(prev => {
+            const next = [...prev];
+            if (next[wpIdx]) {
+              next[wpIdx] = { ...next[wpIdx], x: mx, y: my };
+            }
+            return next;
+          });
+        }
       }
       return;
     }
@@ -201,7 +220,8 @@ export const ScalarsVectorsWorkbench: React.FC<ScalarsVectorsWorkbenchProps> = (
       const dx = e.clientX - lastMousePosRef.current.x;
       const dy = e.clientY - lastMousePosRef.current.y;
       lastMousePosRef.current = { x: e.clientX, y: e.clientY };
-      setCamYawDeg(prev => (prev - dx * 0.45) % 360);
+      // Follow cursor rotation: +dx so moving cursor right orbits the coordinate system right
+      setCamYawDeg(prev => (prev + dx * 0.45) % 360);
       setCamPitchDeg(prev => Math.max(-65, Math.min(65, prev + dy * 0.35)));
     }
   };
@@ -211,48 +231,129 @@ export const ScalarsVectorsWorkbench: React.FC<ScalarsVectorsWorkbenchProps> = (
     isOrbitDraggingRef.current = false;
   };
 
-  // Mode 3 Path Calculations (Scalar Distance & Speed vs Vector Position, Displacement, Velocity, Acceleration)
-  const effStart: Vector3D = is3D ? pathStart : { ...pathStart, z: 0 };
-  const effMid: Vector3D = is3D ? pathMid : { ...pathMid, z: 0 };
-  const effEnd: Vector3D = is3D ? pathEnd : { ...pathEnd, z: 0 };
-
-  const leg1Vec: Vector3D = {
-    x: effMid.x - effStart.x,
-    y: effMid.y - effStart.y,
-    z: effMid.z - effStart.z,
+  // Waypoint manipulation helpers for Mode 3
+  const updateWaypoint = (idx: number, coord: Partial<Vector3D>) => {
+    setWaypoints(prev => {
+      const next = [...prev];
+      if (next[idx]) {
+        next[idx] = { ...next[idx], ...coord };
+      }
+      return next;
+    });
   };
-  const leg2Vec: Vector3D = {
-    x: effEnd.x - effMid.x,
-    y: effEnd.y - effMid.y,
-    z: effEnd.z - effMid.z,
-  };
-  const leg1Len = getMagnitude(leg1Vec);
-  const leg2Len = getMagnitude(leg2Vec);
 
-  // Current position along 2-segment path at pathProgress in [0, 1]
-  const currentParticlePos: Vector3D =
-    pathProgress <= 0.5
-      ? {
-          x: effStart.x + leg1Vec.x * (pathProgress * 2),
-          y: effStart.y + leg1Vec.y * (pathProgress * 2),
-          z: effStart.z + leg1Vec.z * (pathProgress * 2),
-        }
-      : {
-          x: effMid.x + leg2Vec.x * ((pathProgress - 0.5) * 2),
-          y: effMid.y + leg2Vec.y * ((pathProgress - 0.5) * 2),
-          z: effMid.z + leg2Vec.z * ((pathProgress - 0.5) * 2),
+  const addTurningPoint = () => {
+    setWaypoints(prev => {
+      if (prev.length < 2) return prev;
+      const lastIdx = prev.length - 1;
+      const pPrev = prev[lastIdx - 1];
+      const pEnd = prev[lastIdx];
+      const newPt: Vector3D = {
+        x: parseFloat(((pPrev.x + pEnd.x) / 2 + 1.2).toFixed(1)),
+        y: parseFloat(((pPrev.y + pEnd.y) / 2 - 1.2).toFixed(1)),
+        z: parseFloat(((pPrev.z + pEnd.z) / 2).toFixed(1)),
+      };
+      const next = [...prev];
+      next.splice(lastIdx, 0, newPt);
+      return next;
+    });
+    onToast?.('Added new turning point to motion path');
+  };
+
+  const deleteTurningPoint = (idx: number) => {
+    if (waypoints.length <= 2) {
+      onToast?.('Cannot delete: At least a Start and End point are required');
+      return;
+    }
+    setWaypoints(prev => prev.filter((_, i) => i !== idx));
+    onToast?.(`Deleted Turning Point ${idx}`);
+  };
+
+  // Dynamic Waypoint Calculations (Scalar Distance vs Vector Displacement)
+  const effWaypoints: Vector3D[] = useMemo(() => {
+    return waypoints.map(w => (is3D ? w : { ...w, z: 0 }));
+  }, [waypoints, is3D]);
+
+  const pathSegments = useMemo(() => {
+    const segs = [];
+    for (let i = 0; i < effWaypoints.length - 1; i++) {
+      const pA = effWaypoints[i];
+      const pB = effWaypoints[i + 1];
+      const delta: Vector3D = {
+        x: pB.x - pA.x,
+        y: pB.y - pA.y,
+        z: pB.z - pA.z,
+      };
+      const len = getMagnitude(delta);
+      segs.push({ pA, pB, delta, len, index: i });
+    }
+    return segs;
+  }, [effWaypoints]);
+
+  const totalScalarDistance = useMemo(() => {
+    return pathSegments.reduce((sum, s) => sum + s.len, 0);
+  }, [pathSegments]);
+
+  // Current position and kinematics along piecewise waypoint path
+  const computePathKinematics = () => {
+    if (pathSegments.length === 0) {
+      const p = effWaypoints[0] || { x: 0, y: 0, z: 0 };
+      return {
+        currentParticlePos: p,
+        scalarDistanceTraveled: 0,
+        instVelocityVec: { x: 0, y: 0, z: 0 },
+        activeSegmentIndex: 0,
+      };
+    }
+    const targetDist = pathProgress * totalScalarDistance;
+    let accumulated = 0;
+    for (let i = 0; i < pathSegments.length; i++) {
+      const seg = pathSegments[i];
+      if (targetDist <= accumulated + seg.len || i === pathSegments.length - 1) {
+        const segProg = seg.len > 1e-6 ? Math.max(0, Math.min(1, (targetDist - accumulated) / seg.len)) : 0;
+        const pos: Vector3D = {
+          x: seg.pA.x + seg.delta.x * segProg,
+          y: seg.pA.y + seg.delta.y * segProg,
+          z: seg.pA.z + seg.delta.z * segProg,
         };
-
-  const scalarDistanceTraveled =
-    pathProgress <= 0.5
-      ? leg1Len * (pathProgress * 2)
-      : leg1Len + leg2Len * ((pathProgress - 0.5) * 2);
-
-  const vectorDisplacement: Vector3D = {
-    x: currentParticlePos.x - effStart.x,
-    y: currentParticlePos.y - effStart.y,
-    z: currentParticlePos.z - effStart.z,
+        const segTime = Math.max(0.1, (seg.len / Math.max(0.1, totalScalarDistance)) * totalTimeSec);
+        const vel: Vector3D = {
+          x: seg.delta.x / segTime,
+          y: seg.delta.y / segTime,
+          z: seg.delta.z / segTime,
+        };
+        return {
+          currentParticlePos: pos,
+          scalarDistanceTraveled: targetDist,
+          instVelocityVec: vel,
+          activeSegmentIndex: i,
+        };
+      }
+      accumulated += seg.len;
+    }
+    const lastSeg = pathSegments[pathSegments.length - 1];
+    return {
+      currentParticlePos: lastSeg.pB,
+      scalarDistanceTraveled: totalScalarDistance,
+      instVelocityVec: { x: 0, y: 0, z: 0 },
+      activeSegmentIndex: pathSegments.length - 1,
+    };
   };
+
+  const pathKinematics = computePathKinematics();
+  const currentParticlePos = pathKinematics.currentParticlePos;
+  const scalarDistanceTraveled = pathKinematics.scalarDistanceTraveled;
+  const instVelocityVec = pathKinematics.instVelocityVec;
+  const activeSegmentIndex = pathKinematics.activeSegmentIndex;
+
+  // Net displacement vector: Δr = r(t) - r(0)
+  const p0 = effWaypoints[0] || { x: 0, y: 0, z: 0 };
+  const vectorDisplacement: Vector3D = {
+    x: currentParticlePos.x - p0.x,
+    y: currentParticlePos.y - p0.y,
+    z: currentParticlePos.z - p0.z,
+  };
+
   const displacementMag = getMagnitude(vectorDisplacement);
   const elapsedSec = Math.max(0.1, pathProgress * totalTimeSec);
   const scalarAvgSpeed = scalarDistanceTraveled / elapsedSec;
@@ -262,26 +363,38 @@ export const ScalarsVectorsWorkbench: React.FC<ScalarsVectorsWorkbenchProps> = (
     z: vectorDisplacement.z / elapsedSec,
   };
 
-  // Instantaneous velocity vector on current leg
-  const instVelocityVec: Vector3D =
-    pathProgress <= 0.5
-      ? {
-          x: leg1Vec.x / (totalTimeSec * 0.5),
-          y: leg1Vec.y / (totalTimeSec * 0.5),
-          z: leg1Vec.z / (totalTimeSec * 0.5),
-        }
-      : {
-          x: leg2Vec.x / (totalTimeSec * 0.5),
-          y: leg2Vec.y / (totalTimeSec * 0.5),
-          z: leg2Vec.z / (totalTimeSec * 0.5),
-        };
+  // Turn impulse acceleration between segments
+  const turnAccelVec: Vector3D = useMemo(() => {
+    if (pathSegments.length <= 1) return { x: 0, y: 0, z: 0 };
+    const curSeg = pathSegments[activeSegmentIndex] || pathSegments[0];
+    const nextSeg = pathSegments[activeSegmentIndex + 1] || pathSegments[pathSegments.length - 1];
+    const segTimeCur = Math.max(0.1, (curSeg.len / Math.max(0.1, totalScalarDistance)) * totalTimeSec);
+    const segTimeNext = Math.max(0.1, (nextSeg.len / Math.max(0.1, totalScalarDistance)) * totalTimeSec);
+    const v1 = { x: curSeg.delta.x / segTimeCur, y: curSeg.delta.y / segTimeCur, z: curSeg.delta.z / segTimeCur };
+    const v2 = { x: nextSeg.delta.x / segTimeNext, y: nextSeg.delta.y / segTimeNext, z: nextSeg.delta.z / segTimeNext };
+    return {
+      x: (v2.x - v1.x) / (totalTimeSec * 0.25),
+      y: (v2.y - v1.y) / (totalTimeSec * 0.25),
+      z: (v2.z - v1.z) / (totalTimeSec * 0.25),
+    };
+  }, [pathSegments, activeSegmentIndex, totalScalarDistance, totalTimeSec]);
 
-  // Acceleration vector impulse at the turn (v2 - v1) / dt
-  const turnAccelVec: Vector3D = {
-    x: (leg2Vec.x - leg1Vec.x) / (totalTimeSec * 0.25),
-    y: (leg2Vec.y - leg1Vec.y) / (totalTimeSec * 0.25),
-    z: (leg2Vec.z - leg1Vec.z) / (totalTimeSec * 0.25),
-  };
+  // Mode 4: 1D Real-Time Kinematics Simulation Loop
+  useEffect(() => {
+    if (!isSimulating1D) return;
+    let animId: number;
+    let lastTime = performance.now();
+
+    const step = (now: number) => {
+      const dt = ((now - lastTime) / 1000) * simSpeed1D;
+      lastTime = now;
+      setSimTime1D(prev => prev + dt);
+      animId = requestAnimationFrame(step);
+    };
+
+    animId = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(animId);
+  }, [isSimulating1D, simSpeed1D]);
 
   // Mode 4: 1D Coordinate System Sign Convention Values (LO 1.1.A.5)
   const signMultiplier = axisPositiveRight ? 1 : -1;
@@ -289,19 +402,25 @@ export const ScalarsVectorsWorkbench: React.FC<ScalarsVectorsWorkbenchProps> = (
   const signedVel1D = vel1DPhysical * signMultiplier;
   const signedAcc1D = acc1DPhysical * signMultiplier;
 
+  // Real-time kinematic physical state at elapsed time simTime1D
+  const currentPhysX1D = pos1DPhysical + vel1DPhysical * simTime1D + 0.5 * acc1DPhysical * simTime1D * simTime1D;
+  const currentPhysV1D = vel1DPhysical + acc1DPhysical * simTime1D;
+  const currentPhysA1D = acc1DPhysical;
+  const currentSignedX1D = currentPhysX1D * signMultiplier;
+  const currentSignedV1D = currentPhysV1D * signMultiplier;
+  const currentSignedA1D = currentPhysA1D * signMultiplier;
+
   return (
-    <div
-      className="relative w-full h-full flex flex-col bg-[#040b09] text-slate-100 overflow-hidden select-none font-sans"
-      onMouseDown={handleCanvasMouseDown}
-      onMouseMove={handleCanvasMouseMove}
-      onMouseUp={handleCanvasMouseUp}
-      onMouseLeave={handleCanvasMouseUp}
-    >
+    <div className="relative w-full h-full flex flex-col bg-[#040b09] text-slate-100 overflow-hidden select-none font-sans">
       {/* Main Interactive Stage */}
       <div className="flex-1 flex overflow-hidden relative">
         {/* Left Interactive 2D/3D Coordinate Grid Stage */}
         <div
           ref={svgContainerRef}
+          onMouseDown={handleCanvasMouseDown}
+          onMouseMove={handleCanvasMouseMove}
+          onMouseUp={handleCanvasMouseUp}
+          onMouseLeave={handleCanvasMouseUp}
           className={`flex-1 relative bg-gradient-to-b from-[#030907] to-[#06130f] overflow-hidden ${
             is3D ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'
           }`}
@@ -587,31 +706,45 @@ export const ScalarsVectorsWorkbench: React.FC<ScalarsVectorsWorkbenchProps> = (
                     strokeWidth="4"
                     markerEnd="url(#arrowVecA)"
                   />
-                  <g transform={`translate(${(orig.sx + tipA.sx) / 2}, ${(orig.sy + tipA.sy) / 2 - 14})`}>
-                    <rect
-                      x="-68"
-                      y="-11"
-                      width="136"
-                      height="22"
-                      rx="6"
-                      fill="#04150f"
-                      stroke="#34d399"
-                      strokeWidth="1.2"
-                    />
-                    <text
-                      x="0"
-                      y="4"
-                      textAnchor="middle"
-                      fill="#6ee7b7"
-                      fontSize="10.5"
-                      fontFamily="monospace"
-                      fontWeight="bold"
-                    >
-                      {notationStyle === 'unit_vector'
-                        ? `A = ${formatUnitVector(effA, 1)}`
-                        : `|A| = ${getMagnitude(effA).toFixed(2)}m`}
-                    </text>
-                  </g>
+                  {/* Vector A Label Badge */}
+                  {showCanvasEquations ? (() => {
+                    const labelA = notationStyle === 'unit_vector'
+                      ? `A = ${formatUnitVector(effA, 1)}`
+                      : `|A| = ${getMagnitude(effA).toFixed(2)}m`;
+                    const badgeWA = Math.max(120, labelA.length * 7.2 + 24);
+                    return (
+                      <g transform={`translate(${(orig.sx + tipA.sx) / 2}, ${(orig.sy + tipA.sy) / 2 - 14})`}>
+                        <rect
+                          x={-badgeWA / 2}
+                          y="-11"
+                          width={badgeWA}
+                          height="22"
+                          rx="6"
+                          fill="#04150f"
+                          stroke="#34d399"
+                          strokeWidth="1.2"
+                        />
+                        <text
+                          x="0"
+                          y="4"
+                          textAnchor="middle"
+                          fill="#6ee7b7"
+                          fontSize="9.5"
+                          fontFamily="monospace"
+                          fontWeight="bold"
+                        >
+                          {labelA}
+                        </text>
+                      </g>
+                    );
+                  })() : (
+                    <g transform={`translate(${(orig.sx + tipA.sx) / 2}, ${(orig.sy + tipA.sy) / 2 - 12})`}>
+                      <circle r="9" fill="#04150f" stroke="#34d399" strokeWidth="1.2" />
+                      <text x="0" y="3.5" textAnchor="middle" fill="#6ee7b7" fontSize="10" fontFamily="monospace" fontWeight="bold">
+                        A
+                      </text>
+                    </g>
+                  )}
 
                   {/* Vector B Arrow */}
                   <line
@@ -623,35 +756,48 @@ export const ScalarsVectorsWorkbench: React.FC<ScalarsVectorsWorkbenchProps> = (
                     strokeWidth="4"
                     markerEnd="url(#arrowVecB)"
                   />
-                  <g
-                    transform={`translate(${(startB.sx + endB.sx) / 2}, ${
-                      (startB.sy + endB.sy) / 2 - 14
-                    })`}
-                  >
-                    <rect
-                      x="-68"
-                      y="-11"
-                      width="136"
-                      height="22"
-                      rx="6"
-                      fill="#061526"
-                      stroke="#38bdf8"
-                      strokeWidth="1.2"
-                    />
-                    <text
-                      x="0"
-                      y="4"
-                      textAnchor="middle"
-                      fill="#7dd3fc"
-                      fontSize="10.5"
-                      fontFamily="monospace"
-                      fontWeight="bold"
-                    >
-                      {notationStyle === 'unit_vector'
-                        ? `B = ${formatUnitVector(effB, 1)}`
-                        : `|B| = ${getMagnitude(effB).toFixed(2)}m`}
-                    </text>
-                  </g>
+                  {showCanvasEquations ? (() => {
+                    const labelB = notationStyle === 'unit_vector'
+                      ? `B = ${formatUnitVector(effB, 1)}`
+                      : `|B| = ${getMagnitude(effB).toFixed(2)}m`;
+                    const badgeWB = Math.max(120, labelB.length * 7.2 + 24);
+                    return (
+                      <g
+                        transform={`translate(${(startB.sx + endB.sx) / 2}, ${
+                          (startB.sy + endB.sy) / 2 - 14
+                        })`}
+                      >
+                        <rect
+                          x={-badgeWB / 2}
+                          y="-11"
+                          width={badgeWB}
+                          height="22"
+                          rx="6"
+                          fill="#061526"
+                          stroke="#38bdf8"
+                          strokeWidth="1.2"
+                        />
+                        <text
+                          x="0"
+                          y="4"
+                          textAnchor="middle"
+                          fill="#7dd3fc"
+                          fontSize="9.5"
+                          fontFamily="monospace"
+                          fontWeight="bold"
+                        >
+                          {labelB}
+                        </text>
+                      </g>
+                    );
+                  })() : (
+                    <g transform={`translate(${(startB.sx + endB.sx) / 2}, ${(startB.sy + endB.sy) / 2 - 12})`}>
+                      <circle r="9" fill="#061526" stroke="#38bdf8" strokeWidth="1.2" />
+                      <text x="0" y="3.5" textAnchor="middle" fill="#7dd3fc" fontSize="10" fontFamily="monospace" fontWeight="bold">
+                        B
+                      </text>
+                    </g>
+                  )}
 
                   {/* Resultant Vector C = A + B Arrow */}
                   <line
@@ -664,31 +810,44 @@ export const ScalarsVectorsWorkbench: React.FC<ScalarsVectorsWorkbenchProps> = (
                     strokeDasharray="6 3"
                     markerEnd="url(#arrowVecC)"
                   />
-                  <g transform={`translate(${tipC.sx}, ${tipC.sy - 22})`}>
-                    <rect
-                      x="-85"
-                      y="-11"
-                      width="170"
-                      height="22"
-                      rx="6"
-                      fill="#1c1104"
-                      stroke="#f59e0b"
-                      strokeWidth="1.4"
-                    />
-                    <text
-                      x="0"
-                      y="4"
-                      textAnchor="middle"
-                      fill="#fcd34d"
-                      fontSize="10.5"
-                      fontFamily="monospace"
-                      fontWeight="bold"
-                    >
-                      {notationStyle === 'unit_vector'
-                        ? `C = A+B = ${formatUnitVector(effC, 1)}`
-                        : `|C| = ${getMagnitude(effC).toFixed(2)}m`}
-                    </text>
-                  </g>
+                  {showCanvasEquations ? (() => {
+                    const labelC = notationStyle === 'unit_vector'
+                      ? `C = A+B = ${formatUnitVector(effC, 1)}`
+                      : `|C| = ${getMagnitude(effC).toFixed(2)}m`;
+                    const badgeWC = Math.max(140, labelC.length * 7.2 + 28);
+                    return (
+                      <g transform={`translate(${tipC.sx}, ${tipC.sy - 22})`}>
+                        <rect
+                          x={-badgeWC / 2}
+                          y="-11"
+                          width={badgeWC}
+                          height="22"
+                          rx="6"
+                          fill="#1c1104"
+                          stroke="#f59e0b"
+                          strokeWidth="1.4"
+                        />
+                        <text
+                          x="0"
+                          y="4"
+                          textAnchor="middle"
+                          fill="#fcd34d"
+                          fontSize="9.5"
+                          fontFamily="monospace"
+                          fontWeight="bold"
+                        >
+                          {labelC}
+                        </text>
+                      </g>
+                    );
+                  })() : (
+                    <g transform={`translate(${tipC.sx}, ${tipC.sy - 20})`}>
+                      <circle r="9" fill="#1c1104" stroke="#f59e0b" strokeWidth="1.4" />
+                      <text x="0" y="3.5" textAnchor="middle" fill="#fcd34d" fontSize="10" fontFamily="monospace" fontWeight="bold">
+                        C
+                      </text>
+                    </g>
+                  )}
 
                   {/* Interactive 2D Drag Handles */}
                   {!is3D && (
@@ -796,29 +955,42 @@ export const ScalarsVectorsWorkbench: React.FC<ScalarsVectorsWorkbenchProps> = (
                   />
 
                   {/* Unit Vector Label */}
-                  <g transform={`translate(${tipUnit.sx + 20}, ${tipUnit.sy + 18})`}>
-                    <rect
-                      x="-78"
-                      y="-11"
-                      width="156"
-                      height="22"
-                      rx="6"
-                      fill="#1f1905"
-                      stroke="#facc15"
-                      strokeWidth="1.4"
-                    />
-                    <text
-                      x="0"
-                      y="4"
-                      textAnchor="middle"
-                      fill="#fef08a"
-                      fontSize="10"
-                      fontFamily="monospace"
-                      fontWeight="bold"
-                    >
-                      r̂ = {formatUnitVector(unitR, 2)} (|r̂|=1)
-                    </text>
-                  </g>
+                  {showCanvasEquations ? (() => {
+                    const labelUnit = `r̂ = ${formatUnitVector(unitR, 2)} (|r̂|=1)`;
+                    const badgeWUnit = Math.max(140, labelUnit.length * 7.2 + 24);
+                    return (
+                      <g transform={`translate(${tipUnit.sx + 20}, ${tipUnit.sy + 18})`}>
+                        <rect
+                          x={-badgeWUnit / 2}
+                          y="-11"
+                          width={badgeWUnit}
+                          height="22"
+                          rx="6"
+                          fill="#1f1905"
+                          stroke="#facc15"
+                          strokeWidth="1.4"
+                        />
+                        <text
+                          x="0"
+                          y="4"
+                          textAnchor="middle"
+                          fill="#fef08a"
+                          fontSize="9.5"
+                          fontFamily="monospace"
+                          fontWeight="bold"
+                        >
+                          {labelUnit}
+                        </text>
+                      </g>
+                    );
+                  })() : (
+                    <g transform={`translate(${tipUnit.sx + 16}, ${tipUnit.sy + 16})`}>
+                      <circle r="9" fill="#1f1905" stroke="#facc15" strokeWidth="1.4" />
+                      <text x="0" y="3.5" textAnchor="middle" fill="#fef08a" fontSize="10" fontFamily="monospace" fontWeight="bold">
+                        r̂
+                      </text>
+                    </g>
+                  )}
 
                   {/* Point P(x,y,z) & Position Vector Label */}
                   <circle
@@ -836,42 +1008,54 @@ export const ScalarsVectorsWorkbench: React.FC<ScalarsVectorsWorkbenchProps> = (
                       }
                     }}
                   />
-                  <g transform={`translate(${tipR.sx}, ${tipR.sy - 22})`}>
-                    <rect
-                      x="-84"
-                      y="-11"
-                      width="168"
-                      height="22"
-                      rx="6"
-                      fill="#04150f"
-                      stroke="#34d399"
-                      strokeWidth="1.3"
-                    />
-                    <text
-                      x="0"
-                      y="4"
-                      textAnchor="middle"
-                      fill="#6ee7b7"
-                      fontSize="10.5"
-                      fontFamily="monospace"
-                      fontWeight="bold"
-                    >
-                      r = {formatUnitVector(effPosR, 1)} (|r|={magPosR.toFixed(2)}m)
-                    </text>
-                  </g>
+                  {showCanvasEquations ? (() => {
+                    const labelPos = `r = ${formatUnitVector(effPosR, 1)} (|r|=${magPosR.toFixed(2)}m)`;
+                    const badgeWPos = Math.max(160, labelPos.length * 7.2 + 24);
+                    return (
+                      <g transform={`translate(${tipR.sx}, ${tipR.sy - 22})`}>
+                        <rect
+                          x={-badgeWPos / 2}
+                          y="-11"
+                          width={badgeWPos}
+                          height="22"
+                          rx="6"
+                          fill="#04150f"
+                          stroke="#34d399"
+                          strokeWidth="1.3"
+                        />
+                        <text
+                          x="0"
+                          y="4"
+                          textAnchor="middle"
+                          fill="#6ee7b7"
+                          fontSize="9.5"
+                          fontFamily="monospace"
+                          fontWeight="bold"
+                        >
+                          {labelPos}
+                        </text>
+                      </g>
+                    );
+                  })() : (
+                    <g transform={`translate(${tipR.sx}, ${tipR.sy - 20})`}>
+                      <circle r="9" fill="#04150f" stroke="#34d399" strokeWidth="1.3" />
+                      <text x="0" y="3.5" textAnchor="middle" fill="#6ee7b7" fontSize="10" fontFamily="monospace" fontWeight="bold">
+                        P
+                      </text>
+                    </g>
+                  )}
                 </g>
               );
             })()}
 
             {/* ================================================================= */}
-            {/* MODE 3: SCALAR VS VECTOR MOTION PATH LAB (LO 1.1.A.1 & 1.1.A.3)   */}
+            {/* MODE 3: DYNAMIC WAYPOINTS SCALAR VS VECTOR LAB (LO 1.1.A.1, 1.1.A.3)*/}
             {/* ================================================================= */}
             {labMode === 'scalar_vs_vector' && (() => {
               const orig = projectPoint({ x: 0, y: 0, z: 0 });
-              const p0 = projectPoint(effStart);
-              const p1 = projectPoint(effMid);
-              const p2 = projectPoint(effEnd);
+              const projWaypoints = effWaypoints.map(w => projectPoint(w));
               const pCur = projectPoint(currentParticlePos);
+              const p0 = projWaypoints[0] || orig;
 
               // Velocity & Acceleration vector tips from current particle
               const velTip = projectPoint({
@@ -885,11 +1069,13 @@ export const ScalarsVectorsWorkbench: React.FC<ScalarsVectorsWorkbenchProps> = (
                 z: currentParticlePos.z + turnAccelVec.z * 0.45,
               });
 
+              const polyPoints = projWaypoints.map(p => `${p.sx},${p.sy}`).join(' ');
+
               return (
                 <g>
-                  {/* Full Scalar Path Segments (Distance d = s1 + s2) */}
+                  {/* Full Scalar Path Segments (Distance d = sum |Δs_i|) */}
                   <polyline
-                    points={`${p0.sx},${p0.sy} ${p1.sx},${p1.sy} ${p2.sx},${p2.sy}`}
+                    points={polyPoints}
                     fill="none"
                     stroke="#94a3b8"
                     strokeWidth="3"
@@ -930,106 +1116,110 @@ export const ScalarsVectorsWorkbench: React.FC<ScalarsVectorsWorkbenchProps> = (
                   />
 
                   {/* Acceleration Vector a near waypoint turn */}
-                  <line
-                    x1={pCur.sx}
-                    y1={pCur.sy}
-                    x2={accTip.sx}
-                    y2={accTip.sy}
-                    stroke="#fb7185"
-                    strokeWidth="2.8"
-                    markerEnd="url(#arrowRose)"
-                  />
+                  {pathSegments.length > 1 && (
+                    <line
+                      x1={pCur.sx}
+                      y1={pCur.sy}
+                      x2={accTip.sx}
+                      y2={accTip.sy}
+                      stroke="#fb7185"
+                      strokeWidth="2.8"
+                      markerEnd="url(#arrowRose)"
+                    />
+                  )}
 
-                  {/* Waypoint markers */}
-                  <circle cx={p0.sx} cy={p0.sy} r="6" fill="#64748b" stroke="#fff" strokeWidth="1.5" />
-                  <text x={p0.sx - 28} y={p0.sy + 18} fill="#cbd5e1" fontSize="11" fontFamily="monospace">
-                    Start r₀
-                  </text>
+                  {/* Interactive Waypoint markers (Start, Turning Points, End) */}
+                  {projWaypoints.map((pw, idx) => {
+                    const isStart = idx === 0;
+                    const isEnd = idx === projWaypoints.length - 1;
+                    const fillCol = isStart ? '#64748b' : isEnd ? '#f43f5e' : '#38bdf8';
+                    const wpCoord = effWaypoints[idx];
+                    const labelTitle = isStart ? 'Start r₀' : isEnd ? `End r_${idx}` : `Turn r_${idx}`;
 
-                  <circle
-                    cx={p1.sx}
-                    cy={p1.sy}
-                    r="7"
-                    fill="#38bdf8"
-                    stroke="#fff"
-                    strokeWidth="1.5"
-                    className={!is3D ? 'cursor-pointer' : ''}
-                    onMouseDown={e => {
-                      if (!is3D) {
-                        e.stopPropagation();
-                        setDraggingTarget('mid');
-                      }
-                    }}
-                  />
-                  <text x={p1.sx - 30} y={p1.sy - 12} fill="#7dd3fc" fontSize="11" fontFamily="monospace">
-                    Turn r₁
-                  </text>
-
-                  <circle
-                    cx={p2.sx}
-                    cy={p2.sy}
-                    r="7"
-                    fill="#f43f5e"
-                    stroke="#fff"
-                    strokeWidth="1.5"
-                    className={!is3D ? 'cursor-pointer' : ''}
-                    onMouseDown={e => {
-                      if (!is3D) {
-                        e.stopPropagation();
-                        setDraggingTarget('end');
-                      }
-                    }}
-                  />
-                  <text x={p2.sx + 10} y={p2.sy + 4} fill="#fda4af" fontSize="11" fontFamily="monospace">
-                    End r₂
-                  </text>
+                    return (
+                      <g key={`wp-marker-${idx}`}>
+                        <circle
+                          cx={pw.sx}
+                          cy={pw.sy}
+                          r={isStart ? 6.5 : 8}
+                          fill={fillCol}
+                          stroke="#ffffff"
+                          strokeWidth="2"
+                          className={!is3D ? 'cursor-pointer' : ''}
+                          onMouseDown={e => {
+                            if (!is3D) {
+                              e.stopPropagation();
+                              setDraggingTarget(`wp_${idx}`);
+                            }
+                          }}
+                        />
+                        <text
+                          x={pw.sx + 10}
+                          y={pw.sy + 4}
+                          fill={isStart ? '#cbd5e1' : isEnd ? '#fda4af' : '#7dd3fc'}
+                          fontSize="10"
+                          fontFamily="monospace"
+                          fontWeight="bold"
+                        >
+                          {labelTitle} ({wpCoord?.x.toFixed(1)}, {wpCoord?.y.toFixed(1)})
+                        </text>
+                      </g>
+                    );
+                  })}
 
                   {/* Moving Particle */}
                   <circle
                     cx={pCur.sx}
                     cy={pCur.sy}
-                    r="9"
+                    r="9.5"
                     fill="#10b981"
                     stroke="#ffffff"
                     strokeWidth="2.5"
                   />
-                  <g transform={`translate(${pCur.sx}, ${pCur.sy - 22})`}>
-                    <rect
-                      x="-90"
-                      y="-11"
-                      width="180"
-                      height="22"
-                      rx="6"
-                      fill="#04150f"
-                      stroke="#34d399"
-                      strokeWidth="1.2"
-                    />
-                    <text
-                      x="0"
-                      y="4"
-                      textAnchor="middle"
-                      fill="#6ee7b7"
-                      fontSize="10"
-                      fontFamily="monospace"
-                      fontWeight="bold"
-                    >
-                      |Δr|={displacementMag.toFixed(1)}m vs Dist d={scalarDistanceTraveled.toFixed(1)}m
-                    </text>
-                  </g>
+                  {showCanvasEquations ? (() => {
+                    const labelMotion = `|Δr|=${displacementMag.toFixed(1)}m vs Dist d=${scalarDistanceTraveled.toFixed(1)}m`;
+                    const badgeWMotion = Math.max(180, labelMotion.length * 7.2 + 24);
+                    return (
+                      <g transform={`translate(${pCur.sx}, ${pCur.sy - 22})`}>
+                        <rect
+                          x={-badgeWMotion / 2}
+                          y="-11"
+                          width={badgeWMotion}
+                          height="22"
+                          rx="6"
+                          fill="#04150f"
+                          stroke="#34d399"
+                          strokeWidth="1.2"
+                        />
+                        <text
+                          x="0"
+                          y="4"
+                          textAnchor="middle"
+                          fill="#6ee7b7"
+                          fontSize="9.5"
+                          fontFamily="monospace"
+                          fontWeight="bold"
+                        >
+                          {labelMotion}
+                        </text>
+                      </g>
+                    );
+                  })() : null}
                 </g>
               );
             })()}
 
             {/* ================================================================= */}
-            {/* MODE 4: 1D COORDINATE SYSTEM & OPPOSITE SIGNS (LO 1.1.A.5)        */}
+            {/* MODE 4: 1D COORDINATE SYSTEM & REAL-TIME TEST PARTICLE (1.1.A.5)  */}
             {/* ================================================================= */}
             {labMode === 'sign_1d' && (() => {
               const axisY = 300;
               const origX = 500;
               const scale1D = 36; // px per meter
-              const objX = origX + pos1DPhysical * scale1D;
-              const velEndX = objX + vel1DPhysical * 18;
-              const accEndX = objX + acc1DPhysical * 18;
+              const initObjX = origX + pos1DPhysical * scale1D;
+              const liveObjX = origX + currentPhysX1D * scale1D;
+              const liveVelEndX = liveObjX + currentPhysV1D * 18;
+              const liveAccEndX = liveObjX + currentPhysA1D * 18;
 
               return (
                 <g>
@@ -1091,81 +1281,135 @@ export const ScalarsVectorsWorkbench: React.FC<ScalarsVectorsWorkbenchProps> = (
                     −x Opposite Direction (−)
                   </text>
 
-                  {/* Position Vector from Origin x=0 to Object */}
+                  {/* Initial Position Ghost Marker (x0) */}
+                  <circle
+                    cx={initObjX}
+                    cy={axisY}
+                    r="6"
+                    fill="none"
+                    stroke="#64748b"
+                    strokeWidth="1.8"
+                    strokeDasharray="3 2"
+                  />
+                  <text
+                    x={initObjX}
+                    y={axisY + 44}
+                    textAnchor="middle"
+                    fill="#94a3b8"
+                    fontSize="10"
+                    fontFamily="monospace"
+                  >
+                    x₀ = {signedPos1D >= 0 ? `+${signedPos1D.toFixed(1)}` : signedPos1D.toFixed(1)}m
+                  </text>
+
+                  {/* Position Vector from Origin x=0 to Active Particle */}
                   <line
                     x1={origX}
                     y1={axisY - 45}
-                    x2={objX}
+                    x2={liveObjX}
                     y2={axisY - 45}
                     stroke="#34d399"
-                    strokeWidth="4"
+                    strokeWidth="3.5"
                     markerEnd="url(#arrowVecA)"
                   />
-                  <text
-                    x={(origX + objX) / 2}
-                    y={axisY - 55}
-                    textAnchor="middle"
-                    fill="#6ee7b7"
-                    fontSize="12"
-                    fontFamily="monospace"
-                    fontWeight="bold"
-                  >
-                    Position x = {signedPos1D >= 0 ? `+${signedPos1D.toFixed(1)}` : signedPos1D.toFixed(1)} m
-                  </text>
+                  {showCanvasEquations && (
+                    <text
+                      x={(origX + liveObjX) / 2}
+                      y={axisY - 55}
+                      textAnchor="middle"
+                      fill="#6ee7b7"
+                      fontSize="11"
+                      fontFamily="monospace"
+                      fontWeight="bold"
+                    >
+                      x(t) = {currentSignedX1D >= 0 ? `+${currentSignedX1D.toFixed(2)}` : currentSignedX1D.toFixed(2)} m
+                    </text>
+                  )}
 
-                  {/* Velocity Vector v_x */}
-                  <line
-                    x1={objX}
-                    y1={axisY - 95}
-                    x2={velEndX}
-                    y2={axisY - 95}
-                    stroke="#38bdf8"
-                    strokeWidth="4"
-                    markerEnd="url(#arrowVecB)"
-                  />
-                  <text
-                    x={(objX + velEndX) / 2}
-                    y={axisY - 107}
-                    textAnchor="middle"
-                    fill="#7dd3fc"
-                    fontSize="12"
-                    fontFamily="monospace"
-                    fontWeight="bold"
-                  >
-                    Velocity v_x = {signedVel1D >= 0 ? `+${signedVel1D.toFixed(1)}` : signedVel1D.toFixed(1)} m/s
-                  </text>
+                  {/* Real-time Instantaneous Velocity Vector v_x(t) */}
+                  {Math.abs(currentPhysV1D) > 0.05 && (
+                    <>
+                      <line
+                        x1={liveObjX}
+                        y1={axisY - 85}
+                        x2={liveVelEndX}
+                        y2={axisY - 85}
+                        stroke="#38bdf8"
+                        strokeWidth="3.8"
+                        markerEnd="url(#arrowVecB)"
+                      />
+                      {showCanvasEquations && (
+                        <text
+                          x={(liveObjX + liveVelEndX) / 2}
+                          y={axisY - 96}
+                          textAnchor="middle"
+                          fill="#7dd3fc"
+                          fontSize="11"
+                          fontFamily="monospace"
+                          fontWeight="bold"
+                        >
+                          v_x = {currentSignedV1D >= 0 ? `+${currentSignedV1D.toFixed(2)}` : currentSignedV1D.toFixed(2)} m/s
+                        </text>
+                      )}
+                    </>
+                  )}
 
-                  {/* Acceleration Vector a_x */}
-                  <line
-                    x1={objX}
-                    y1={axisY + 65}
-                    x2={accEndX}
-                    y2={axisY + 65}
-                    stroke="#f59e0b"
-                    strokeWidth="4"
-                    markerEnd="url(#arrowVecC)"
-                  />
-                  <text
-                    x={(objX + accEndX) / 2}
-                    y={axisY + 88}
-                    textAnchor="middle"
-                    fill="#fcd34d"
-                    fontSize="12"
-                    fontFamily="monospace"
-                    fontWeight="bold"
-                  >
-                    Acceleration a_x = {signedAcc1D >= 0 ? `+${signedAcc1D.toFixed(1)}` : signedAcc1D.toFixed(1)} m/s²
-                  </text>
+                  {/* Real-time Acceleration Vector a_x */}
+                  {Math.abs(currentPhysA1D) > 0.05 && (
+                    <>
+                      <line
+                        x1={liveObjX}
+                        y1={axisY + 65}
+                        x2={liveAccEndX}
+                        y2={axisY + 65}
+                        stroke="#f59e0b"
+                        strokeWidth="3.8"
+                        markerEnd="url(#arrowVecC)"
+                      />
+                      {showCanvasEquations && (
+                        <text
+                          x={(liveObjX + liveAccEndX) / 2}
+                          y={axisY + 86}
+                          textAnchor="middle"
+                          fill="#fcd34d"
+                          fontSize="11"
+                          fontFamily="monospace"
+                          fontWeight="bold"
+                        >
+                          a_x = {currentSignedA1D >= 0 ? `+${currentSignedA1D.toFixed(1)}` : currentSignedA1D.toFixed(1)} m/s²
+                        </text>
+                      )}
+                    </>
+                  )}
 
-                  {/* Particle on 1D Line */}
-                  <circle
-                    cx={objX}
-                    cy={axisY}
-                    r="13"
-                    fill="#10b981"
-                    stroke="#ffffff"
-                    strokeWidth="3"
-                  />
+                  {/* Active 1D Test Particle */}
+                  <g transform={`translate(${liveObjX}, ${axisY})`}>
+                    {(isSimulating1D || simTime1D > 0) && (
+                      <circle
+                        r="18"
+                        fill="rgba(16, 185, 129, 0.2)"
+                        stroke="#34d399"
+                        strokeWidth="1.5"
+                        strokeDasharray="3 2"
+                      />
+                    )}
+                    <circle
+                      r="12"
+                      fill="#10b981"
+                      stroke="#ffffff"
+                      strokeWidth="2.5"
+                    />
+                    <text
+                      y="4"
+                      textAnchor="middle"
+                      fill="#04150f"
+                      fontSize="9"
+                      fontFamily="monospace"
+                      fontWeight="900"
+                    >
+                      P
+                    </text>
+                  </g>
                 </g>
               );
             })()}
@@ -1199,24 +1443,56 @@ export const ScalarsVectorsWorkbench: React.FC<ScalarsVectorsWorkbenchProps> = (
             </div>
           </div>
 
-          {/* Floating Instruction Banner */}
-          <div className="absolute top-20 left-1/2 -translate-x-1/2 z-10 bg-[#061510]/85 backdrop-blur-md px-4 py-1.5 rounded-full border border-emerald-500/25 text-xs text-slate-200 pointer-events-none flex items-center gap-2 shadow-lg">
-            <Sparkles className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-            <span>
-              {is3D
-                ? '3D Mode: Drag anywhere on the canvas to orbit the 3D (î, ĵ, k̂) coordinate axes, or switch to 2D to drag vector tips.'
-                : '2D Mode: Drag vector tips directly on the Cartesian grid or adjust components in the cockpit.'}
-            </span>
+          {/* Floating Top Stage Controls & Instruction Banner */}
+          <div className="absolute top-20 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-2 pointer-events-none">
+            <div className="flex items-center gap-2 pointer-events-auto">
+              <button
+                onClick={() => setShowCanvasEquations(prev => !prev)}
+                className={`px-3 py-1 rounded-xl text-xs font-mono font-semibold border shadow-lg transition flex items-center gap-1.5 ${
+                  showCanvasEquations
+                    ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
+                    : 'bg-black/60 border-white/10 text-slate-400 hover:text-white'
+                }`}
+                title="Toggle displaying vector equation formulas on the 3D plane"
+              >
+                <Activity className="w-3.5 h-3.5" />
+                <span>Equations on Plane: {showCanvasEquations ? 'ON' : 'OFF'}</span>
+              </button>
+
+              {labMode === 'sign_1d' && (
+                <div className="px-3 py-1 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-mono font-semibold shadow-lg">
+                  1D Signs Mode (3D N/A)
+                </div>
+              )}
+            </div>
+
+            <div className="bg-[#061510]/90 backdrop-blur-md px-4 py-1.5 rounded-full border border-emerald-500/25 text-xs text-slate-200 pointer-events-none flex items-center gap-2 shadow-lg">
+              <Sparkles className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <span>
+                {labMode === 'sign_1d'
+                  ? '1D Signs: Launch the test particle to watch real-time kinematics on the number line!'
+                  : is3D
+                  ? '3D Mode: Drag anywhere on the canvas to orbit coordinate axes. Sliders in cockpit stay stationary.'
+                  : '2D Mode: Drag vector tips or waypoint markers directly on the Cartesian grid.'}
+              </span>
+            </div>
           </div>
         </div>
 
-        {/* Right Cockpit Parameter & Telemetry Controls Dock */}
-        <div className="w-96 border-l border-emerald-500/20 bg-[#050e0b] flex flex-col overflow-y-auto shrink-0 z-20 pt-16">
+        {/* Right Cockpit Parameter & Telemetry Controls Dock (Stops event propagation so 3D plane stays stationary during adjustment) */}
+        <div
+          onMouseDown={e => e.stopPropagation()}
+          onTouchStart={e => e.stopPropagation()}
+          className="w-96 border-l border-emerald-500/20 bg-[#050e0b] flex flex-col overflow-y-auto shrink-0 z-20 pt-16 select-text"
+        >
           {/* Sub-Lab Mode Selector & AP Theory Button */}
           <div className="p-3.5 border-b border-white/10 bg-[#06130f] space-y-2">
             <div className="grid grid-cols-2 gap-1.5 bg-[#040b08] p-1 rounded-xl border border-white/10 text-[11px]">
               <button
-                onClick={() => setLabMode('addition')}
+                onClick={() => {
+                  setLabMode('addition');
+                  onSubModeChange?.('addition');
+                }}
                 className={`py-1.5 px-2 rounded-lg font-semibold transition ${
                   labMode === 'addition'
                     ? 'bg-emerald-400 text-slate-950 font-bold'
@@ -1226,7 +1502,10 @@ export const ScalarsVectorsWorkbench: React.FC<ScalarsVectorsWorkbenchProps> = (
                 1. Vector Sum (A+B)
               </button>
               <button
-                onClick={() => setLabMode('unit_vector')}
+                onClick={() => {
+                  setLabMode('unit_vector');
+                  onSubModeChange?.('unit_vector');
+                }}
                 className={`py-1.5 px-2 rounded-lg font-semibold transition ${
                   labMode === 'unit_vector'
                     ? 'bg-emerald-400 text-slate-950 font-bold'
@@ -1236,7 +1515,10 @@ export const ScalarsVectorsWorkbench: React.FC<ScalarsVectorsWorkbenchProps> = (
                 2. Unit Vector (r̂)
               </button>
               <button
-                onClick={() => setLabMode('scalar_vs_vector')}
+                onClick={() => {
+                  setLabMode('scalar_vs_vector');
+                  onSubModeChange?.('scalar_vs_vector');
+                }}
                 className={`py-1.5 px-2 rounded-lg font-semibold transition ${
                   labMode === 'scalar_vs_vector'
                     ? 'bg-emerald-400 text-slate-950 font-bold'
@@ -1246,7 +1528,11 @@ export const ScalarsVectorsWorkbench: React.FC<ScalarsVectorsWorkbenchProps> = (
                 3. Scalar vs Vector
               </button>
               <button
-                onClick={() => setLabMode('sign_1d')}
+                onClick={() => {
+                  setLabMode('sign_1d');
+                  onSubModeChange?.('sign_1d');
+                  onViewModeChange?.('2d');
+                }}
                 className={`py-1.5 px-2 rounded-lg font-semibold transition ${
                   labMode === 'sign_1d'
                     ? 'bg-emerald-400 text-slate-950 font-bold'
@@ -1566,7 +1852,7 @@ export const ScalarsVectorsWorkbench: React.FC<ScalarsVectorsWorkbenchProps> = (
             )}
 
             {/* ================================================================= */}
-            {/* COCKPIT FOR MODE 3: SCALAR VS VECTOR MOTION PATH LAB              */}
+            {/* COCKPIT FOR MODE 3: SCALAR VS VECTOR DYNAMIC WAYPOINTS PATH LAB   */}
             {/* ================================================================= */}
             {labMode === 'scalar_vs_vector' && (
               <>
@@ -1599,6 +1885,140 @@ export const ScalarsVectorsWorkbench: React.FC<ScalarsVectorsWorkbenchProps> = (
                   />
                 </div>
 
+                {/* Dynamic Waypoints & Turning Points Manager */}
+                <div className="p-3.5 rounded-2xl bg-[#071510] border border-white/10 space-y-3">
+                  <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                    <span className="font-bold text-white text-xs">Path Waypoints &amp; Turning Points</span>
+                    <button
+                      onClick={addTurningPoint}
+                      className="px-2 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-bold text-[10px] flex items-center gap-1 border border-emerald-500/30 transition"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>Add Turning Point</span>
+                    </button>
+                  </div>
+
+                  <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+                    {/* Start Position Waypoint */}
+                    <div className="p-2.5 rounded-xl bg-black/40 border border-white/5 space-y-1.5">
+                      <div className="flex items-center justify-between text-[11px] font-mono">
+                        <span className="text-slate-300 font-bold">Start Position (r₀):</span>
+                        <span className="text-emerald-300">({waypoints[0]?.x.toFixed(1)}, {waypoints[0]?.y.toFixed(1)}{is3D ? `, ${waypoints[0]?.z.toFixed(1)}` : ''})</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <span className="text-[10px] text-slate-400">x: {waypoints[0]?.x.toFixed(1)}m</span>
+                          <input
+                            type="range"
+                            min="-9"
+                            max="9"
+                            step="0.5"
+                            value={waypoints[0]?.x ?? -6}
+                            onChange={e => updateWaypoint(0, { x: parseFloat(e.target.value) })}
+                            className="w-full accent-emerald-400"
+                          />
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-400">y: {waypoints[0]?.y.toFixed(1)}m</span>
+                          <input
+                            type="range"
+                            min="-7"
+                            max="7"
+                            step="0.5"
+                            value={waypoints[0]?.y ?? -2}
+                            onChange={e => updateWaypoint(0, { y: parseFloat(e.target.value) })}
+                            className="w-full accent-emerald-400"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Intermediate Turning Points */}
+                    {waypoints.slice(1, -1).map((wp, i) => {
+                      const realIdx = i + 1;
+                      return (
+                        <div key={`wp-editor-${realIdx}`} className="p-2.5 rounded-xl bg-[#081522] border border-sky-500/20 space-y-1.5">
+                          <div className="flex items-center justify-between text-[11px] font-mono">
+                            <span className="text-sky-300 font-bold">Turning Point #{realIdx} (r_{realIdx}):</span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-sky-200">({wp.x.toFixed(1)}, {wp.y.toFixed(1)})</span>
+                              <button
+                                onClick={() => deleteTurningPoint(realIdx)}
+                                className="p-1 rounded-md text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition"
+                                title="Delete turning point"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <span className="text-[10px] text-slate-400">x: {wp.x.toFixed(1)}m</span>
+                              <input
+                                type="range"
+                                min="-9"
+                                max="9"
+                                step="0.5"
+                                value={wp.x}
+                                onChange={e => updateWaypoint(realIdx, { x: parseFloat(e.target.value) })}
+                                className="w-full accent-sky-400"
+                              />
+                            </div>
+                            <div>
+                              <span className="text-[10px] text-slate-400">y: {wp.y.toFixed(1)}m</span>
+                              <input
+                                type="range"
+                                min="-7"
+                                max="7"
+                                step="0.5"
+                                value={wp.y}
+                                onChange={e => updateWaypoint(realIdx, { y: parseFloat(e.target.value) })}
+                                className="w-full accent-sky-400"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {/* End Position Waypoint */}
+                    <div className="p-2.5 rounded-xl bg-black/40 border border-white/5 space-y-1.5">
+                      <div className="flex items-center justify-between text-[11px] font-mono">
+                        <span className="text-rose-300 font-bold">End Position (r_end):</span>
+                        <span className="text-rose-200">
+                          ({waypoints[waypoints.length - 1]?.x.toFixed(1)}, {waypoints[waypoints.length - 1]?.y.toFixed(1)})
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <span className="text-[10px] text-slate-400">x: {waypoints[waypoints.length - 1]?.x.toFixed(1)}m</span>
+                          <input
+                            type="range"
+                            min="-9"
+                            max="9"
+                            step="0.5"
+                            value={waypoints[waypoints.length - 1]?.x ?? 6}
+                            onChange={e => updateWaypoint(waypoints.length - 1, { x: parseFloat(e.target.value) })}
+                            className="w-full accent-rose-400"
+                          />
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-400">y: {waypoints[waypoints.length - 1]?.y.toFixed(1)}m</span>
+                          <input
+                            type="range"
+                            min="-7"
+                            max="7"
+                            step="0.5"
+                            value={waypoints[waypoints.length - 1]?.y ?? -3}
+                            onChange={e => updateWaypoint(waypoints.length - 1, { y: parseFloat(e.target.value) })}
+                            className="w-full accent-rose-400"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Scalar Quantities Card (Magnitude Only - LO 1.1.A.1 & 1.1.A.3) */}
                 <div className="p-3.5 rounded-2xl bg-[#071510] border border-slate-500/30 space-y-2">
                   <div className="flex items-center justify-between border-b border-white/10 pb-1.5">
@@ -1613,7 +2033,7 @@ export const ScalarsVectorsWorkbench: React.FC<ScalarsVectorsWorkbenchProps> = (
                       <span className="text-white font-bold text-base">
                         {scalarDistanceTraveled.toFixed(2)} m
                       </span>
-                      <span className="text-[9px] text-slate-400 block">Total path length</span>
+                      <span className="text-[9px] text-slate-400 block">Total scalar path</span>
                     </div>
                     <div className="p-2.5 rounded-xl bg-black/40 border border-white/5">
                       <span className="text-slate-400 block text-[10px]">Avg Speed (d/Δt):</span>
@@ -1665,20 +2085,115 @@ export const ScalarsVectorsWorkbench: React.FC<ScalarsVectorsWorkbenchProps> = (
             )}
 
             {/* ================================================================= */}
-            {/* COCKPIT FOR MODE 4: 1D COORDINATE SYSTEM & SIGNS (LO 1.1.A.5)     */}
+            {/* COCKPIT FOR MODE 4: 1D COORDINATE SYSTEM & REAL-TIME SIMULATION   */}
             {/* ================================================================= */}
             {labMode === 'sign_1d' && (
               <>
+                {/* Real-Time Kinematics Particle Launcher Panel */}
                 <div className="p-3.5 rounded-2xl bg-[#071a14] border border-emerald-500/35 space-y-3 shadow-lg">
                   <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                    <span className="font-bold text-emerald-300 flex items-center gap-1.5 text-xs">
+                      <Gauge className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Real-Time 1D Particle Launcher</span>
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => setIsSimulating1D(prev => !prev)}
+                        className={`px-3 py-1 rounded-xl text-[11px] font-bold flex items-center gap-1 transition shadow-md ${
+                          isSimulating1D
+                            ? 'bg-amber-400 text-slate-950 hover:bg-amber-300'
+                            : 'bg-emerald-400 text-slate-950 hover:bg-emerald-300'
+                        }`}
+                      >
+                        {isSimulating1D ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
+                        <span>{isSimulating1D ? 'Pause' : 'Launch Particle'}</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setIsSimulating1D(false);
+                          setSimTime1D(0);
+                        }}
+                        className="p-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 transition"
+                        title="Reset simulation to initial position x0"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Live Real-Time Telemetry */}
+                  <div className="grid grid-cols-2 gap-2 font-mono text-[11px]">
+                    <div className="p-2.5 rounded-xl bg-black/40 border border-white/5">
+                      <span className="text-slate-400 block text-[10px]">Elapsed Time (t):</span>
+                      <span className="text-white font-bold text-base">
+                        {simTime1D.toFixed(2)} s
+                      </span>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-black/40 border border-white/5">
+                      <span className="text-slate-400 block text-[10px]">Sim Speed:</span>
+                      <div className="flex items-center gap-1 mt-0.5">
+                        {[0.5, 1.0, 2.0].map(sp => (
+                          <button
+                            key={sp}
+                            onClick={() => setSimSpeed1D(sp)}
+                            className={`px-1.5 py-0.5 rounded text-[10px] font-mono transition ${
+                              simSpeed1D === sp
+                                ? 'bg-emerald-400 text-slate-950 font-bold'
+                                : 'bg-white/5 text-slate-400 hover:text-white'
+                            }`}
+                          >
+                            {sp}x
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-2.5 rounded-xl bg-black/50 border border-emerald-500/25 space-y-1.5 font-mono text-[11px]">
+                    <div className="flex justify-between">
+                      <span className="text-emerald-300">Position x(t):</span>
+                      <span className="text-white font-bold">
+                        {currentSignedX1D >= 0 ? `+${currentSignedX1D.toFixed(2)}` : currentSignedX1D.toFixed(2)} î m
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sky-300">Velocity v(t):</span>
+                      <span className="text-white font-bold">
+                        {currentSignedV1D >= 0 ? `+${currentSignedV1D.toFixed(2)}` : currentSignedV1D.toFixed(2)} î m/s
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-amber-300">Acceleration a:</span>
+                      <span className="text-white font-bold">
+                        {currentSignedA1D >= 0 ? `+${currentSignedA1D.toFixed(1)}` : currentSignedA1D.toFixed(1)} î m/s²
+                      </span>
+                    </div>
+                    <div className="pt-1 border-t border-white/10 flex justify-between text-[10px]">
+                      <span className="text-slate-400">Motion State:</span>
+                      <span className="text-emerald-300 font-bold">
+                        {Math.abs(currentPhysV1D) < 0.05
+                          ? 'Turnaround Point (v=0)'
+                          : currentPhysV1D * currentPhysA1D > 0
+                          ? 'Speeding Up'
+                          : currentPhysV1D * currentPhysA1D < 0
+                          ? 'Slowing Down'
+                          : 'Constant Velocity'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 1D Sign Convention Direction Switcher */}
+                <div className="p-3.5 rounded-2xl bg-[#071510] border border-emerald-500/35 space-y-2.5 shadow-lg">
+                  <div className="flex items-center justify-between border-b border-white/10 pb-1.5">
                     <span className="font-bold text-emerald-300 flex items-center gap-1.5">
                       <ArrowLeftRight className="w-3.5 h-3.5" />
-                      <span>1D Sign Convention (LO 1.1.A.5)</span>
+                      <span>Coordinate Axis Direction (LO 1.1.A.5)</span>
                     </span>
                   </div>
 
                   <p className="text-[11px] text-slate-300 leading-relaxed">
-                    In a 1D coordinate system, <strong>opposite directions are denoted by opposite signs (+ vs −)</strong>. Flip the coordinate axis below to see how algebraic signs invert while physical arrows stay unchanged!
+                    Opposite directions are denoted by opposite algebraic signs (+ vs −). Flip the coordinate axis to see signs invert without changing the physics:
                   </p>
 
                   <button
@@ -1699,11 +2214,13 @@ export const ScalarsVectorsWorkbench: React.FC<ScalarsVectorsWorkbenchProps> = (
                   </button>
                 </div>
 
-                {/* 1D Vector Sliders */}
+                {/* Initial 1D Vector Kinematic Parameters */}
                 <div className="p-3.5 rounded-2xl bg-[#071510] border border-white/10 space-y-3">
+                  <div className="font-bold text-white text-xs">Initial Kinematic Parameters</div>
+
                   <div className="space-y-1">
                     <div className="flex justify-between font-mono text-[11px]">
-                      <span className="text-slate-400">1D Position (x):</span>
+                      <span className="text-slate-400">Initial Position (x₀):</span>
                       <span className="text-emerald-300 font-bold">
                         {signedPos1D >= 0 ? `+${signedPos1D.toFixed(1)}` : signedPos1D.toFixed(1)} î m
                       </span>
@@ -1714,14 +2231,17 @@ export const ScalarsVectorsWorkbench: React.FC<ScalarsVectorsWorkbenchProps> = (
                       max="8"
                       step="0.5"
                       value={pos1DPhysical}
-                      onChange={e => setPos1DPhysical(parseFloat(e.target.value))}
+                      onChange={e => {
+                        setPos1DPhysical(parseFloat(e.target.value));
+                        if (!isSimulating1D) setSimTime1D(0);
+                      }}
                       className="w-full accent-emerald-400"
                     />
                   </div>
 
                   <div className="space-y-1">
                     <div className="flex justify-between font-mono text-[11px]">
-                      <span className="text-slate-400">1D Velocity (v_x):</span>
+                      <span className="text-slate-400">Initial Velocity (v₀):</span>
                       <span className="text-sky-300 font-bold">
                         {signedVel1D >= 0 ? `+${signedVel1D.toFixed(1)}` : signedVel1D.toFixed(1)} î m/s
                       </span>
@@ -1732,40 +2252,33 @@ export const ScalarsVectorsWorkbench: React.FC<ScalarsVectorsWorkbenchProps> = (
                       max="8"
                       step="0.5"
                       value={vel1DPhysical}
-                      onChange={e => setVel1DPhysical(parseFloat(e.target.value))}
+                      onChange={e => {
+                        setVel1DPhysical(parseFloat(e.target.value));
+                        if (!isSimulating1D) setSimTime1D(0);
+                      }}
                       className="w-full accent-sky-400"
                     />
                   </div>
 
                   <div className="space-y-1">
                     <div className="flex justify-between font-mono text-[11px]">
-                      <span className="text-slate-400">1D Acceleration (a_x):</span>
+                      <span className="text-slate-400">Constant Accel (a):</span>
                       <span className="text-amber-300 font-bold">
                         {signedAcc1D >= 0 ? `+${signedAcc1D.toFixed(1)}` : signedAcc1D.toFixed(1)} î m/s²
                       </span>
                     </div>
                     <input
                       type="range"
-                      min="-8"
-                      max="8"
+                      min="-6"
+                      max="6"
                       step="0.5"
                       value={acc1DPhysical}
-                      onChange={e => setAcc1DPhysical(parseFloat(e.target.value))}
+                      onChange={e => {
+                        setAcc1DPhysical(parseFloat(e.target.value));
+                        if (!isSimulating1D) setSimTime1D(0);
+                      }}
                       className="w-full accent-amber-400"
                     />
-                  </div>
-
-                  <div className="p-2.5 rounded-xl bg-black/40 border border-white/5 font-mono text-[10.5px] space-y-1">
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">v_x &amp; a_x Relative Sign:</span>
-                      <span className="text-white font-bold">
-                        {signedVel1D * signedAcc1D > 0
-                          ? 'Same Sign (Speeding Up)'
-                          : signedVel1D * signedAcc1D < 0
-                          ? 'Opposite Signs (Slowing Down)'
-                          : 'Zero Acceleration/Velocity'}
-                      </span>
-                    </div>
                   </div>
                 </div>
               </>
