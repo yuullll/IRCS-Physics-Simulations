@@ -29,7 +29,7 @@ export interface PhysicsModelSlot {
   equation: string;
   description: string;
   status: 'live' | 'blank';
-  simulationMode?: 'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors';
+  simulationMode?: 'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors' | 'kinematics12' | 'relative14' | 'motion15';
   accentColor: 'cyan' | 'amber' | 'emerald' | 'rose' | 'sky';
   metrics: string[];
 }
@@ -55,7 +55,7 @@ export interface PhysicsUnitModule {
 }
 
 export const LIVE_SIMULATION_SLOTS: Record<
-  'vectors' | 'projectile' | 'field' | 'circuit' | 'coulomb',
+  'vectors' | 'kinematics12' | 'projectile' | 'relative14' | 'motion15' | 'field' | 'circuit' | 'coulomb',
   PhysicsModelSlot
 > = {
   vectors: {
@@ -73,6 +73,21 @@ export const LIVE_SIMULATION_SLOTS: Record<
     accentColor: 'emerald',
     metrics: ['3D Unit Vectors (î, ĵ, k̂)', 'Unit Vector r̂ = r/|r|', 'Scalar vs Vector Path Lab'],
   },
+  kinematics12: {
+    id: 'mech-kinematics-1-2',
+    course: 'mechanics',
+    code: '1.2',
+    title: 'Displacement, Velocity & Acceleration Lab',
+    subtitle: 'Secant-to-Tangent Limits, Object Model Abstraction & Calculus Integrals',
+    unit: 'Unit 1 · Kinematics (1.2 Displacement, Velocity, and Acceleration)',
+    equation: 'v_avg = Δr/Δt · v = dr/dt · a = dv/dt',
+    description:
+      'Interactive 2D/3D workbench for AP Physics C Topic 1.2: compare Extended vs Point-Mass object models, contrast average vs instantaneous kinematics as Δt → 0, inspect constant-speed turning acceleration (1.2.B.4), and verify Δx = ∫v(t)dt with quantitative x-v-a graphs.',
+    status: 'live',
+    simulationMode: 'kinematics12',
+    accentColor: 'emerald',
+    metrics: ['Extended vs Point-Mass (1.2.A.1)', 'Δt → 0 Secant Limit Proof', 'x-v-a Graphs & ∫dt Integrals'],
+  },
   projectile: {
     id: 'mech-kinematics-drag',
     course: 'mechanics',
@@ -87,6 +102,36 @@ export const LIVE_SIMULATION_SLOTS: Record<
     simulationMode: 'projectile',
     accentColor: 'emerald',
     metrics: ['Live 3D RK4 Integrator', '5 Kinematics Formulas Proof', 'Impact Flags & FBD'],
+  },
+  relative14: {
+    id: 'mech-relative-motion-1-4',
+    course: 'mechanics',
+    code: '1.4',
+    title: 'Reference Frames & Relative Motion Lab',
+    subtitle: 'Galilean Vector Addition, Multi-Observer Views & Inertial Acceleration Invariance',
+    unit: 'Unit 1 · Kinematics (1.4 Reference Frames and Relative Motion)',
+    equation: 'v_P/E = v_P/M + v_M/E · a_P/E = a_P/M',
+    description:
+      'Interactive 2D/3D workbench for AP Physics C Topic 1.4: switch seamlessly between Earth E, Moving Platform M, and Object P observer frames; build tip-to-tail relative velocity diagrams; solve zero-drift river crossings; and verify inertial acceleration invariance.',
+    status: 'live',
+    simulationMode: 'relative14',
+    accentColor: 'emerald',
+    metrics: ['3 Inertial Observer Frames', 'Tip-to-Tail Vector Triangle', 'a_P/E = a_P/M Invariance Proof'],
+  },
+  motion15: {
+    id: 'mech-motion-1-5',
+    course: 'mechanics',
+    code: '1.5',
+    title: 'Motion in Two or Three Dimensions Lab',
+    subtitle: 'Component Separation, Drop vs. Launch Independence & 3D Qualitative Boundary',
+    unit: 'Unit 1 · Kinematics (1.5 Motion in Two or Three Dimensions)',
+    equation: 'r(t) = x(t)î + y(t)ĵ · a = dv/dt',
+    description:
+      'Interactive 2D/3D workbench for AP Physics C Topic 1.5: verify perpendicular component independence (1.5.A.3), analyze projectile & nonuniform 2D kinematics via 1D component integrals & graphs (1.B), test 2.D scaling ratios, and inspect the 3D qualitative E&M helical boundary.',
+    status: 'live',
+    simulationMode: 'motion15',
+    accentColor: 'emerald',
+    metrics: ['Drop vs. Launch Sync Proof', '1.B Component Graphs & Scaling', '3D Qualitative E&M Boundary'],
   },
   coulomb: {
     id: 'model-coulomb-force',
@@ -157,6 +202,7 @@ export const MECHANICS_UNITS: PhysicsUnitModule[] = [
         id: 'sub-1-2',
         code: '1.2',
         title: '1.2 Displacement, Velocity, and Acceleration',
+        simulation: LIVE_SIMULATION_SLOTS.kinematics12,
       },
       {
         id: 'sub-1-3',
@@ -168,11 +214,13 @@ export const MECHANICS_UNITS: PhysicsUnitModule[] = [
         id: 'sub-1-4',
         code: '1.4',
         title: '1.4 Reference Frames and Relative Motion',
+        simulation: LIVE_SIMULATION_SLOTS.relative14,
       },
       {
         id: 'sub-1-5',
         code: '1.5',
         title: '1.5 Motion in Two or Three Dimensions',
+        simulation: LIVE_SIMULATION_SLOTS.motion15,
       },
     ],
   },
@@ -459,7 +507,10 @@ export const EM_UNITS: PhysicsUnitModule[] = [
 export const ALL_PHYSICS_UNITS: PhysicsUnitModule[] = [...MECHANICS_UNITS, ...EM_UNITS];
 
 export const PHYSICS_MODEL_SLOTS: PhysicsModelSlot[] = [
+  LIVE_SIMULATION_SLOTS.kinematics12,
   LIVE_SIMULATION_SLOTS.projectile,
+  LIVE_SIMULATION_SLOTS.relative14,
+  LIVE_SIMULATION_SLOTS.motion15,
   LIVE_SIMULATION_SLOTS.field,
   LIVE_SIMULATION_SLOTS.circuit,
   LIVE_SIMULATION_SLOTS.coulomb,

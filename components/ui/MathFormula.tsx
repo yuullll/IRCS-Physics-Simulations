@@ -245,11 +245,54 @@ export const AP_MATH_FORMULAS: Record<string, React.ReactNode> = {
     </span>
   ),
 
+  // Simulation 1.2: Displacement, Velocity, and Acceleration
+  'sim-kinematics12': (
+    <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
+      <span>
+        <Vec>v</Vec><Sub>avg</Sub> <Op>=</Op> <Frac num={<><Var>Δ</Var><Vec>r</Vec></>} den={<><Var>Δ</Var><Var>t</Var></>} />
+      </span>
+      <span className="text-slate-500 font-sans mx-1">,</span>
+      <span>
+        <Vec>v</Vec> <Op>=</Op> <Frac num={<><Var>d</Var><Vec>r</Vec></>} den={<><Var>d</Var><Var>t</Var></>} />
+      </span>
+      <span className="text-slate-500 font-sans mx-1">,</span>
+      <span>
+        <Vec>a</Vec> <Op>=</Op> <Frac num={<><Var>d</Var><Vec>v</Vec></>} den={<><Var>d</Var><Var>t</Var></>} />
+      </span>
+    </span>
+  ),
+
   // Simulation 1.3: Non-Linear Projectile & Drag Ballistics
   'sim-projectile': (
     <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
       <span>
         <Var>m</Var><Frac num={<><Var>d</Var><Vec>v</Vec></>} den={<><Var>d</Var><Var>t</Var></>} /> <Op>=</Op> <Var>m</Var><Vec>g</Vec> <Op>−</Op> <Var>b</Var><Vec>v</Vec> <Op>−</Op> <Var>c</Var>|<Vec>v</Vec>|<Vec>v</Vec>
+      </span>
+    </span>
+  ),
+
+  // Simulation 1.4: Reference Frames and Relative Motion
+  'sim-relative14': (
+    <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
+      <span>
+        <Vec>v</Vec><Sub>P/E</Sub> <Op>=</Op> <Vec>v</Vec><Sub>P/M</Sub> <Op>+</Op> <Vec>v</Vec><Sub>M/E</Sub>
+      </span>
+      <span className="text-slate-500 font-sans mx-1">,</span>
+      <span>
+        <Vec>a</Vec><Sub>P/E</Sub> <Op>=</Op> <Vec>a</Vec><Sub>P/M</Sub>
+      </span>
+    </span>
+  ),
+
+  // Simulation 1.5: Motion in Two or Three Dimensions
+  'sim-motion15': (
+    <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
+      <span>
+        <Vec>r</Vec>(<Var>t</Var>) <Op>=</Op> <Var>x</Var>(<Var>t</Var>)<Var>î</Var> <Op>+</Op> <Var>y</Var>(<Var>t</Var>)<Var>ĵ</Var>
+      </span>
+      <span className="text-slate-500 font-sans mx-1">,</span>
+      <span>
+        <Vec>a</Vec> <Op>=</Op> <Frac num={<><Var>d</Var><Vec>v</Vec></>} den={<><Var>d</Var><Var>t</Var></>} />
       </span>
     </span>
   ),
@@ -352,6 +395,20 @@ export const MathFormula: React.FC<{
  * Converts keyboard/computer notation strings into standard math typography
  */
 function parseSimpleMathStringToJSX(text: string): React.ReactNode {
+  // Exact compound textbook formulas before splitting on ' · '
+  if (text.includes('v_P/E') && text.includes('v_M/E')) {
+    return AP_MATH_FORMULAS['sim-relative14'];
+  }
+  if (text.includes('î') && text.includes('ĵ') && text.includes('r(t)')) {
+    return AP_MATH_FORMULAS['sim-motion15'];
+  }
+  if (text.includes('v_avg') && text.includes('dr/dt')) {
+    return AP_MATH_FORMULAS['sim-kinematics12'];
+  }
+  if (text.includes('v(t) = dr/dt') && text.includes('a(t) = dv/dt')) {
+    return AP_MATH_FORMULAS['unit-1'];
+  }
+
   // If text has multiple sub-equations separated by ' · ' or ','
   if (text.includes(' · ')) {
     const parts = text.split(' · ');

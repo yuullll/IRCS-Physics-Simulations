@@ -39,6 +39,9 @@ import { Oscilloscope, DataPoint } from '@/components/ui/Oscilloscope';
 import { ProjectileSandbox } from '@/components/simulation/ProjectileSandbox';
 import { CoulombForceWorkbench } from '@/components/simulation/CoulombForceWorkbench';
 import { ScalarsVectorsWorkbench } from '@/components/simulation/ScalarsVectorsWorkbench';
+import { Kinematics12Workbench } from '@/components/simulation/Kinematics12Workbench';
+import { RelativeMotion14Workbench } from '@/components/simulation/RelativeMotion14Workbench';
+import { Motion15Workbench } from '@/components/simulation/Motion15Workbench';
 import { CalculusTheoryModal } from '@/components/ui/CalculusTheoryModal';
 import { UserRoleBar } from '@/components/auth/UserRoleBar';
 import { AuthModal } from '@/components/auth/AuthModal';
@@ -68,9 +71,9 @@ import {
 type LayerRoute =
   | { layer: 'catalog'; course?: PhysicsCourseId }
   | { layer: 'unit'; unit: PhysicsUnitModule }
-  | {
+    | {
       layer: 'workspace';
-      mode: 'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors';
+      mode: 'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors' | 'kinematics12' | 'relative14' | 'motion15';
       modelTitle: string;
       unit?: PhysicsUnitModule;
     }
@@ -87,9 +90,12 @@ export default function SimulationCockpit() {
   ]);
   const [navIndex, setNavIndex] = useState<number>(0);
   // Active simulation mode when in workspace layer
-  const [activeMode, setActiveMode] = useState<'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors'>('projectile');
+  const [activeMode, setActiveMode] = useState<'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors' | 'kinematics12' | 'relative14' | 'motion15'>('projectile');
   const [projectileViewMode, setProjectileViewMode] = useState<'3d' | '2d'>('3d');
   const [vectorsViewMode, setVectorsViewMode] = useState<'3d' | '2d'>('3d');
+  const [kinematics12ViewMode, setKinematics12ViewMode] = useState<'3d' | '2d'>('3d');
+  const [relative14ViewMode, setRelative14ViewMode] = useState<'3d' | '2d'>('3d');
+  const [motion15ViewMode, setMotion15ViewMode] = useState<'3d' | '2d'>('3d');
   const [vectorsSubMode, setVectorsSubMode] = useState<string>('vector_sum');
 
   const currentRoute = navHistory[navIndex] || { layer: 'catalog', course: 'mechanics' };
@@ -100,7 +106,17 @@ export default function SimulationCockpit() {
       ? currentRoute.unit.course
       : currentRoute.layer === 'workspace' && currentRoute.unit
       ? currentRoute.unit.course
-      : currentRoute.layer === 'workspace' && (currentRoute.mode === 'projectile' || activeMode === 'projectile' || currentRoute.mode === 'vectors' || activeMode === 'vectors')
+      : currentRoute.layer === 'workspace' &&
+        (currentRoute.mode === 'projectile' ||
+          activeMode === 'projectile' ||
+          currentRoute.mode === 'vectors' ||
+          activeMode === 'vectors' ||
+          currentRoute.mode === 'kinematics12' ||
+          activeMode === 'kinematics12' ||
+          currentRoute.mode === 'relative14' ||
+          activeMode === 'relative14' ||
+          currentRoute.mode === 'motion15' ||
+          activeMode === 'motion15')
       ? 'mechanics'
       : currentRoute.layer === 'workspace' && (currentRoute.mode === 'coulomb' || activeMode === 'coulomb' || currentRoute.mode === 'field' || activeMode === 'field' || currentRoute.mode === 'circuit' || activeMode === 'circuit')
       ? 'em'
@@ -110,7 +126,12 @@ export default function SimulationCockpit() {
 
   const isCurrentMechanics =
     activeCourse === 'mechanics' ||
-    (currentRoute.layer === 'workspace' && (activeMode === 'projectile' || activeMode === 'vectors'));
+    (currentRoute.layer === 'workspace' &&
+      (activeMode === 'projectile' ||
+        activeMode === 'vectors' ||
+        activeMode === 'kinematics12' ||
+        activeMode === 'relative14' ||
+        activeMode === 'motion15'));
 
   // Header visibility on catalog scroll (disappears on scroll down, reappears on scroll up)
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
@@ -310,6 +331,30 @@ export default function SimulationCockpit() {
           timestamp: now,
           title,
           mode: 'vectors',
+        };
+      } else if (activeMode === 'kinematics12') {
+        return {
+          id,
+          version: '1.0',
+          timestamp: now,
+          title,
+          mode: 'kinematics12',
+        };
+      } else if (activeMode === 'relative14') {
+        return {
+          id,
+          version: '1.0',
+          timestamp: now,
+          title,
+          mode: 'relative14',
+        };
+      } else if (activeMode === 'motion15') {
+        return {
+          id,
+          version: '1.0',
+          timestamp: now,
+          title,
+          mode: 'motion15',
         };
       } else if (activeMode === 'projectile') {
         return {
@@ -849,6 +894,12 @@ export default function SimulationCockpit() {
                     ? '8.1 Electric Charge & Coulomb Force'
                     : activeMode === 'vectors'
                     ? '1.1 Scalars and Vectors'
+                    : activeMode === 'kinematics12'
+                    ? '1.2 Displacement, Velocity & Acceleration'
+                    : activeMode === 'relative14'
+                    ? '1.4 Reference Frames & Relative Motion'
+                    : activeMode === 'motion15'
+                    ? '1.5 Motion in Two or Three Dimensions'
                     : '1.3 Projectile & Drag Ballistics'}
                 </span>
               </>
@@ -896,6 +947,12 @@ export default function SimulationCockpit() {
                     ? projectileViewMode === '3d'
                     : activeMode === 'vectors'
                     ? vectorsViewMode === '3d'
+                    : activeMode === 'kinematics12'
+                    ? kinematics12ViewMode === '3d'
+                    : activeMode === 'relative14'
+                    ? relative14ViewMode === '3d'
+                    : activeMode === 'motion15'
+                    ? motion15ViewMode === '3d'
                     : (activeMode === 'field' ? fieldControls.viewMode : circuitControls.viewMode) === '3d');
                 const is2DActive = is3DDisabled || !is3DActive;
 
@@ -911,6 +968,12 @@ export default function SimulationCockpit() {
                           setCircuitControls(prev => ({ ...prev, viewMode: '3d' }));
                         else if (activeMode === 'vectors')
                           setVectorsViewMode('3d');
+                        else if (activeMode === 'kinematics12')
+                          setKinematics12ViewMode('3d');
+                        else if (activeMode === 'relative14')
+                          setRelative14ViewMode('3d');
+                        else if (activeMode === 'motion15')
+                          setMotion15ViewMode('3d');
                         else
                           setProjectileViewMode('3d');
                       }}
@@ -941,6 +1004,12 @@ export default function SimulationCockpit() {
                           setCircuitControls(prev => ({ ...prev, viewMode: 'top' }));
                         else if (activeMode === 'vectors')
                           setVectorsViewMode('2d');
+                        else if (activeMode === 'kinematics12')
+                          setKinematics12ViewMode('2d');
+                        else if (activeMode === 'relative14')
+                          setRelative14ViewMode('2d');
+                        else if (activeMode === 'motion15')
+                          setMotion15ViewMode('2d');
                         else
                           setProjectileViewMode('2d');
                       }}
@@ -1508,6 +1577,24 @@ export default function SimulationCockpit() {
                 externalViewMode={vectorsViewMode}
                 onViewModeChange={setVectorsViewMode}
                 onSubModeChange={setVectorsSubMode}
+              />
+            ) : activeMode === 'kinematics12' ? (
+              <Kinematics12Workbench
+                onToast={showToast}
+                externalViewMode={kinematics12ViewMode}
+                onViewModeChange={setKinematics12ViewMode}
+              />
+            ) : activeMode === 'relative14' ? (
+              <RelativeMotion14Workbench
+                onToast={showToast}
+                externalViewMode={relative14ViewMode}
+                onViewModeChange={setRelative14ViewMode}
+              />
+            ) : activeMode === 'motion15' ? (
+              <Motion15Workbench
+                onToast={showToast}
+                externalViewMode={motion15ViewMode}
+                onViewModeChange={setMotion15ViewMode}
               />
             ) : (
               <ProjectileSandbox
