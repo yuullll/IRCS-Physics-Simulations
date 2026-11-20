@@ -319,6 +319,17 @@ export const AP_MATH_FORMULAS: Record<string, React.ReactNode> = {
     </span>
   ),
 
+  // Simulation 8.4: Electric Fields of Charge Distributions
+  'sim-distributions84': (
+    <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
+      <span>
+        <Vec>E</Vec> <Op>=</Op> <Frac num="1" den={<>4<Var>π</Var><Var>ε</Var><Sub>0</Sub></>} />{' '}
+        <BigInt /> <Frac num={<><Var>d</Var><Var>q</Var></>} den={<><Var>r</Var><Sup>2</Sup></>} />{' '}
+        <Var>r̂</Var>
+      </span>
+    </span>
+  ),
+
   // Simulation 11.S: 3D Circuit Workbench
   'sim-circuit': (
     <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
@@ -420,6 +431,9 @@ function parseSimpleMathStringToJSX(text: string): React.ReactNode {
   }
   if (text.includes('∑ Q_i = ∑ Q_f') || text.includes('ΣQ_i = ΣQ_f')) {
     return AP_MATH_FORMULAS['sim-charging82'];
+  }
+  if (text.includes('dq / r²') || text.includes('dq/r²')) {
+    return AP_MATH_FORMULAS['sim-distributions84'];
   }
   if (text.includes('v(t) = dr/dt') && text.includes('a(t) = dv/dt')) {
     return AP_MATH_FORMULAS['unit-1'];

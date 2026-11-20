@@ -29,7 +29,7 @@ export interface PhysicsModelSlot {
   equation: string;
   description: string;
   status: 'live' | 'blank';
-  simulationMode?: 'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors' | 'kinematics12' | 'relative14' | 'motion15' | 'charging82';
+  simulationMode?: 'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors' | 'kinematics12' | 'relative14' | 'motion15' | 'charging82' | 'distributions84';
   accentColor: 'cyan' | 'amber' | 'emerald' | 'rose' | 'sky';
   metrics: string[];
 }
@@ -55,7 +55,7 @@ export interface PhysicsUnitModule {
 }
 
 export const LIVE_SIMULATION_SLOTS: Record<
-  'vectors' | 'kinematics12' | 'projectile' | 'relative14' | 'motion15' | 'field' | 'circuit' | 'coulomb' | 'charging82',
+  'vectors' | 'kinematics12' | 'projectile' | 'relative14' | 'motion15' | 'field' | 'circuit' | 'coulomb' | 'charging82' | 'distributions84',
   PhysicsModelSlot
 > = {
   vectors: {
@@ -177,6 +177,21 @@ export const LIVE_SIMULATION_SLOTS: Record<
     simulationMode: 'field',
     accentColor: 'sky',
     metrics: ['60×60m Cartesian Grid', 'Fixed-dt RK4 Integrator', 'Equipotential Slicing'],
+  },
+  distributions84: {
+    id: 'em-distributions-8-4',
+    course: 'em',
+    code: '8.4',
+    title: 'Electric Fields of Charge Distributions Lab',
+    subtitle: 'Calculus Integration ∫(dq/r²)r̂, Symmetry Cancellation & All 5 AP Geometries',
+    unit: 'Unit 8 · Electric Charges, Fields, and Gauss’s Law (8.4 Electric Fields of Charge Distributions)',
+    equation: 'E = (1/4πε₀) ∫ (dq / r²) r̂',
+    description:
+      'Interactive 2D/3D workbench for AP Physics C Topic 8.4: integrate continuous charge distributions across all five boundary-statement geometries (thin ring, circular arc, finite line bisector, finite line collinear, infinite wire), inspect symmetry twin cancellation dE⊥ + dE′⊥ = 0, and compare N-segment Riemann sums against closed-form calculus results.',
+    status: 'live',
+    simulationMode: 'distributions84',
+    accentColor: 'sky',
+    metrics: ['All 5 AP Calculus Geometries', 'Symmetry Twin dE⊥ Proof', 'Exact ∫ vs Riemann Sum'],
   },
   circuit: {
     id: 'model-circuit',
@@ -377,6 +392,7 @@ export const EM_UNITS: PhysicsUnitModule[] = [
         id: 'sub-8-4',
         code: '8.4',
         title: '8.4 Electric Fields of Charge Distributions',
+        simulation: LIVE_SIMULATION_SLOTS.distributions84,
       },
       {
         id: 'sub-8-5',
@@ -531,6 +547,7 @@ export const PHYSICS_MODEL_SLOTS: PhysicsModelSlot[] = [
   LIVE_SIMULATION_SLOTS.circuit,
   LIVE_SIMULATION_SLOTS.coulomb,
   LIVE_SIMULATION_SLOTS.charging82,
+  LIVE_SIMULATION_SLOTS.distributions84,
 ];
 
 /**
