@@ -297,6 +297,19 @@ export const AP_MATH_FORMULAS: Record<string, React.ReactNode> = {
     </span>
   ),
 
+  // Simulation 8.2: Conservation of Electric Charge & Process of Charging
+  'sim-charging82': (
+    <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
+      <span>
+        <BigSum /><Var>Q</Var><Sub>i</Sub> <Op>=</Op> <BigSum /><Var>Q</Var><Sub>f</Sub>
+      </span>
+      <span className="text-slate-500 font-sans mx-1">,</span>
+      <span>
+        <Var>Q</Var> <Op>=</Op> (<Var>N</Var><Sub>p</Sub> <Op>−</Op> <Var>N</Var><Sub>e</Sub>)<Var>e</Var>
+      </span>
+    </span>
+  ),
+
   // Simulation 8.3: Electrostatic Field & Lorentz Dynamics
   'sim-field': (
     <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
@@ -404,6 +417,9 @@ function parseSimpleMathStringToJSX(text: string): React.ReactNode {
   }
   if (text.includes('v_avg') && text.includes('dr/dt')) {
     return AP_MATH_FORMULAS['sim-kinematics12'];
+  }
+  if (text.includes('∑ Q_i = ∑ Q_f') || text.includes('ΣQ_i = ΣQ_f')) {
+    return AP_MATH_FORMULAS['sim-charging82'];
   }
   if (text.includes('v(t) = dr/dt') && text.includes('a(t) = dv/dt')) {
     return AP_MATH_FORMULAS['unit-1'];

@@ -29,7 +29,7 @@ export interface PhysicsModelSlot {
   equation: string;
   description: string;
   status: 'live' | 'blank';
-  simulationMode?: 'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors' | 'kinematics12' | 'relative14' | 'motion15';
+  simulationMode?: 'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors' | 'kinematics12' | 'relative14' | 'motion15' | 'charging82';
   accentColor: 'cyan' | 'amber' | 'emerald' | 'rose' | 'sky';
   metrics: string[];
 }
@@ -55,7 +55,7 @@ export interface PhysicsUnitModule {
 }
 
 export const LIVE_SIMULATION_SLOTS: Record<
-  'vectors' | 'kinematics12' | 'projectile' | 'relative14' | 'motion15' | 'field' | 'circuit' | 'coulomb',
+  'vectors' | 'kinematics12' | 'projectile' | 'relative14' | 'motion15' | 'field' | 'circuit' | 'coulomb' | 'charging82',
   PhysicsModelSlot
 > = {
   vectors: {
@@ -147,6 +147,21 @@ export const LIVE_SIMULATION_SLOTS: Record<
     simulationMode: 'coulomb',
     accentColor: 'cyan',
     metrics: ['Coulomb & Gravity Dual Solver', 'Dielectric Permittivity Slider', '4-Body Vector Superposition'],
+  },
+  charging82: {
+    id: 'em-charging-8-2',
+    course: 'em',
+    code: '8.2',
+    title: 'Conservation of Electric Charge & Charging Lab',
+    subtitle: 'Friction, Contact Conduction, Neutral Polarization & Earth Grounding',
+    unit: 'Unit 8 · Electric Charges, Fields, and Gauss’s Law (8.2 Conservation of Electric Charge)',
+    equation: '∑ Q_i = ∑ Q_f · Q = (N_p - N_e)e',
+    description:
+      'Interactive 2D/3D workbench for AP Physics C Topic 8.2: investigate electron transfer during triboelectric friction and conductor contact (8.2.A.1.i), induce polarization in neutral conductors and insulators (8.2.A.1.ii–iii), and execute 4-step Earth grounding induction (8.2.A.3) with live charge bar charts.',
+    status: 'live',
+    simulationMode: 'charging82',
+    accentColor: 'sky',
+    metrics: ['Friction & Contact Electron Flow', 'Neutral Polarization & Induction', '4-Step Earth Grounding Lab'],
   },
   field: {
     id: 'model-field',
@@ -350,6 +365,7 @@ export const EM_UNITS: PhysicsUnitModule[] = [
         id: 'sub-8-2',
         code: '8.2',
         title: '8.2 Conservation of Electric Charge and the Process of Charging',
+        simulation: LIVE_SIMULATION_SLOTS.charging82,
       },
       {
         id: 'sub-8-3',
@@ -514,6 +530,7 @@ export const PHYSICS_MODEL_SLOTS: PhysicsModelSlot[] = [
   LIVE_SIMULATION_SLOTS.field,
   LIVE_SIMULATION_SLOTS.circuit,
   LIVE_SIMULATION_SLOTS.coulomb,
+  LIVE_SIMULATION_SLOTS.charging82,
 ];
 
 /**

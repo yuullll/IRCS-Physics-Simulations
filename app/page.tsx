@@ -42,6 +42,7 @@ import { ScalarsVectorsWorkbench } from '@/components/simulation/ScalarsVectorsW
 import { Kinematics12Workbench } from '@/components/simulation/Kinematics12Workbench';
 import { RelativeMotion14Workbench } from '@/components/simulation/RelativeMotion14Workbench';
 import { Motion15Workbench } from '@/components/simulation/Motion15Workbench';
+import { ChargeConservation82Workbench } from '@/components/simulation/ChargeConservation82Workbench';
 import { CalculusTheoryModal } from '@/components/ui/CalculusTheoryModal';
 import { UserRoleBar } from '@/components/auth/UserRoleBar';
 import { AuthModal } from '@/components/auth/AuthModal';
@@ -73,7 +74,7 @@ type LayerRoute =
   | { layer: 'unit'; unit: PhysicsUnitModule }
     | {
       layer: 'workspace';
-      mode: 'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors' | 'kinematics12' | 'relative14' | 'motion15';
+      mode: 'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors' | 'kinematics12' | 'relative14' | 'motion15' | 'charging82';
       modelTitle: string;
       unit?: PhysicsUnitModule;
     }
@@ -90,12 +91,13 @@ export default function SimulationCockpit() {
   ]);
   const [navIndex, setNavIndex] = useState<number>(0);
   // Active simulation mode when in workspace layer
-  const [activeMode, setActiveMode] = useState<'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors' | 'kinematics12' | 'relative14' | 'motion15'>('projectile');
+  const [activeMode, setActiveMode] = useState<'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors' | 'kinematics12' | 'relative14' | 'motion15' | 'charging82'>('projectile');
   const [projectileViewMode, setProjectileViewMode] = useState<'3d' | '2d'>('3d');
   const [vectorsViewMode, setVectorsViewMode] = useState<'3d' | '2d'>('3d');
   const [kinematics12ViewMode, setKinematics12ViewMode] = useState<'3d' | '2d'>('3d');
   const [relative14ViewMode, setRelative14ViewMode] = useState<'3d' | '2d'>('3d');
   const [motion15ViewMode, setMotion15ViewMode] = useState<'3d' | '2d'>('3d');
+  const [charging82ViewMode, setCharging82ViewMode] = useState<'3d' | '2d'>('3d');
   const [vectorsSubMode, setVectorsSubMode] = useState<string>('vector_sum');
 
   const currentRoute = navHistory[navIndex] || { layer: 'catalog', course: 'mechanics' };
@@ -118,7 +120,15 @@ export default function SimulationCockpit() {
           currentRoute.mode === 'motion15' ||
           activeMode === 'motion15')
       ? 'mechanics'
-      : currentRoute.layer === 'workspace' && (currentRoute.mode === 'coulomb' || activeMode === 'coulomb' || currentRoute.mode === 'field' || activeMode === 'field' || currentRoute.mode === 'circuit' || activeMode === 'circuit')
+      : currentRoute.layer === 'workspace' &&
+        (currentRoute.mode === 'coulomb' ||
+          activeMode === 'coulomb' ||
+          currentRoute.mode === 'charging82' ||
+          activeMode === 'charging82' ||
+          currentRoute.mode === 'field' ||
+          activeMode === 'field' ||
+          currentRoute.mode === 'circuit' ||
+          activeMode === 'circuit')
       ? 'em'
       : currentRoute.layer === 'slot-detail'
       ? currentRoute.slot.course || 'mechanics'
@@ -323,6 +333,14 @@ export default function SimulationCockpit() {
           timestamp: now,
           title,
           mode: 'coulomb',
+        };
+      } else if (activeMode === 'charging82') {
+        return {
+          id,
+          version: '1.0',
+          timestamp: now,
+          title,
+          mode: 'charging82',
         };
       } else if (activeMode === 'vectors') {
         return {
@@ -892,6 +910,8 @@ export default function SimulationCockpit() {
                     ? 'Unit 11 Circuit Workbench'
                     : activeMode === 'coulomb'
                     ? '8.1 Electric Charge & Coulomb Force'
+                    : activeMode === 'charging82'
+                    ? '8.2 Conservation of Charge & Charging'
                     : activeMode === 'vectors'
                     ? '1.1 Scalars and Vectors'
                     : activeMode === 'kinematics12'
@@ -953,6 +973,8 @@ export default function SimulationCockpit() {
                     ? relative14ViewMode === '3d'
                     : activeMode === 'motion15'
                     ? motion15ViewMode === '3d'
+                    : activeMode === 'charging82'
+                    ? charging82ViewMode === '3d'
                     : (activeMode === 'field' ? fieldControls.viewMode : circuitControls.viewMode) === '3d');
                 const is2DActive = is3DDisabled || !is3DActive;
 
@@ -974,6 +996,8 @@ export default function SimulationCockpit() {
                           setRelative14ViewMode('3d');
                         else if (activeMode === 'motion15')
                           setMotion15ViewMode('3d');
+                        else if (activeMode === 'charging82')
+                          setCharging82ViewMode('3d');
                         else
                           setProjectileViewMode('3d');
                       }}
@@ -1010,6 +1034,8 @@ export default function SimulationCockpit() {
                           setRelative14ViewMode('2d');
                         else if (activeMode === 'motion15')
                           setMotion15ViewMode('2d');
+                        else if (activeMode === 'charging82')
+                          setCharging82ViewMode('2d');
                         else
                           setProjectileViewMode('2d');
                       }}
@@ -1571,6 +1597,12 @@ export default function SimulationCockpit() {
               />
             ) : activeMode === 'coulomb' ? (
               <CoulombForceWorkbench onToast={showToast} />
+            ) : activeMode === 'charging82' ? (
+              <ChargeConservation82Workbench
+                onToast={showToast}
+                externalViewMode={charging82ViewMode}
+                onViewModeChange={setCharging82ViewMode}
+              />
             ) : activeMode === 'vectors' ? (
               <ScalarsVectorsWorkbench
                 onToast={showToast}
