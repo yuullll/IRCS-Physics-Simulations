@@ -29,7 +29,7 @@ export interface PhysicsModelSlot {
   equation: string;
   description: string;
   status: 'live' | 'blank';
-  simulationMode?: 'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors' | 'kinematics12' | 'relative14' | 'motion15' | 'charging82' | 'distributions84';
+  simulationMode?: 'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors' | 'kinematics12' | 'relative14' | 'motion15' | 'charging82' | 'distributions84' | 'flux85';
   accentColor: 'cyan' | 'amber' | 'emerald' | 'rose' | 'sky';
   metrics: string[];
 }
@@ -55,7 +55,7 @@ export interface PhysicsUnitModule {
 }
 
 export const LIVE_SIMULATION_SLOTS: Record<
-  'vectors' | 'kinematics12' | 'projectile' | 'relative14' | 'motion15' | 'field' | 'circuit' | 'coulomb' | 'charging82' | 'distributions84',
+  'vectors' | 'kinematics12' | 'projectile' | 'relative14' | 'motion15' | 'field' | 'circuit' | 'coulomb' | 'charging82' | 'distributions84' | 'flux85',
   PhysicsModelSlot
 > = {
   vectors: {
@@ -192,6 +192,21 @@ export const LIVE_SIMULATION_SLOTS: Record<
     simulationMode: 'distributions84',
     accentColor: 'sky',
     metrics: ['All 5 AP Calculus Geometries', 'Symmetry Twin dE⊥ Proof', 'Exact ∫ vs Riemann Sum'],
+  },
+  flux85: {
+    id: 'em-flux-8-5',
+    course: 'em',
+    code: '8.5',
+    title: 'Electric Flux & Surface Integral Lab',
+    subtitle: 'Dot Product Φ_E = E·A = EA cosθ, Outward Area Normals & Surface Integrals ∫E·dA',
+    unit: 'Unit 8 · Electric Charges, Fields, and Gauss’s Law (8.5 Electric Flux)',
+    equation: 'Φ_E = ∫ E · dA',
+    description:
+      'Interactive 2D/3D workbench for AP Physics C Topic 8.5: explore flux through tilted open surfaces (Φ_E = E·A = EA cosθ), integrate spatially varying electric fields with discrete N×N patch Riemann sums ∫E·dA, audit all 6 outward-normal faces of a closed cube, and compare closed curved surfaces in uniform vs. radial point-charge fields.',
+    status: 'live',
+    simulationMode: 'flux85',
+    accentColor: 'sky',
+    metrics: ['Dot Product Φ_E = EA cosθ', 'N×N Surface Integral ∫E·dA', '6-Face Closed Surface Audit'],
   },
   circuit: {
     id: 'model-circuit',
@@ -398,6 +413,7 @@ export const EM_UNITS: PhysicsUnitModule[] = [
         id: 'sub-8-5',
         code: '8.5',
         title: '8.5 Electric Flux',
+        simulation: LIVE_SIMULATION_SLOTS.flux85,
       },
       {
         id: 'sub-8-6',
@@ -548,6 +564,7 @@ export const PHYSICS_MODEL_SLOTS: PhysicsModelSlot[] = [
   LIVE_SIMULATION_SLOTS.coulomb,
   LIVE_SIMULATION_SLOTS.charging82,
   LIVE_SIMULATION_SLOTS.distributions84,
+  LIVE_SIMULATION_SLOTS.flux85,
 ];
 
 /**

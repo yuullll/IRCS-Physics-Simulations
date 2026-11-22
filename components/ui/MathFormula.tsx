@@ -330,6 +330,23 @@ export const AP_MATH_FORMULAS: Record<string, React.ReactNode> = {
     </span>
   ),
 
+  // Simulation 8.5: Electric Flux (Surface Integral & Constant-Field Dot Product)
+  'sim-flux85': (
+    <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
+      <span>
+        <Var>Φ</Var><Sub>E</Sub> <Op>=</Op> <BigInt /> <Vec>E</Vec> <Dot /> <Var>d</Var><Vec>A</Vec>
+      </span>
+    </span>
+  ),
+
+  'sim-flux85-dot': (
+    <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
+      <span>
+        <Var>Φ</Var><Sub>E</Sub> <Op>=</Op> <Vec>E</Vec> <Dot /> <Vec>A</Vec>
+      </span>
+    </span>
+  ),
+
   // Simulation 11.S: 3D Circuit Workbench
   'sim-circuit': (
     <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
@@ -434,6 +451,15 @@ function parseSimpleMathStringToJSX(text: string): React.ReactNode {
   }
   if (text.includes('dq / r²') || text.includes('dq/r²')) {
     return AP_MATH_FORMULAS['sim-distributions84'];
+  }
+  if (text.includes('∮ E · dA')) {
+    return AP_MATH_FORMULAS['unit-8'];
+  }
+  if (text.includes('∫ E · dA') || (text.includes('Φ_E') && text.includes('dA'))) {
+    return AP_MATH_FORMULAS['sim-flux85'];
+  }
+  if (text.includes('Φ_E') && text.includes('E · A')) {
+    return AP_MATH_FORMULAS['sim-flux85-dot'];
   }
   if (text.includes('v(t) = dr/dt') && text.includes('a(t) = dv/dt')) {
     return AP_MATH_FORMULAS['unit-1'];
