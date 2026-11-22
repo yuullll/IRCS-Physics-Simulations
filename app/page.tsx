@@ -45,6 +45,7 @@ import { Motion15Workbench } from '@/components/simulation/Motion15Workbench';
 import { ChargeConservation82Workbench } from '@/components/simulation/ChargeConservation82Workbench';
 import { ChargeDistributions84Workbench } from '@/components/simulation/ChargeDistributions84Workbench';
 import { ElectricFlux85Workbench } from '@/components/simulation/ElectricFlux85Workbench';
+import { ElectricGauss86Workbench } from '@/components/simulation/ElectricGauss86Workbench';
 import { CalculusTheoryModal } from '@/components/ui/CalculusTheoryModal';
 import { UserRoleBar } from '@/components/auth/UserRoleBar';
 import { AuthModal } from '@/components/auth/AuthModal';
@@ -76,7 +77,7 @@ type LayerRoute =
   | { layer: 'unit'; unit: PhysicsUnitModule }
     | {
       layer: 'workspace';
-      mode: 'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors' | 'kinematics12' | 'relative14' | 'motion15' | 'charging82' | 'distributions84' | 'flux85';
+      mode: 'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors' | 'kinematics12' | 'relative14' | 'motion15' | 'charging82' | 'distributions84' | 'flux85' | 'gauss86';
       modelTitle: string;
       unit?: PhysicsUnitModule;
     }
@@ -93,7 +94,7 @@ export default function SimulationCockpit() {
   ]);
   const [navIndex, setNavIndex] = useState<number>(0);
   // Active simulation mode when in workspace layer
-  const [activeMode, setActiveMode] = useState<'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors' | 'kinematics12' | 'relative14' | 'motion15' | 'charging82' | 'distributions84' | 'flux85'>('projectile');
+  const [activeMode, setActiveMode] = useState<'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors' | 'kinematics12' | 'relative14' | 'motion15' | 'charging82' | 'distributions84' | 'flux85' | 'gauss86'>('projectile');
   const [projectileViewMode, setProjectileViewMode] = useState<'3d' | '2d'>('3d');
   const [vectorsViewMode, setVectorsViewMode] = useState<'3d' | '2d'>('3d');
   const [kinematics12ViewMode, setKinematics12ViewMode] = useState<'3d' | '2d'>('3d');
@@ -102,6 +103,7 @@ export default function SimulationCockpit() {
   const [charging82ViewMode, setCharging82ViewMode] = useState<'3d' | '2d'>('3d');
   const [distributions84ViewMode, setDistributions84ViewMode] = useState<'3d' | '2d'>('3d');
   const [flux85ViewMode, setFlux85ViewMode] = useState<'3d' | '2d'>('3d');
+  const [gauss86ViewMode, setGauss86ViewMode] = useState<'3d' | '2d'>('3d');
   const [vectorsSubMode, setVectorsSubMode] = useState<string>('vector_sum');
 
   const currentRoute = navHistory[navIndex] || { layer: 'catalog', course: 'mechanics' };
@@ -133,6 +135,8 @@ export default function SimulationCockpit() {
           activeMode === 'distributions84' ||
           currentRoute.mode === 'flux85' ||
           activeMode === 'flux85' ||
+          currentRoute.mode === 'gauss86' ||
+          activeMode === 'gauss86' ||
           currentRoute.mode === 'field' ||
           activeMode === 'field' ||
           currentRoute.mode === 'circuit' ||
@@ -365,6 +369,14 @@ export default function SimulationCockpit() {
           timestamp: now,
           title,
           mode: 'flux85',
+        };
+      } else if (activeMode === 'gauss86') {
+        return {
+          id,
+          version: '1.0',
+          timestamp: now,
+          title,
+          mode: 'gauss86',
         };
       } else if (activeMode === 'vectors') {
         return {
@@ -940,6 +952,8 @@ export default function SimulationCockpit() {
                     ? '8.4 Electric Fields of Charge Distributions'
                     : activeMode === 'flux85'
                     ? '8.5 Electric Flux'
+                    : activeMode === 'gauss86'
+                    ? '8.6 Gauss’s Law'
                     : activeMode === 'vectors'
                     ? '1.1 Scalars and Vectors'
                     : activeMode === 'kinematics12'
@@ -1007,6 +1021,8 @@ export default function SimulationCockpit() {
                     ? distributions84ViewMode === '3d'
                     : activeMode === 'flux85'
                     ? flux85ViewMode === '3d'
+                    : activeMode === 'gauss86'
+                    ? gauss86ViewMode === '3d'
                     : (activeMode === 'field' ? fieldControls.viewMode : circuitControls.viewMode) === '3d');
                 const is2DActive = is3DDisabled || !is3DActive;
 
@@ -1034,6 +1050,8 @@ export default function SimulationCockpit() {
                           setDistributions84ViewMode('3d');
                         else if (activeMode === 'flux85')
                           setFlux85ViewMode('3d');
+                        else if (activeMode === 'gauss86')
+                          setGauss86ViewMode('3d');
                         else
                           setProjectileViewMode('3d');
                       }}
@@ -1076,6 +1094,8 @@ export default function SimulationCockpit() {
                           setDistributions84ViewMode('2d');
                         else if (activeMode === 'flux85')
                           setFlux85ViewMode('2d');
+                        else if (activeMode === 'gauss86')
+                          setGauss86ViewMode('2d');
                         else
                           setProjectileViewMode('2d');
                       }}
@@ -1654,6 +1674,12 @@ export default function SimulationCockpit() {
                 onToast={showToast}
                 externalViewMode={flux85ViewMode}
                 onViewModeChange={setFlux85ViewMode}
+              />
+            ) : activeMode === 'gauss86' ? (
+              <ElectricGauss86Workbench
+                onToast={showToast}
+                externalViewMode={gauss86ViewMode}
+                onViewModeChange={setGauss86ViewMode}
               />
             ) : activeMode === 'vectors' ? (
               <ScalarsVectorsWorkbench

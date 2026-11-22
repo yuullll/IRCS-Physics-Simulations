@@ -347,6 +347,23 @@ export const AP_MATH_FORMULAS: Record<string, React.ReactNode> = {
     </span>
   ),
 
+  // Simulation 8.6: Gauss's Law & Charge Density Volume Integral
+  'sim-gauss86': (
+    <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
+      <span>
+        <BigContourInt /> <Vec>E</Vec> <Dot /> <Var>d</Var><Vec>A</Vec> <Op>=</Op> <Frac num={<><Var>q</Var><Sub>enc</Sub></>} den={<><Var>ε</Var><Sub>0</Sub></>} />
+      </span>
+    </span>
+  ),
+
+  'sim-gauss86-rho': (
+    <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
+      <span>
+        <Var>Q</Var><Sub>total</Sub> <Op>=</Op> <BigInt /> <Var>ρ</Var>(<Vec>r</Vec>) <Var>d</Var><Var>V</Var>
+      </span>
+    </span>
+  ),
+
   // Simulation 11.S: 3D Circuit Workbench
   'sim-circuit': (
     <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
@@ -451,6 +468,9 @@ function parseSimpleMathStringToJSX(text: string): React.ReactNode {
   }
   if (text.includes('dq / r²') || text.includes('dq/r²')) {
     return AP_MATH_FORMULAS['sim-distributions84'];
+  }
+  if (text.includes('q_enc / ε₀')) {
+    return AP_MATH_FORMULAS['sim-gauss86'];
   }
   if (text.includes('∮ E · dA')) {
     return AP_MATH_FORMULAS['unit-8'];

@@ -29,7 +29,7 @@ export interface PhysicsModelSlot {
   equation: string;
   description: string;
   status: 'live' | 'blank';
-  simulationMode?: 'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors' | 'kinematics12' | 'relative14' | 'motion15' | 'charging82' | 'distributions84' | 'flux85';
+  simulationMode?: 'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors' | 'kinematics12' | 'relative14' | 'motion15' | 'charging82' | 'distributions84' | 'flux85' | 'gauss86';
   accentColor: 'cyan' | 'amber' | 'emerald' | 'rose' | 'sky';
   metrics: string[];
 }
@@ -55,7 +55,7 @@ export interface PhysicsUnitModule {
 }
 
 export const LIVE_SIMULATION_SLOTS: Record<
-  'vectors' | 'kinematics12' | 'projectile' | 'relative14' | 'motion15' | 'field' | 'circuit' | 'coulomb' | 'charging82' | 'distributions84' | 'flux85',
+  'vectors' | 'kinematics12' | 'projectile' | 'relative14' | 'motion15' | 'field' | 'circuit' | 'coulomb' | 'charging82' | 'distributions84' | 'flux85' | 'gauss86',
   PhysicsModelSlot
 > = {
   vectors: {
@@ -207,6 +207,21 @@ export const LIVE_SIMULATION_SLOTS: Record<
     simulationMode: 'flux85',
     accentColor: 'sky',
     metrics: ['Dot Product Φ_E = EA cosθ', 'N×N Surface Integral ∫E·dA', '6-Face Closed Surface Audit'],
+  },
+  gauss86: {
+    id: 'em-gauss-8-6',
+    course: 'em',
+    code: '8.6',
+    title: 'Gauss’s Law & Symmetry Lab',
+    subtitle: 'Maxwell’s 1st Equation, Size Invariance & Spherical/Cylindrical/Planar Symmetry',
+    unit: 'Unit 8 · Electric Charges, Fields, and Gauss’s Law (8.6 Gauss’s Law)',
+    equation: '∮ E · dA = q_enc / ε₀',
+    description:
+      'Interactive 2D/3D workbench for AP Physics C Topic 8.6: test Gaussian surface size invariance and external charge cancellation (8.6.A.1–8.6.A.3), integrate nonuniform charge densities ∫ρ(r)dV (8.6.A.5), and derive electric fields across point, spherical, cylindrical, and planar symmetry geometries (8.6.A.4 & Boundary Statement).',
+    status: 'live',
+    simulationMode: 'gauss86',
+    accentColor: 'sky',
+    metrics: ['Size-Invariance & External q', '∫ρ(r)dV Radial Integrals', 'Spherical · Cylindrical · Planar'],
   },
   circuit: {
     id: 'model-circuit',
@@ -419,6 +434,7 @@ export const EM_UNITS: PhysicsUnitModule[] = [
         id: 'sub-8-6',
         code: '8.6',
         title: '8.6 Gauss’s Law',
+        simulation: LIVE_SIMULATION_SLOTS.gauss86,
       },
     ],
   },
@@ -565,6 +581,7 @@ export const PHYSICS_MODEL_SLOTS: PhysicsModelSlot[] = [
   LIVE_SIMULATION_SLOTS.charging82,
   LIVE_SIMULATION_SLOTS.distributions84,
   LIVE_SIMULATION_SLOTS.flux85,
+  LIVE_SIMULATION_SLOTS.gauss86,
 ];
 
 /**
