@@ -42,6 +42,8 @@ import { ScalarsVectorsWorkbench } from '@/components/simulation/ScalarsVectorsW
 import { Kinematics12Workbench } from '@/components/simulation/Kinematics12Workbench';
 import { RelativeMotion14Workbench } from '@/components/simulation/RelativeMotion14Workbench';
 import { Motion15Workbench } from '@/components/simulation/Motion15Workbench';
+import { SystemsCom21Workbench } from '@/components/simulation/SystemsCom21Workbench';
+import { ForcesFbd22Workbench } from '@/components/simulation/ForcesFbd22Workbench';
 import { ChargeConservation82Workbench } from '@/components/simulation/ChargeConservation82Workbench';
 import { ChargeDistributions84Workbench } from '@/components/simulation/ChargeDistributions84Workbench';
 import { ElectricFlux85Workbench } from '@/components/simulation/ElectricFlux85Workbench';
@@ -77,7 +79,7 @@ type LayerRoute =
   | { layer: 'unit'; unit: PhysicsUnitModule }
     | {
       layer: 'workspace';
-      mode: 'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors' | 'kinematics12' | 'relative14' | 'motion15' | 'charging82' | 'distributions84' | 'flux85' | 'gauss86';
+      mode: 'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors' | 'kinematics12' | 'relative14' | 'motion15' | 'systems21' | 'forces22' | 'charging82' | 'distributions84' | 'flux85' | 'gauss86';
       modelTitle: string;
       unit?: PhysicsUnitModule;
     }
@@ -94,12 +96,14 @@ export default function SimulationCockpit() {
   ]);
   const [navIndex, setNavIndex] = useState<number>(0);
   // Active simulation mode when in workspace layer
-  const [activeMode, setActiveMode] = useState<'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors' | 'kinematics12' | 'relative14' | 'motion15' | 'charging82' | 'distributions84' | 'flux85' | 'gauss86'>('projectile');
+  const [activeMode, setActiveMode] = useState<'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors' | 'kinematics12' | 'relative14' | 'motion15' | 'systems21' | 'forces22' | 'charging82' | 'distributions84' | 'flux85' | 'gauss86'>('projectile');
   const [projectileViewMode, setProjectileViewMode] = useState<'3d' | '2d'>('3d');
   const [vectorsViewMode, setVectorsViewMode] = useState<'3d' | '2d'>('3d');
   const [kinematics12ViewMode, setKinematics12ViewMode] = useState<'3d' | '2d'>('3d');
   const [relative14ViewMode, setRelative14ViewMode] = useState<'3d' | '2d'>('3d');
   const [motion15ViewMode, setMotion15ViewMode] = useState<'3d' | '2d'>('3d');
+  const [systems21ViewMode, setSystems21ViewMode] = useState<'3d' | '2d'>('3d');
+  const [forces22ViewMode, setForces22ViewMode] = useState<'3d' | '2d'>('3d');
   const [charging82ViewMode, setCharging82ViewMode] = useState<'3d' | '2d'>('3d');
   const [distributions84ViewMode, setDistributions84ViewMode] = useState<'3d' | '2d'>('3d');
   const [flux85ViewMode, setFlux85ViewMode] = useState<'3d' | '2d'>('3d');
@@ -124,7 +128,11 @@ export default function SimulationCockpit() {
           currentRoute.mode === 'relative14' ||
           activeMode === 'relative14' ||
           currentRoute.mode === 'motion15' ||
-          activeMode === 'motion15')
+          activeMode === 'motion15' ||
+          currentRoute.mode === 'systems21' ||
+          activeMode === 'systems21' ||
+          currentRoute.mode === 'forces22' ||
+          activeMode === 'forces22')
       ? 'mechanics'
       : currentRoute.layer === 'workspace' &&
         (currentRoute.mode === 'coulomb' ||
@@ -153,7 +161,9 @@ export default function SimulationCockpit() {
         activeMode === 'vectors' ||
         activeMode === 'kinematics12' ||
         activeMode === 'relative14' ||
-        activeMode === 'motion15'));
+        activeMode === 'motion15' ||
+        activeMode === 'systems21' ||
+        activeMode === 'forces22'));
 
   // Header visibility on catalog scroll (disappears on scroll down, reappears on scroll up)
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
@@ -409,6 +419,22 @@ export default function SimulationCockpit() {
           timestamp: now,
           title,
           mode: 'motion15',
+        };
+      } else if (activeMode === 'systems21') {
+        return {
+          id,
+          version: '1.0',
+          timestamp: now,
+          title,
+          mode: 'systems21',
+        };
+      } else if (activeMode === 'forces22') {
+        return {
+          id,
+          version: '1.0',
+          timestamp: now,
+          title,
+          mode: 'forces22',
         };
       } else if (activeMode === 'projectile') {
         return {
@@ -962,6 +988,10 @@ export default function SimulationCockpit() {
                     ? '1.4 Reference Frames & Relative Motion'
                     : activeMode === 'motion15'
                     ? '1.5 Motion in Two or Three Dimensions'
+                    : activeMode === 'systems21'
+                    ? '2.1 Systems and Center of Mass'
+                    : activeMode === 'forces22'
+                    ? '2.2 Forces and Free-Body Diagrams'
                     : '1.3 Projectile & Drag Ballistics'}
                 </span>
               </>
@@ -1015,6 +1045,10 @@ export default function SimulationCockpit() {
                     ? relative14ViewMode === '3d'
                     : activeMode === 'motion15'
                     ? motion15ViewMode === '3d'
+                    : activeMode === 'systems21'
+                    ? systems21ViewMode === '3d'
+                    : activeMode === 'forces22'
+                    ? forces22ViewMode === '3d'
                     : activeMode === 'charging82'
                     ? charging82ViewMode === '3d'
                     : activeMode === 'distributions84'
@@ -1044,6 +1078,10 @@ export default function SimulationCockpit() {
                           setRelative14ViewMode('3d');
                         else if (activeMode === 'motion15')
                           setMotion15ViewMode('3d');
+                        else if (activeMode === 'systems21')
+                          setSystems21ViewMode('3d');
+                        else if (activeMode === 'forces22')
+                          setForces22ViewMode('3d');
                         else if (activeMode === 'charging82')
                           setCharging82ViewMode('3d');
                         else if (activeMode === 'distributions84')
@@ -1088,6 +1126,10 @@ export default function SimulationCockpit() {
                           setRelative14ViewMode('2d');
                         else if (activeMode === 'motion15')
                           setMotion15ViewMode('2d');
+                        else if (activeMode === 'systems21')
+                          setSystems21ViewMode('2d');
+                        else if (activeMode === 'forces22')
+                          setForces22ViewMode('2d');
                         else if (activeMode === 'charging82')
                           setCharging82ViewMode('2d');
                         else if (activeMode === 'distributions84')
@@ -1705,6 +1747,18 @@ export default function SimulationCockpit() {
                 onToast={showToast}
                 externalViewMode={motion15ViewMode}
                 onViewModeChange={setMotion15ViewMode}
+              />
+            ) : activeMode === 'systems21' ? (
+              <SystemsCom21Workbench
+                onToast={showToast}
+                externalViewMode={systems21ViewMode}
+                onViewModeChange={setSystems21ViewMode}
+              />
+            ) : activeMode === 'forces22' ? (
+              <ForcesFbd22Workbench
+                onToast={showToast}
+                externalViewMode={forces22ViewMode}
+                onViewModeChange={setForces22ViewMode}
               />
             ) : (
               <ProjectileSandbox

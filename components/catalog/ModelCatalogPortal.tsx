@@ -29,7 +29,7 @@ export interface PhysicsModelSlot {
   equation: string;
   description: string;
   status: 'live' | 'blank';
-  simulationMode?: 'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors' | 'kinematics12' | 'relative14' | 'motion15' | 'charging82' | 'distributions84' | 'flux85' | 'gauss86';
+  simulationMode?: 'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors' | 'kinematics12' | 'relative14' | 'motion15' | 'systems21' | 'forces22' | 'charging82' | 'distributions84' | 'flux85' | 'gauss86';
   accentColor: 'cyan' | 'amber' | 'emerald' | 'rose' | 'sky';
   metrics: string[];
 }
@@ -55,7 +55,7 @@ export interface PhysicsUnitModule {
 }
 
 export const LIVE_SIMULATION_SLOTS: Record<
-  'vectors' | 'kinematics12' | 'projectile' | 'relative14' | 'motion15' | 'field' | 'circuit' | 'coulomb' | 'charging82' | 'distributions84' | 'flux85' | 'gauss86',
+  'vectors' | 'kinematics12' | 'projectile' | 'relative14' | 'motion15' | 'systems21' | 'forces22' | 'field' | 'circuit' | 'coulomb' | 'charging82' | 'distributions84' | 'flux85' | 'gauss86',
   PhysicsModelSlot
 > = {
   vectors: {
@@ -132,6 +132,36 @@ export const LIVE_SIMULATION_SLOTS: Record<
     simulationMode: 'motion15',
     accentColor: 'emerald',
     metrics: ['Drop vs. Launch Sync Proof', '1.B Component Graphs & Scaling', '3D Qualitative E&M Boundary'],
+  },
+  systems21: {
+    id: 'mech-systems-com-2-1',
+    course: 'mechanics',
+    code: '2.1',
+    title: 'Systems & Center of Mass Lab',
+    subtitle: 'Discrete Σm_i r_i/Σm_i, Nonuniform ∫r dm/∫dm, Cutouts & System Boundaries',
+    unit: 'Unit 2 · Force and Translational Dynamics (2.1 Systems and Center of Mass)',
+    equation: 'x_cm = ∑m_i x_i / ∑m_i · r_cm = ∫ r dm / ∫ dm',
+    description:
+      'Interactive 2D/3D workbench for AP Physics C Topic 2.1: explore discrete multi-mass systems and symmetry axes (2.1.B.1–2.1.B.2), integrate nonuniform linear mass densities λ(x) = dm/dx via ∫r dm/∫dm (2.1.B.3), solve 2D composite plates and cutouts, and compare system center-of-mass motion against internal constituent motion across system boundaries (2.1.A & 2.1.B.4).',
+    status: 'live',
+    simulationMode: 'systems21',
+    accentColor: 'emerald',
+    metrics: ['Discrete & Symmetry COM', 'Nonuniform Rod ∫λ(x)dx', 'Baton · Split · Spring Systems'],
+  },
+  forces22: {
+    id: 'mech-forces-fbd-2-2',
+    course: 'mechanics',
+    code: '2.2',
+    title: 'Forces & Free-Body Diagrams Lab',
+    subtitle: 'Agent-Object Interactions, Rotated Axes, Side-by-Side Arrows & AP FBD Audit',
+    unit: 'Unit 2 · Force and Translational Dynamics (2.2 Forces and Free-Body Diagrams)',
+    equation: '∑ F_ext = m a · F_N = mg cosθ',
+    description:
+      'Interactive 2D/3D workbench for AP Physics C Topic 2.2: align coordinate axes along inclined acceleration (2.2.B.4), enforce side-by-side collinear AP FBD arrows without components, isolate multi-body system boundaries & microscopic interatomic contact repulsion (2.2.A), and audit AP Exam free-body diagrams.',
+    status: 'live',
+    simulationMode: 'forces22',
+    accentColor: 'emerald',
+    metrics: ['Rotated Incline Axes (2.2.B.4)', 'Side-by-Side AP FBD Rules', 'Interactive AP FBD Builder'],
   },
   coulomb: {
     id: 'model-coulomb-force',
@@ -295,10 +325,26 @@ export const MECHANICS_UNITS: PhysicsUnitModule[] = [
     equation: '∑ F = dp/dt = m a',
     accentColor: 'amber',
     subtopics: [
-      { id: 'sub-2-1', code: '2.1', title: 'Under Development' },
-      { id: 'sub-2-2', code: '2.2', title: 'Under Development' },
-      { id: 'sub-2-3', code: '2.3', title: 'Under Development' },
-      { id: 'sub-2-4', code: '2.4', title: 'Under Development' },
+      {
+        id: 'sub-2-1',
+        code: '2.1',
+        title: '2.1 Systems and Center of Mass',
+        simulation: LIVE_SIMULATION_SLOTS.systems21,
+      },
+      {
+        id: 'sub-2-2',
+        code: '2.2',
+        title: '2.2 Forces and Free-Body Diagrams',
+        simulation: LIVE_SIMULATION_SLOTS.forces22,
+      },
+      { id: 'sub-2-3', code: '2.3', title: '2.3 Newton’s Third Law' },
+      { id: 'sub-2-4', code: '2.4', title: '2.4 Newton’s First Law' },
+      { id: 'sub-2-5', code: '2.5', title: '2.5 Newton’s Second Law' },
+      { id: 'sub-2-6', code: '2.6', title: '2.6 Gravitational Force' },
+      { id: 'sub-2-7', code: '2.7', title: '2.7 Kinetic and Static Friction' },
+      { id: 'sub-2-8', code: '2.8', title: '2.8 Spring Forces' },
+      { id: 'sub-2-9', code: '2.9', title: '2.9 Resistive Forces' },
+      { id: 'sub-2-10', code: '2.10', title: '2.10 Circular Motion' },
     ],
   },
   {
@@ -575,6 +621,8 @@ export const PHYSICS_MODEL_SLOTS: PhysicsModelSlot[] = [
   LIVE_SIMULATION_SLOTS.projectile,
   LIVE_SIMULATION_SLOTS.relative14,
   LIVE_SIMULATION_SLOTS.motion15,
+  LIVE_SIMULATION_SLOTS.systems21,
+  LIVE_SIMULATION_SLOTS.forces22,
   LIVE_SIMULATION_SLOTS.field,
   LIVE_SIMULATION_SLOTS.circuit,
   LIVE_SIMULATION_SLOTS.coulomb,

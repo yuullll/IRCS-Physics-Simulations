@@ -297,6 +297,60 @@ export const AP_MATH_FORMULAS: Record<string, React.ReactNode> = {
     </span>
   ),
 
+  // Simulation 2.1: Systems and Center of Mass
+  'sim-systems21': (
+    <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
+      <span>
+        <Vec>x</Vec><Sub>cm</Sub> <Op>=</Op> <Frac num={<><BigSum /> <Var>m</Var><Sub>i</Sub><Vec>x</Vec><Sub>i</Sub></>} den={<><BigSum /> <Var>m</Var><Sub>i</Sub></>} />
+      </span>
+    </span>
+  ),
+
+  'sim-systems21-int': (
+    <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
+      <span>
+        <Vec>r</Vec><Sub>cm</Sub> <Op>=</Op> <Frac num={<><BigInt /> <Vec>r</Vec> <Var>d</Var><Var>m</Var></>} den={<><BigInt /> <Var>d</Var><Var>m</Var></>} />
+      </span>
+    </span>
+  ),
+
+  'sim-systems21-lambda': (
+    <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
+      <span>
+        <Var>λ</Var> <Op>=</Op> <Frac num={<><Var>d</Var></>} den={<><Var>d</Var><Var>ℓ</Var></>} /><Var>m</Var>(<Var>ℓ</Var>)
+      </span>
+    </span>
+  ),
+
+  'sim-systems21-mass': (
+    <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
+      <span>
+        <Var>M</Var><Sub>total</Sub> <Op>=</Op> <BigInt /> <Var>ρ</Var>(<Var>r</Var>) <Var>d</Var><Var>V</Var>
+      </span>
+    </span>
+  ),
+
+  // Simulation 2.2: Forces and Free-Body Diagrams
+  'sim-forces22': (
+    <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
+      <span>
+        <BigSum /> <Vec>F</Vec><Sub>ext</Sub> <Op>=</Op> <Var>m</Var><Vec>a</Vec>
+      </span>
+    </span>
+  ),
+
+  'sim-forces22-incline': (
+    <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
+      <span>
+        <BigSum /> <Vec>F</Vec><Sub>ext</Sub> <Op>=</Op> <Var>m</Var><Vec>a</Vec>
+      </span>
+      <span className="text-slate-500 font-sans mx-1">,</span>
+      <span>
+        <Var>F</Var><Sub>N</Sub> <Op>=</Op> <Var>m</Var><Var>g</Var><span className="font-serif not-italic ml-0.5">cos</span><Var>θ</Var>
+      </span>
+    </span>
+  ),
+
   // Simulation 8.2: Conservation of Electric Charge & Process of Charging
   'sim-charging82': (
     <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
@@ -484,6 +538,9 @@ function parseSimpleMathStringToJSX(text: string): React.ReactNode {
   if (text.includes('v(t) = dr/dt') && text.includes('a(t) = dv/dt')) {
     return AP_MATH_FORMULAS['unit-1'];
   }
+  if (text.includes('F_ext') && text.includes('cosθ')) {
+    return AP_MATH_FORMULAS['sim-forces22-incline'];
+  }
 
   // If text has multiple sub-equations separated by ' · ' or ','
   if (text.includes(' · ')) {
@@ -507,6 +564,17 @@ function parseSimpleMathStringToJSX(text: string): React.ReactNode {
   // Unit 1: v(t) = dr/dt · a(t) = dv/dt
   if (text.includes('dr/dt')) {
     return AP_MATH_FORMULAS['unit-1'];
+  }
+  // Topic 2.1: Discrete & Continuous Center of Mass
+  if (text.includes('x_cm') && text.includes('m_i')) {
+    return AP_MATH_FORMULAS['sim-systems21'];
+  }
+  if (text.includes('r_cm') && text.includes('dm')) {
+    return AP_MATH_FORMULAS['sim-systems21-int'];
+  }
+  // Topic 2.2: Forces and Free-Body Diagrams
+  if (text.includes('F_ext')) {
+    return AP_MATH_FORMULAS['sim-forces22'];
   }
   // Unit 2: ∑ F = dp/dt = m a
   if (text.includes('dp/dt')) {
