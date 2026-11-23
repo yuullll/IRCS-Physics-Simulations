@@ -351,6 +351,27 @@ export const AP_MATH_FORMULAS: Record<string, React.ReactNode> = {
     </span>
   ),
 
+  // Simulation 2.3: Newton's Third Law
+  'sim-newton23': (
+    <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
+      <span>
+        <Vec>F</Vec><Sub>A on B</Sub> <Op>=</Op> <Op>−</Op><Vec>F</Vec><Sub>B on A</Sub>
+      </span>
+    </span>
+  ),
+
+  'sim-newton23-full': (
+    <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
+      <span>
+        <Vec>F</Vec><Sub>A on B</Sub> <Op>=</Op> <Op>−</Op><Vec>F</Vec><Sub>B on A</Sub>
+      </span>
+      <span className="text-slate-500 font-sans mx-1">,</span>
+      <span>
+        <BigSum /> <Vec>F</Vec><Sub>int</Sub> <Op>=</Op> 0
+      </span>
+    </span>
+  ),
+
   // Simulation 8.2: Conservation of Electric Charge & Process of Charging
   'sim-charging82': (
     <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
@@ -540,6 +561,12 @@ function parseSimpleMathStringToJSX(text: string): React.ReactNode {
   }
   if (text.includes('F_ext') && text.includes('cosθ')) {
     return AP_MATH_FORMULAS['sim-forces22-incline'];
+  }
+  if (text.includes('F_A on B') && text.includes('F_int')) {
+    return AP_MATH_FORMULAS['sim-newton23-full'];
+  }
+  if (text.includes('F_A on B')) {
+    return AP_MATH_FORMULAS['sim-newton23'];
   }
 
   // If text has multiple sub-equations separated by ' · ' or ','

@@ -29,7 +29,7 @@ export interface PhysicsModelSlot {
   equation: string;
   description: string;
   status: 'live' | 'blank';
-  simulationMode?: 'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors' | 'kinematics12' | 'relative14' | 'motion15' | 'systems21' | 'forces22' | 'charging82' | 'distributions84' | 'flux85' | 'gauss86';
+  simulationMode?: 'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors' | 'kinematics12' | 'relative14' | 'motion15' | 'systems21' | 'forces22' | 'newton23' | 'charging82' | 'distributions84' | 'flux85' | 'gauss86';
   accentColor: 'cyan' | 'amber' | 'emerald' | 'rose' | 'sky';
   metrics: string[];
 }
@@ -55,7 +55,7 @@ export interface PhysicsUnitModule {
 }
 
 export const LIVE_SIMULATION_SLOTS: Record<
-  'vectors' | 'kinematics12' | 'projectile' | 'relative14' | 'motion15' | 'systems21' | 'forces22' | 'field' | 'circuit' | 'coulomb' | 'charging82' | 'distributions84' | 'flux85' | 'gauss86',
+  'vectors' | 'kinematics12' | 'projectile' | 'relative14' | 'motion15' | 'systems21' | 'forces22' | 'newton23' | 'field' | 'circuit' | 'coulomb' | 'charging82' | 'distributions84' | 'flux85' | 'gauss86',
   PhysicsModelSlot
 > = {
   vectors: {
@@ -162,6 +162,21 @@ export const LIVE_SIMULATION_SLOTS: Record<
     simulationMode: 'forces22',
     accentColor: 'emerald',
     metrics: ['Rotated Incline Axes (2.2.B.4)', 'Side-by-Side AP FBD Rules', 'Interactive AP FBD Builder'],
+  },
+  newton23: {
+    id: 'mech-newton-third-2-3',
+    course: 'mechanics',
+    code: '2.3',
+    title: 'Newton’s Third Law & Tension Lab',
+    subtitle: 'Paired Forces F_A on B = -F_B on A, Internal COM Invariance, Massive Ropes & Ideal Pulleys',
+    unit: 'Unit 2 · Force and Translational Dynamics (2.3 Newton’s Third Law)',
+    equation: 'F_A on B = -F_B on A · ∑ F_int = 0',
+    description:
+      'Interactive 2D/3D workbench for AP Physics C Topic 2.3: verify equal-and-opposite force pairs across unequal masses and gravity/normal traps (2.3.A.1), prove internal forces cannot accelerate a system’s center of mass (2.3.A.2), compare ideal uniform vs. massive non-uniform string tension segment-by-segment (2.3.A.3.i–iii), and test ideal vs. real pulleys (2.3.A.3.iv).',
+    status: 'live',
+    simulationMode: 'newton23',
+    accentColor: 'emerald',
+    metrics: ['Paired Forces (2.3.A.1)', 'Internal Forces & COM (2.3.A.2)', 'Ideal vs Massive Rope & Pulley'],
   },
   coulomb: {
     id: 'model-coulomb-force',
@@ -337,7 +352,12 @@ export const MECHANICS_UNITS: PhysicsUnitModule[] = [
         title: '2.2 Forces and Free-Body Diagrams',
         simulation: LIVE_SIMULATION_SLOTS.forces22,
       },
-      { id: 'sub-2-3', code: '2.3', title: '2.3 Newton’s Third Law' },
+      {
+        id: 'sub-2-3',
+        code: '2.3',
+        title: '2.3 Newton’s Third Law',
+        simulation: LIVE_SIMULATION_SLOTS.newton23,
+      },
       { id: 'sub-2-4', code: '2.4', title: '2.4 Newton’s First Law' },
       { id: 'sub-2-5', code: '2.5', title: '2.5 Newton’s Second Law' },
       { id: 'sub-2-6', code: '2.6', title: '2.6 Gravitational Force' },
@@ -623,6 +643,7 @@ export const PHYSICS_MODEL_SLOTS: PhysicsModelSlot[] = [
   LIVE_SIMULATION_SLOTS.motion15,
   LIVE_SIMULATION_SLOTS.systems21,
   LIVE_SIMULATION_SLOTS.forces22,
+  LIVE_SIMULATION_SLOTS.newton23,
   LIVE_SIMULATION_SLOTS.field,
   LIVE_SIMULATION_SLOTS.circuit,
   LIVE_SIMULATION_SLOTS.coulomb,
