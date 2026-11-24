@@ -29,7 +29,7 @@ export interface PhysicsModelSlot {
   equation: string;
   description: string;
   status: 'live' | 'blank';
-  simulationMode?: 'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors' | 'kinematics12' | 'relative14' | 'motion15' | 'systems21' | 'forces22' | 'newton23' | 'charging82' | 'distributions84' | 'flux85' | 'gauss86';
+  simulationMode?: 'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors' | 'kinematics12' | 'relative14' | 'motion15' | 'systems21' | 'forces22' | 'newton23' | 'newton24' | 'newton25' | 'charging82' | 'distributions84' | 'flux85' | 'gauss86';
   accentColor: 'cyan' | 'amber' | 'emerald' | 'rose' | 'sky';
   metrics: string[];
 }
@@ -55,7 +55,7 @@ export interface PhysicsUnitModule {
 }
 
 export const LIVE_SIMULATION_SLOTS: Record<
-  'vectors' | 'kinematics12' | 'projectile' | 'relative14' | 'motion15' | 'systems21' | 'forces22' | 'newton23' | 'field' | 'circuit' | 'coulomb' | 'charging82' | 'distributions84' | 'flux85' | 'gauss86',
+  'vectors' | 'kinematics12' | 'projectile' | 'relative14' | 'motion15' | 'systems21' | 'forces22' | 'newton23' | 'newton24' | 'newton25' | 'field' | 'circuit' | 'coulomb' | 'charging82' | 'distributions84' | 'flux85' | 'gauss86',
   PhysicsModelSlot
 > = {
   vectors: {
@@ -177,6 +177,36 @@ export const LIVE_SIMULATION_SLOTS: Record<
     simulationMode: 'newton23',
     accentColor: 'emerald',
     metrics: ['Paired Forces (2.3.A.1)', 'Internal Forces & COM (2.3.A.2)', 'Ideal vs Massive Rope & Pulley'],
+  },
+  newton24: {
+    id: 'mech-newton-first-2-4',
+    course: 'mechanics',
+    code: '2.4',
+    title: 'Newton’s First Law & Equilibrium Lab',
+    subtitle: 'Vector Sum ΣF_i = 0, Constant Velocity Cruise, Orthogonal Axes & Inertial Frames',
+    unit: 'Unit 2 · Force and Translational Dynamics (2.4 Newton’s First Law)',
+    equation: '∑ F_i = 0 · v = const',
+    description:
+      'Interactive 2D/3D workbench for AP Physics C Topic 2.4: balance multi-vector force tables and hanging signs in translational equilibrium (2.4.A.1–2.4.A.2), prove constant nonzero velocity requires zero net force (2.4.A.3), test orthogonal balanced vs. unbalanced axes on a 2D strobe air table (2.4.A.4), and distinguish inertial vs. non-inertial railcar reference frames (2.4.A.5).',
+    status: 'live',
+    simulationMode: 'newton24',
+    accentColor: 'emerald',
+    metrics: ['Force Table & Hanging Sign (ΣF=0)', '2D Balanced vs Unbalanced Axes', 'Inertial vs Non-Inertial Railcar'],
+  },
+  newton25: {
+    id: 'mech-newton-second-2-5',
+    course: 'mechanics',
+    code: '2.5',
+    title: 'Newton’s Second Law & Dynamics Lab',
+    subtitle: 'a_sys = ΣF/m_sys, Braking & 2D Alignment, Modified Atwood & System COM',
+    unit: 'Unit 2 · Force and Translational Dynamics (2.5 Newton’s Second Law)',
+    equation: 'a_sys = ∑F / m_sys = F_net / m_sys',
+    description:
+      'Interactive 2D/3D workbench for AP Physics C Topic 2.5: investigate unbalanced forces and braking acceleration (2.5.A.1–2.5.A.2), verify exact 2D co-alignment of a_sys and F_net, run a constant-total-mass Modified Atwood transfer experiment with linearized a vs. 1/m data plotting (Skills 1.B, 2.D, 3.A), and prove internal spring forces leave system center-of-mass velocity unchanged without ΣF_ext (2.5.A.3).',
+    status: 'live',
+    simulationMode: 'newton25',
+    accentColor: 'emerald',
+    metrics: ['1D Track & 2D θ_a = θ_F Proof', 'Modified Atwood & 1/m Linearize', 'System COM vs Internal Spring'],
   },
   coulomb: {
     id: 'model-coulomb-force',
@@ -358,8 +388,18 @@ export const MECHANICS_UNITS: PhysicsUnitModule[] = [
         title: '2.3 Newton’s Third Law',
         simulation: LIVE_SIMULATION_SLOTS.newton23,
       },
-      { id: 'sub-2-4', code: '2.4', title: '2.4 Newton’s First Law' },
-      { id: 'sub-2-5', code: '2.5', title: '2.5 Newton’s Second Law' },
+      {
+        id: 'sub-2-4',
+        code: '2.4',
+        title: '2.4 Newton’s First Law',
+        simulation: LIVE_SIMULATION_SLOTS.newton24,
+      },
+      {
+        id: 'sub-2-5',
+        code: '2.5',
+        title: '2.5 Newton’s Second Law',
+        simulation: LIVE_SIMULATION_SLOTS.newton25,
+      },
       { id: 'sub-2-6', code: '2.6', title: '2.6 Gravitational Force' },
       { id: 'sub-2-7', code: '2.7', title: '2.7 Kinetic and Static Friction' },
       { id: 'sub-2-8', code: '2.8', title: '2.8 Spring Forces' },
@@ -644,6 +684,8 @@ export const PHYSICS_MODEL_SLOTS: PhysicsModelSlot[] = [
   LIVE_SIMULATION_SLOTS.systems21,
   LIVE_SIMULATION_SLOTS.forces22,
   LIVE_SIMULATION_SLOTS.newton23,
+  LIVE_SIMULATION_SLOTS.newton24,
+  LIVE_SIMULATION_SLOTS.newton25,
   LIVE_SIMULATION_SLOTS.field,
   LIVE_SIMULATION_SLOTS.circuit,
   LIVE_SIMULATION_SLOTS.coulomb,

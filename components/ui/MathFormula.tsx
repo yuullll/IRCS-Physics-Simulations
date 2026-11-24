@@ -372,6 +372,81 @@ export const AP_MATH_FORMULAS: Record<string, React.ReactNode> = {
     </span>
   ),
 
+  // Simulation 2.4: Newton's First Law
+  'sim-newton24': (
+    <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
+      <span>
+        <BigSum /> <Vec>F</Vec><Sub>i</Sub> <Op>=</Op> 0
+      </span>
+    </span>
+  ),
+
+  'sim-newton24-full': (
+    <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
+      <span>
+        <BigSum /> <Vec>F</Vec><Sub>i</Sub> <Op>=</Op> 0
+      </span>
+      <span className="text-slate-500 font-sans mx-1">⇒</span>
+      <span>
+        <Vec>v</Vec> <Op>=</Op> <span className="font-serif not-italic">const</span>
+      </span>
+    </span>
+  ),
+
+  // Simulation 2.5: Newton's Second Law
+  'sim-newton25': (
+    <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
+      <span>
+        <Vec>a</Vec><Sub>sys</Sub> <Op>=</Op>{' '}
+        <Frac
+          num={
+            <>
+              <BigSum /> <Vec>F</Vec>
+            </>
+          }
+          den={
+            <>
+              <Var>m</Var><Sub>sys</Sub>
+            </>
+          }
+        />
+      </span>
+    </span>
+  ),
+
+  'sim-newton25-full': (
+    <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
+      <span>
+        <Vec>a</Vec><Sub>sys</Sub> <Op>=</Op>{' '}
+        <Frac
+          num={
+            <>
+              <BigSum /> <Vec>F</Vec>
+            </>
+          }
+          den={
+            <>
+              <Var>m</Var><Sub>sys</Sub>
+            </>
+          }
+        />{' '}
+        <Op>=</Op>{' '}
+        <Frac
+          num={
+            <>
+              <Vec>F</Vec><Sub>net</Sub>
+            </>
+          }
+          den={
+            <>
+              <Var>m</Var><Sub>sys</Sub>
+            </>
+          }
+        />
+      </span>
+    </span>
+  ),
+
   // Simulation 8.2: Conservation of Electric Charge & Process of Charging
   'sim-charging82': (
     <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
@@ -567,6 +642,18 @@ function parseSimpleMathStringToJSX(text: string): React.ReactNode {
   }
   if (text.includes('F_A on B')) {
     return AP_MATH_FORMULAS['sim-newton23'];
+  }
+  if ((text.includes('∑ F_i = 0') || text.includes('ΣF_i = 0')) && text.includes('const')) {
+    return AP_MATH_FORMULAS['sim-newton24-full'];
+  }
+  if (text.includes('∑ F_i = 0') || text.includes('ΣF_i = 0')) {
+    return AP_MATH_FORMULAS['sim-newton24'];
+  }
+  if (text.includes('a_sys =') && text.includes('F_net')) {
+    return AP_MATH_FORMULAS['sim-newton25-full'];
+  }
+  if (text.includes('a_sys =') && text.includes('m_sys')) {
+    return AP_MATH_FORMULAS['sim-newton25'];
   }
 
   // If text has multiple sub-equations separated by ' · ' or ','
