@@ -28,36 +28,118 @@ import {
   Activity,
   Gauge,
 } from 'lucide-react';
-import { FieldSandbox, FieldSandboxControls } from '@/components/simulation/FieldSandbox';
-import {
-  CircuitWorkbench,
+import dynamic from 'next/dynamic';
+import type { FieldSandboxControls } from '@/components/simulation/FieldSandbox';
+import type {
   CircuitWorkbenchControls,
   CircuitWorkbenchTelemetry,
   CircuitMeterReading,
 } from '@/components/simulation/CircuitWorkbench';
-import { Oscilloscope, DataPoint } from '@/components/ui/Oscilloscope';
-import { ProjectileSandbox } from '@/components/simulation/ProjectileSandbox';
-import { CoulombForceWorkbench } from '@/components/simulation/CoulombForceWorkbench';
-import { ScalarsVectorsWorkbench } from '@/components/simulation/ScalarsVectorsWorkbench';
-import { Kinematics12Workbench } from '@/components/simulation/Kinematics12Workbench';
-import { RelativeMotion14Workbench } from '@/components/simulation/RelativeMotion14Workbench';
-import { Motion15Workbench } from '@/components/simulation/Motion15Workbench';
-import { SystemsCom21Workbench } from '@/components/simulation/SystemsCom21Workbench';
-import { ForcesFbd22Workbench } from '@/components/simulation/ForcesFbd22Workbench';
-import { NewtonThirdLaw23Workbench } from '@/components/simulation/NewtonThirdLaw23Workbench';
-import { NewtonFirstLaw24Workbench } from '@/components/simulation/NewtonFirstLaw24Workbench';
-import { NewtonSecondLaw25Workbench } from '@/components/simulation/NewtonSecondLaw25Workbench';
-import { ChargeConservation82Workbench } from '@/components/simulation/ChargeConservation82Workbench';
-import { ChargeDistributions84Workbench } from '@/components/simulation/ChargeDistributions84Workbench';
-import { ElectricFlux85Workbench } from '@/components/simulation/ElectricFlux85Workbench';
-import { ElectricGauss86Workbench } from '@/components/simulation/ElectricGauss86Workbench';
-import { CalculusTheoryModal } from '@/components/ui/CalculusTheoryModal';
+import type { DataPoint } from '@/components/ui/Oscilloscope';
+const Oscilloscope = dynamic(
+  () => import('@/components/ui/Oscilloscope').then(m => m.Oscilloscope),
+  { ssr: false }
+);
+
+const WorkbenchLoadingFallback = () => (
+  <div className="w-full h-screen flex items-center justify-center bg-[#040d0a] text-emerald-300 font-mono text-xs tracking-wide">
+    Initializing 3D Physics Workbench…
+  </div>
+);
+
+const FieldSandbox = dynamic(
+  () => import('@/components/simulation/FieldSandbox').then(m => m.FieldSandbox),
+  { ssr: false, loading: WorkbenchLoadingFallback }
+);
+const CircuitWorkbench = dynamic(
+  () => import('@/components/simulation/CircuitWorkbench').then(m => m.CircuitWorkbench),
+  { ssr: false, loading: WorkbenchLoadingFallback }
+);
+const ProjectileSandbox = dynamic(
+  () => import('@/components/simulation/ProjectileSandbox').then(m => m.ProjectileSandbox),
+  { ssr: false, loading: WorkbenchLoadingFallback }
+);
+const CoulombForceWorkbench = dynamic(
+  () => import('@/components/simulation/CoulombForceWorkbench').then(m => m.CoulombForceWorkbench),
+  { ssr: false, loading: WorkbenchLoadingFallback }
+);
+const ScalarsVectorsWorkbench = dynamic(
+  () => import('@/components/simulation/ScalarsVectorsWorkbench').then(m => m.ScalarsVectorsWorkbench),
+  { ssr: false, loading: WorkbenchLoadingFallback }
+);
+const Kinematics12Workbench = dynamic(
+  () => import('@/components/simulation/Kinematics12Workbench').then(m => m.Kinematics12Workbench),
+  { ssr: false, loading: WorkbenchLoadingFallback }
+);
+const RelativeMotion14Workbench = dynamic(
+  () => import('@/components/simulation/RelativeMotion14Workbench').then(m => m.RelativeMotion14Workbench),
+  { ssr: false, loading: WorkbenchLoadingFallback }
+);
+const Motion15Workbench = dynamic(
+  () => import('@/components/simulation/Motion15Workbench').then(m => m.Motion15Workbench),
+  { ssr: false, loading: WorkbenchLoadingFallback }
+);
+const SystemsCom21Workbench = dynamic(
+  () => import('@/components/simulation/SystemsCom21Workbench').then(m => m.SystemsCom21Workbench),
+  { ssr: false, loading: WorkbenchLoadingFallback }
+);
+const ForcesFbd22Workbench = dynamic(
+  () => import('@/components/simulation/ForcesFbd22Workbench').then(m => m.ForcesFbd22Workbench),
+  { ssr: false, loading: WorkbenchLoadingFallback }
+);
+const NewtonThirdLaw23Workbench = dynamic(
+  () => import('@/components/simulation/NewtonThirdLaw23Workbench').then(m => m.NewtonThirdLaw23Workbench),
+  { ssr: false, loading: WorkbenchLoadingFallback }
+);
+const NewtonFirstLaw24Workbench = dynamic(
+  () => import('@/components/simulation/NewtonFirstLaw24Workbench').then(m => m.NewtonFirstLaw24Workbench),
+  { ssr: false, loading: WorkbenchLoadingFallback }
+);
+const NewtonSecondLaw25Workbench = dynamic(
+  () => import('@/components/simulation/NewtonSecondLaw25Workbench').then(m => m.NewtonSecondLaw25Workbench),
+  { ssr: false, loading: WorkbenchLoadingFallback }
+);
+const ChargeConservation82Workbench = dynamic(
+  () => import('@/components/simulation/ChargeConservation82Workbench').then(m => m.ChargeConservation82Workbench),
+  { ssr: false, loading: WorkbenchLoadingFallback }
+);
+const ChargeDistributions84Workbench = dynamic(
+  () => import('@/components/simulation/ChargeDistributions84Workbench').then(m => m.ChargeDistributions84Workbench),
+  { ssr: false, loading: WorkbenchLoadingFallback }
+);
+const ElectricFlux85Workbench = dynamic(
+  () => import('@/components/simulation/ElectricFlux85Workbench').then(m => m.ElectricFlux85Workbench),
+  { ssr: false, loading: WorkbenchLoadingFallback }
+);
+const ElectricGauss86Workbench = dynamic(
+  () => import('@/components/simulation/ElectricGauss86Workbench').then(m => m.ElectricGauss86Workbench),
+  { ssr: false, loading: WorkbenchLoadingFallback }
+);
+const CalculusTheoryModal = dynamic(
+  () => import('@/components/ui/CalculusTheoryModal').then(m => m.CalculusTheoryModal),
+  { ssr: false }
+);
 import { UserRoleBar } from '@/components/auth/UserRoleBar';
-import { AuthModal } from '@/components/auth/AuthModal';
-import { StudentAccountModal } from '@/components/auth/StudentAccountModal';
-import { SavedScenesDrawer } from '@/components/lab/SavedScenesDrawer';
-import { GuidedLabModal } from '@/components/lab/GuidedLabModal';
-import { InstructorDashboardModal } from '@/components/lab/InstructorDashboardModal';
+const AuthModal = dynamic(
+  () => import('@/components/auth/AuthModal').then(m => m.AuthModal),
+  { ssr: false }
+);
+const StudentAccountModal = dynamic(
+  () => import('@/components/auth/StudentAccountModal').then(m => m.StudentAccountModal),
+  { ssr: false }
+);
+const SavedScenesDrawer = dynamic(
+  () => import('@/components/lab/SavedScenesDrawer').then(m => m.SavedScenesDrawer),
+  { ssr: false }
+);
+const GuidedLabModal = dynamic(
+  () => import('@/components/lab/GuidedLabModal').then(m => m.GuidedLabModal),
+  { ssr: false }
+);
+const InstructorDashboardModal = dynamic(
+  () => import('@/components/lab/InstructorDashboardModal').then(m => m.InstructorDashboardModal),
+  { ssr: false }
+);
 import { MathFormula } from '@/components/ui/MathFormula';
 import {
   ModelCatalogPortal,
@@ -2956,102 +3038,114 @@ export default function SimulationCockpit() {
       )}
 
       {/* Guided Lab Report Card Modal */}
-      <GuidedLabModal
-        isOpen={isGuidedLabOpen}
-        onClose={() => setIsGuidedLabOpen(false)}
-        assignment={assignment}
-        currentUser={currentUser}
-        course={activeCourse}
-        initialSubmission={currentSubmission}
-        onSaveDraft={handleSaveDraft}
-        onSubmitLab={handleSubmitLab}
-        onAddComment={(text: string) => {
-          if (currentSubmission) {
-            handleAddSubmissionComment(currentSubmission.id, text);
-          } else {
-            const draft = labStorage.saveSubmissionDraft({
-              assignmentId: assignment.id,
-              studentComments: text,
-              sceneSnapshot: captureCurrentSnapshot('Lab Draft Snapshot'),
-            });
-            if (draft) {
-              handleAddSubmissionComment(draft.id, text);
+      {isGuidedLabOpen && (
+        <GuidedLabModal
+          isOpen={isGuidedLabOpen}
+          onClose={() => setIsGuidedLabOpen(false)}
+          assignment={assignment}
+          currentUser={currentUser}
+          course={activeCourse}
+          initialSubmission={currentSubmission}
+          onSaveDraft={handleSaveDraft}
+          onSubmitLab={handleSubmitLab}
+          onAddComment={(text: string) => {
+            if (currentSubmission) {
+              handleAddSubmissionComment(currentSubmission.id, text);
+            } else {
+              const draft = labStorage.saveSubmissionDraft({
+                assignmentId: assignment.id,
+                studentComments: text,
+                sceneSnapshot: captureCurrentSnapshot('Lab Draft Snapshot'),
+              });
+              if (draft) {
+                handleAddSubmissionComment(draft.id, text);
+              }
             }
-          }
-        }}
-        getLiveSceneSnapshot={() => captureCurrentSnapshot('Lab 01 Submission Snapshot')}
-        liveSeparationDistance={liveDistance}
-        liveCoulombForce={liveForce}
-      />
+          }}
+          getLiveSceneSnapshot={() => captureCurrentSnapshot('Lab 01 Submission Snapshot')}
+          liveSeparationDistance={liveDistance}
+          liveCoulombForce={liveForce}
+        />
+      )}
 
       {/* Saved Scenes & Version History Drawer */}
-      <SavedScenesDrawer
-        isOpen={isSavedScenesOpen}
-        onClose={() => setIsSavedScenesOpen(false)}
-        savedExperiments={savedExperiments}
-        onSaveCurrentScene={handleSaveScene}
-        onLoadExperiment={handleLoadScene}
-        onDeleteExperiment={handleDeleteScene}
-        onExportCurrentScene={handleExportCurrentScene}
-        onImportSceneJSON={handleImportSceneJSON}
-        lastAutoSave={lastAutoSaveSnapshot}
-        onRestoreAutoSave={handleRestoreAutoSave}
-      />
+      {isSavedScenesOpen && (
+        <SavedScenesDrawer
+          isOpen={isSavedScenesOpen}
+          onClose={() => setIsSavedScenesOpen(false)}
+          savedExperiments={savedExperiments}
+          onSaveCurrentScene={handleSaveScene}
+          onLoadExperiment={handleLoadScene}
+          onDeleteExperiment={handleDeleteScene}
+          onExportCurrentScene={handleExportCurrentScene}
+          onImportSceneJSON={handleImportSceneJSON}
+          lastAutoSave={lastAutoSaveSnapshot}
+          onRestoreAutoSave={handleRestoreAutoSave}
+        />
+      )}
 
       {/* Instructor Class Administration, Student Roster & Grading Modal */}
-      <InstructorDashboardModal
-        isOpen={isTeacherDashboardOpen}
-        onClose={() => setIsTeacherDashboardOpen(false)}
-        submissions={teacherSubmissions}
-        students={classStudents}
-        savedExperiments={allSavedExperiments}
-        assignments={allAssignments}
-        currentUser={currentUser}
-        course={activeCourse}
-        onGradeSubmission={handleGradeSubmission}
-        onRestoreSceneSnapshot={handleRestoreStudentSnapshot}
-        onEnrollStudent={handleEnrollStudent}
-        onRemoveStudent={handleRemoveStudent}
-        onUpdateStudent={handleUpdateStudent}
-        onResetStudentSubmission={handleResetStudentSubmission}
-        onCreateAssignment={handleCreateAssignment}
-        onAddComment={handleAddSubmissionComment}
-        onExportCSV={() => {
-          labStorage.exportSubmissionsCSV();
-          showToast('Downloaded student grades and submissions as CSV spreadsheet');
-        }}
-      />
+      {isTeacherDashboardOpen && (
+        <InstructorDashboardModal
+          isOpen={isTeacherDashboardOpen}
+          onClose={() => setIsTeacherDashboardOpen(false)}
+          submissions={teacherSubmissions}
+          students={classStudents}
+          savedExperiments={allSavedExperiments}
+          assignments={allAssignments}
+          currentUser={currentUser}
+          course={activeCourse}
+          onGradeSubmission={handleGradeSubmission}
+          onRestoreSceneSnapshot={handleRestoreStudentSnapshot}
+          onEnrollStudent={handleEnrollStudent}
+          onRemoveStudent={handleRemoveStudent}
+          onUpdateStudent={handleUpdateStudent}
+          onResetStudentSubmission={handleResetStudentSubmission}
+          onCreateAssignment={handleCreateAssignment}
+          onAddComment={handleAddSubmissionComment}
+          onExportCSV={() => {
+            labStorage.exportSubmissionsCSV();
+            showToast('Downloaded student grades and submissions as CSV spreadsheet');
+          }}
+        />
+      )}
 
       {/* Student Account Choices & Privacy Modal */}
-      <StudentAccountModal
-        isOpen={isStudentAccountModalOpen}
-        onClose={() => setIsStudentAccountModalOpen(false)}
-        currentUser={currentUser}
-        course={activeCourse}
-        submission={currentSubmission}
-        onDeleteAccount={handleDeleteMyAccount}
-        onResetProgress={handleResetMyProgress}
-        onForgetOnDevice={() => handleForgetAccountOnDevice(currentUser.id, currentUser.name)}
-        onUpdateProfile={handleUpdateStudentProfile}
-      />
+      {isStudentAccountModalOpen && (
+        <StudentAccountModal
+          isOpen={isStudentAccountModalOpen}
+          onClose={() => setIsStudentAccountModalOpen(false)}
+          currentUser={currentUser}
+          course={activeCourse}
+          submission={currentSubmission}
+          onDeleteAccount={handleDeleteMyAccount}
+          onResetProgress={handleResetMyProgress}
+          onForgetOnDevice={() => handleForgetAccountOnDevice(currentUser.id, currentUser.name)}
+          onUpdateProfile={handleUpdateStudentProfile}
+        />
+      )}
 
       {/* Login & Sign-Up Auth Modal */}
-      <AuthModal
-        isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)}
-        currentUser={currentUser}
-        allUsers={allUsers}
-        onLogin={handleLogin}
-        onRegister={handleRegister}
-        onSwitchUser={handleSwitchUser}
-      />
+      {isAuthModalOpen && (
+        <AuthModal
+          isOpen={isAuthModalOpen}
+          onClose={() => setIsAuthModalOpen(false)}
+          currentUser={currentUser}
+          allUsers={allUsers}
+          onLogin={handleLogin}
+          onRegister={handleRegister}
+          onSwitchUser={handleSwitchUser}
+        />
+      )}
 
       {/* AP Physics C Theory Modal */}
-      <CalculusTheoryModal
-        isOpen={isTheoryOpen}
-        onClose={() => setIsTheoryOpen(false)}
-        course={activeCourse}
-      />
+      {isTheoryOpen && (
+        <CalculusTheoryModal
+          isOpen={isTheoryOpen}
+          onClose={() => setIsTheoryOpen(false)}
+          course={activeCourse}
+        />
+      )}
     </div>
   );
 }

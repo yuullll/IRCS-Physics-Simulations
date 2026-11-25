@@ -8,6 +8,7 @@ import {
   computeConductionEquilibrium,
   createDefaultCharging82Params,
   evaluateCharging82State,
+  type Charging82Params,
 } from './charge-conservation-8-2';
 
 describe('Topic 8.2 Conservation of Electric Charge & Process of Charging', () => {
@@ -132,9 +133,9 @@ describe('Topic 8.2 Conservation of Electric Charge & Process of Charging', () =
     assert.equal(directState.flow.toId, 'sphere');
 
     // 4-step induction with negative rod -> sphere ends permanently positive after step 4
-    let params = {
+    let params: Charging82Params = {
       ...createDefaultCharging82Params('grounding_earth'),
-      groundingMode: 'induction_ground' as const,
+      groundingMode: 'induction_ground',
       groundRodCharge: -6,
     };
     params = applyGroundedInductionStep(params, 1);

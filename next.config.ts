@@ -26,16 +26,40 @@ export default function nextConfig(phase: string): NextConfig {
       ],
     },
     output: 'standalone',
-    transpilePackages: ['motion'],
-    webpack: (config, {dev}) => {
-      // HMR is disabled in AI Studio via DISABLE_HMR env var.
-      // Do not modify—file watching is disabled to prevent flickering during agent edits.
-      if (dev && process.env.DISABLE_HMR === 'true') {
-        config.watchOptions = {
-          ignored: /.*/,
-        };
-      }
-      return config;
+    outputFileTracingExcludes: {
+      '*': [
+        '**/node_modules/typescript/**',
+        '**/node_modules/eslint/**',
+        '**/node_modules/firebase-tools/**',
+        '**/node_modules/webpack/**',
+        '**/node_modules/@swc/core-linux-x64-gnu/**',
+        '**/node_modules/@swc/core-linux-x64-musl/**',
+        '**/next/dist/compiled/babel/**',
+        '**/next/dist/compiled/next-devtools/**',
+        '**/next/dist/server/typescript/**',
+        '**/next/dist/server/next-typescript.js',
+        '**/next/dist/server/dev/next-dev-server.js',
+        '**/.aistudio/**',
+      ],
     },
+    experimental: {
+      webpackBuildWorker: true,
+      parallelServerBuildTraces: true,
+    },
+    transpilePackages: ['motion'],
+    ...(phase === PHASE_DEVELOPMENT_SERVER
+      ? {
+          webpack: (config, {dev}) => {
+            // HMR is disabled in AI Studio via DISABLE_HMR env var.
+            // Do not modify—file watching is disabled to prevent flickering during agent edits.
+            if (dev && process.env.DISABLE_HMR === 'true') {
+              config.watchOptions = {
+                ignored: /.*/,
+              };
+            }
+            return config;
+          },
+        }
+      : {}),
   };
 }

@@ -1,7 +1,7 @@
-import { SourceCharge } from '@/lib/physics/coulomb';
-import { CircuitComponentData, CircuitWireData } from '@/lib/physics/mna-solver';
-import { FieldSandboxControls } from '@/components/simulation/FieldSandbox';
-import { CircuitWorkbenchControls } from '@/components/simulation/CircuitWorkbench';
+import type { SourceCharge } from '@/lib/physics/coulomb';
+import type { CircuitComponentData, CircuitWireData } from '@/lib/physics/mna-solver';
+import type { FieldSandboxControls } from '@/components/simulation/FieldSandbox';
+import type { CircuitWorkbenchControls } from '@/components/simulation/CircuitWorkbench';
 
 export type UserRole = 'student' | 'instructor';
 
