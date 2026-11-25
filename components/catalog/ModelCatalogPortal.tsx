@@ -29,7 +29,7 @@ export interface PhysicsModelSlot {
   equation: string;
   description: string;
   status: 'live' | 'blank';
-  simulationMode?: 'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors' | 'kinematics12' | 'relative14' | 'motion15' | 'systems21' | 'forces22' | 'newton23' | 'newton24' | 'newton25' | 'charging82' | 'distributions84' | 'flux85' | 'gauss86';
+  simulationMode?: 'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors' | 'kinematics12' | 'relative14' | 'motion15' | 'systems21' | 'forces22' | 'newton23' | 'newton24' | 'newton25' | 'gravity26' | 'charging82' | 'distributions84' | 'flux85' | 'gauss86';
   accentColor: 'cyan' | 'amber' | 'emerald' | 'rose' | 'sky';
   metrics: string[];
 }
@@ -55,7 +55,7 @@ export interface PhysicsUnitModule {
 }
 
 export const LIVE_SIMULATION_SLOTS: Record<
-  'vectors' | 'kinematics12' | 'projectile' | 'relative14' | 'motion15' | 'systems21' | 'forces22' | 'newton23' | 'newton24' | 'newton25' | 'field' | 'circuit' | 'coulomb' | 'charging82' | 'distributions84' | 'flux85' | 'gauss86',
+  'vectors' | 'kinematics12' | 'projectile' | 'relative14' | 'motion15' | 'systems21' | 'forces22' | 'newton23' | 'newton24' | 'newton25' | 'gravity26' | 'field' | 'circuit' | 'coulomb' | 'charging82' | 'distributions84' | 'flux85' | 'gauss86',
   PhysicsModelSlot
 > = {
   vectors: {
@@ -207,6 +207,21 @@ export const LIVE_SIMULATION_SLOTS: Record<
     simulationMode: 'newton25',
     accentColor: 'emerald',
     metrics: ['1D Track & 2D θ_a = θ_F Proof', 'Modified Atwood & 1/m Linearize', 'System COM vs Internal Spring'],
+  },
+  gravity26: {
+    id: 'mech-gravitational-force-2-6',
+    course: 'mechanics',
+    code: '2.6',
+    title: 'Gravitational Force & Shell Theorem Lab',
+    subtitle: 'Universal Gravitation, Near-Surface g, Apparent Weight & Equivalence, Shell Theorem',
+    unit: 'Unit 2 · Force and Translational Dynamics (2.6 Gravitational Force)',
+    equation: '|F_g| = G m_1 m_2 / r² · |g| = G M / r²',
+    description:
+      'Interactive 2D/3D workbench for AP Physics C Topic 2.6: explore Newton’s Law of Universal Gravitation and gravitational field vectors g = F_g/m = GM/r² (2.6.A), test the constant-g near-surface limit and inertial vs. gravitational mass m_i = m_g (2.6.B & 2.6.D), compare apparent weight F_N = m(g + a) and Einstein’s Equivalence Principle (2.6.C), and probe uniform solid spheres vs. hollow shells via Newton’s Shell Theorem (2.6.E).',
+    status: 'live',
+    simulationMode: 'gravity26',
+    accentColor: 'emerald',
+    metrics: ['Universal Law & g(r) Field (2.6.A)', 'Apparent Wt & Equivalence (2.6.C)', 'Shell Theorem & Tunnel (2.6.E)'],
   },
   coulomb: {
     id: 'model-coulomb-force',
@@ -400,7 +415,12 @@ export const MECHANICS_UNITS: PhysicsUnitModule[] = [
         title: '2.5 Newton’s Second Law',
         simulation: LIVE_SIMULATION_SLOTS.newton25,
       },
-      { id: 'sub-2-6', code: '2.6', title: '2.6 Gravitational Force' },
+      {
+        id: 'sub-2-6',
+        code: '2.6',
+        title: '2.6 Gravitational Force',
+        simulation: LIVE_SIMULATION_SLOTS.gravity26,
+      },
       { id: 'sub-2-7', code: '2.7', title: '2.7 Kinetic and Static Friction' },
       { id: 'sub-2-8', code: '2.8', title: '2.8 Spring Forces' },
       { id: 'sub-2-9', code: '2.9', title: '2.9 Resistive Forces' },
@@ -686,6 +706,7 @@ export const PHYSICS_MODEL_SLOTS: PhysicsModelSlot[] = [
   LIVE_SIMULATION_SLOTS.newton23,
   LIVE_SIMULATION_SLOTS.newton24,
   LIVE_SIMULATION_SLOTS.newton25,
+  LIVE_SIMULATION_SLOTS.gravity26,
   LIVE_SIMULATION_SLOTS.field,
   LIVE_SIMULATION_SLOTS.circuit,
   LIVE_SIMULATION_SLOTS.coulomb,

@@ -447,6 +447,60 @@ export const AP_MATH_FORMULAS: Record<string, React.ReactNode> = {
     </span>
   ),
 
+  // Simulation 2.6: Gravitational Force & Shell Theorem
+  'sim-gravity26': (
+    <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
+      <span>
+        |<Vec>F</Vec><Sub>g</Sub>| <Op>=</Op> <Var>G</Var>
+        <Frac
+          num={
+            <>
+              <Var>m</Var><Sub>1</Sub><Var>m</Var><Sub>2</Sub>
+            </>
+          }
+          den={
+            <>
+              <Var>r</Var><Sup>2</Sup>
+            </>
+          }
+        />
+      </span>
+    </span>
+  ),
+
+  'sim-gravity26-field': (
+    <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
+      <span>
+        |<Vec>g</Vec>| <Op>=</Op>{' '}
+        <Frac
+          num={
+            <>
+              |<Vec>F</Vec><Sub>g</Sub>|
+            </>
+          }
+          den={<Var>m</Var>}
+        />{' '}
+        <Op>=</Op> <Var>G</Var>
+        <Frac
+          num={<Var>M</Var>}
+          den={
+            <>
+              <Var>r</Var><Sup>2</Sup>
+            </>
+          }
+        />
+      </span>
+    </span>
+  ),
+
+  'sim-gravity26-shell': (
+    <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
+      <span>
+        <Vec>F</Vec><Sub>g,partial</Sub> <Op>=</Op> <Op>−</Op><Var>k</Var><Vec>r</Vec><Sub>partial</Sub>
+      </span>
+    </span>
+  ),
+
   // Simulation 8.2: Conservation of Electric Charge & Process of Charging
   'sim-charging82': (
     <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
@@ -654,6 +708,15 @@ function parseSimpleMathStringToJSX(text: string): React.ReactNode {
   }
   if (text.includes('a_sys =') && text.includes('m_sys')) {
     return AP_MATH_FORMULAS['sim-newton25'];
+  }
+  if (text.includes('G m_1 m_2 / r²') || text.includes('G m₁ m₂ / r²')) {
+    return AP_MATH_FORMULAS['sim-gravity26'];
+  }
+  if (text.includes('g = G M / r²') || text.includes('|g| = G M / r²')) {
+    return AP_MATH_FORMULAS['sim-gravity26-field'];
+  }
+  if (text.includes('F_g,partial')) {
+    return AP_MATH_FORMULAS['sim-gravity26-shell'];
   }
 
   // If text has multiple sub-equations separated by ' · ' or ','
