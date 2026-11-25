@@ -501,6 +501,39 @@ export const AP_MATH_FORMULAS: Record<string, React.ReactNode> = {
     </span>
   ),
 
+  // Simulation 2.7: Kinetic and Static Friction
+  'sim-friction27': (
+    <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
+      <span>
+        |<Vec>F</Vec><Sub>f,s</Sub>| <Op>≤</Op> |<Var>μ</Var><Sub>s</Sub><Vec>F</Vec><Sub>N</Sub>|
+      </span>
+      <span className="text-slate-500 font-sans mx-1">,</span>
+      <span>
+        |<Vec>F</Vec><Sub>f,k</Sub>| <Op>=</Op> |<Var>μ</Var><Sub>k</Sub><Vec>F</Vec><Sub>N</Sub>|
+      </span>
+    </span>
+  ),
+
+  'sim-friction27-kinetic': (
+    <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
+      <span>
+        |<Vec>F</Vec><Sub>f,k</Sub>| <Op>=</Op> |<Var>μ</Var><Sub>k</Sub><Vec>F</Vec><Sub>N</Sub>|
+      </span>
+    </span>
+  ),
+
+  'sim-friction27-static': (
+    <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
+      <span>
+        |<Vec>F</Vec><Sub>f,s</Sub>| <Op>≤</Op> |<Var>μ</Var><Sub>s</Sub><Vec>F</Vec><Sub>N</Sub>|
+      </span>
+      <span className="text-slate-500 font-sans mx-1">,</span>
+      <span>
+        <Var>F</Var><Sub>f,s,max</Sub> <Op>=</Op> <Var>μ</Var><Sub>s</Sub><Var>F</Var><Sub>N</Sub>
+      </span>
+    </span>
+  ),
+
   // Simulation 8.2: Conservation of Electric Charge & Process of Charging
   'sim-charging82': (
     <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
@@ -717,6 +750,15 @@ function parseSimpleMathStringToJSX(text: string): React.ReactNode {
   }
   if (text.includes('F_g,partial')) {
     return AP_MATH_FORMULAS['sim-gravity26-shell'];
+  }
+  if (text.includes('μ_s F_N') && text.includes('μ_k F_N')) {
+    return AP_MATH_FORMULAS['sim-friction27'];
+  }
+  if (text.includes('F_f,k') || text.includes('μ_k F_N')) {
+    return AP_MATH_FORMULAS['sim-friction27-kinetic'];
+  }
+  if (text.includes('F_f,s') || text.includes('μ_s F_N')) {
+    return AP_MATH_FORMULAS['sim-friction27-static'];
   }
 
   // If text has multiple sub-equations separated by ' · ' or ','

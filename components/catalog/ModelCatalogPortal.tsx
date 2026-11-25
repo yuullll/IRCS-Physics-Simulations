@@ -29,7 +29,7 @@ export interface PhysicsModelSlot {
   equation: string;
   description: string;
   status: 'live' | 'blank';
-  simulationMode?: 'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors' | 'kinematics12' | 'relative14' | 'motion15' | 'systems21' | 'forces22' | 'newton23' | 'newton24' | 'newton25' | 'gravity26' | 'charging82' | 'distributions84' | 'flux85' | 'gauss86';
+  simulationMode?: 'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors' | 'kinematics12' | 'relative14' | 'motion15' | 'systems21' | 'forces22' | 'newton23' | 'newton24' | 'newton25' | 'gravity26' | 'friction27' | 'charging82' | 'distributions84' | 'flux85' | 'gauss86';
   accentColor: 'cyan' | 'amber' | 'emerald' | 'rose' | 'sky';
   metrics: string[];
 }
@@ -55,7 +55,7 @@ export interface PhysicsUnitModule {
 }
 
 export const LIVE_SIMULATION_SLOTS: Record<
-  'vectors' | 'kinematics12' | 'projectile' | 'relative14' | 'motion15' | 'systems21' | 'forces22' | 'newton23' | 'newton24' | 'newton25' | 'gravity26' | 'field' | 'circuit' | 'coulomb' | 'charging82' | 'distributions84' | 'flux85' | 'gauss86',
+  'vectors' | 'kinematics12' | 'projectile' | 'relative14' | 'motion15' | 'systems21' | 'forces22' | 'newton23' | 'newton24' | 'newton25' | 'gravity26' | 'friction27' | 'field' | 'circuit' | 'coulomb' | 'charging82' | 'distributions84' | 'flux85' | 'gauss86',
   PhysicsModelSlot
 > = {
   vectors: {
@@ -222,6 +222,21 @@ export const LIVE_SIMULATION_SLOTS: Record<
     simulationMode: 'gravity26',
     accentColor: 'emerald',
     metrics: ['Universal Law & g(r) Field (2.6.A)', 'Apparent Wt & Equivalence (2.6.C)', 'Shell Theorem & Tunnel (2.6.E)'],
+  },
+  friction27: {
+    id: 'mech-kinetic-static-friction-2-7',
+    course: 'mechanics',
+    code: '2.7',
+    title: 'Kinetic & Static Friction Laboratory',
+    subtitle: 'Static Breakaway, Angled Pull, Critical Incline θ_c, Stacked Sled & Area Test',
+    unit: 'Unit 2 · Force and Translational Dynamics (2.7 Kinetic and Static Friction)',
+    equation: '|F_f,s| ≤ |μ_s F_N| · |F_f,k| = |μ_k F_N|',
+    description:
+      'Interactive 2D/3D workbench for AP Physics C Topic 2.7: sweep applied pulls past static breakaway F_{f,s,max} = μ_s F_N into kinetic sliding μ_k F_N (2.7.A & 2.7.B), test angled pull normal-force changes and inclined-plane critical angle θ_c = arctan(μ_s), visualize forward static friction and Newton’s 3rd-law pairs in a two-block stack, and prove surface-area independence vs. material dependence (Skills 1.B, 2.A, 2.B, 3.A, 3.B).',
+    status: 'live',
+    simulationMode: 'friction27',
+    accentColor: 'emerald',
+    metrics: ['Static→Kinetic Breakaway (2.7.B)', 'Incline θ_c & Uphill Flip (2.7.A)', '2-Block Stack & Area Proof (1.B/3.A)'],
   },
   coulomb: {
     id: 'model-coulomb-force',
@@ -421,7 +436,12 @@ export const MECHANICS_UNITS: PhysicsUnitModule[] = [
         title: '2.6 Gravitational Force',
         simulation: LIVE_SIMULATION_SLOTS.gravity26,
       },
-      { id: 'sub-2-7', code: '2.7', title: '2.7 Kinetic and Static Friction' },
+      {
+        id: 'sub-2-7',
+        code: '2.7',
+        title: '2.7 Kinetic and Static Friction',
+        simulation: LIVE_SIMULATION_SLOTS.friction27,
+      },
       { id: 'sub-2-8', code: '2.8', title: '2.8 Spring Forces' },
       { id: 'sub-2-9', code: '2.9', title: '2.9 Resistive Forces' },
       { id: 'sub-2-10', code: '2.10', title: '2.10 Circular Motion' },
@@ -707,6 +727,7 @@ export const PHYSICS_MODEL_SLOTS: PhysicsModelSlot[] = [
   LIVE_SIMULATION_SLOTS.newton24,
   LIVE_SIMULATION_SLOTS.newton25,
   LIVE_SIMULATION_SLOTS.gravity26,
+  LIVE_SIMULATION_SLOTS.friction27,
   LIVE_SIMULATION_SLOTS.field,
   LIVE_SIMULATION_SLOTS.circuit,
   LIVE_SIMULATION_SLOTS.coulomb,
