@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, useSyncExternalStore } from 'react';
 import { UserProfile } from '@/lib/types/lab';
+import { formatAccountDisplayName } from '@/lib/services/labStorage';
 import {
   ChevronDown,
   LogIn,
@@ -87,7 +88,7 @@ export const UserRoleBar: React.FC<UserRoleBarProps> = ({
         >
           <span className="text-base leading-none">{displayUser.avatar}</span>
           <div className="flex items-center space-x-1.5 text-left">
-            <span className="font-semibold text-white tracking-tight">{displayUser.name}</span>
+            <span className="font-semibold text-white tracking-tight">{formatAccountDisplayName(displayUser)}</span>
             <span className="text-slate-500">·</span>
             <span
               className={`font-semibold uppercase text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1 ${
@@ -155,7 +156,7 @@ export const UserRoleBar: React.FC<UserRoleBarProps> = ({
             <div className="flex items-center justify-between">
               <div className="font-bold text-white text-sm flex items-center gap-2">
                 <span className="text-base">{displayUser.avatar}</span>
-                <span>{displayUser.name}</span>
+                <span>{formatAccountDisplayName(displayUser)}</span>
               </div>
               {displayUser.role === 'student' && onOpenStudentAccountModal && (
                 <button
@@ -206,7 +207,7 @@ export const UserRoleBar: React.FC<UserRoleBarProps> = ({
                   <span className="text-base">{u.avatar}</span>
                   <div className="min-w-0">
                     <div className="font-medium text-xs flex items-center space-x-1.5 truncate">
-                      <span className="truncate">{u.name}</span>
+                      <span className="truncate">{formatAccountDisplayName(u)}</span>
                       <span
                         className={`text-[9px] px-1 py-0.2 rounded font-mono shrink-0 ${
                           u.role === 'instructor'
@@ -233,10 +234,10 @@ export const UserRoleBar: React.FC<UserRoleBarProps> = ({
                       <button
                         onClick={e => {
                           e.stopPropagation();
-                          onForgetAccountOnDevice(u.id, u.name);
+                          onForgetAccountOnDevice(u.id, formatAccountDisplayName(u));
                         }}
                         className="opacity-60 group-hover:opacity-100 p-1 rounded-lg hover:bg-rose-500/20 text-slate-400 hover:text-rose-300 transition"
-                        title={`Remove ${u.name}'s login access from this laptop (keeps account safe, just hides from this screen)`}
+                        title={`Remove ${formatAccountDisplayName(u)}'s login access from this laptop (keeps account safe, just hides from this screen)`}
                       >
                         <EyeOff className="w-3.5 h-3.5" />
                       </button>

@@ -8,6 +8,7 @@ import {
   SavedExperiment,
   LabAssignment,
 } from '@/lib/types/lab';
+import { formatAccountDisplayName } from '@/lib/services/labStorage';
 import {
   GraduationCap,
   X,
@@ -167,7 +168,7 @@ export const InstructorDashboardModal: React.FC<InstructorDashboardModalProps> =
             </p>
           </div>
           <div className="p-3 bg-white/[0.03] border border-white/10 rounded-2xl text-[11px] text-slate-400">
-            Currently logged in as student: <span className="text-white font-semibold">{currentUser.name}</span> ({currentUser.email})
+            Currently logged in as student: <span className="text-white font-semibold">{formatAccountDisplayName(currentUser)}</span> ({currentUser.email})
           </div>
           <button
             onClick={onClose}
@@ -579,7 +580,7 @@ export const InstructorDashboardModal: React.FC<InstructorDashboardModalProps> =
                             ) : (
                               <div>
                                 <div className="font-semibold text-white flex items-center space-x-1.5">
-                                  <span>{stu.name}</span>
+                                  <span>{formatAccountDisplayName(stu)}</span>
                                   {stu.role === 'instructor' && (
                                     <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 font-normal">
                                       Instructor

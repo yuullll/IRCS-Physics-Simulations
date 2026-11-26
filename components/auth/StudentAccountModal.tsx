@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { UserProfile, LabSubmission } from '@/lib/types/lab';
+import { formatAccountDisplayName } from '@/lib/services/labStorage';
 import {
   User,
   Shield,
@@ -172,7 +173,7 @@ export const StudentAccountModal: React.FC<StudentAccountModalProps> = ({
                 <div>
                   <div className="text-base font-bold text-white flex items-center gap-2">
                     <span>{currentUser.avatar}</span>
-                    <span>{currentUser.name}</span>
+                    <span>{formatAccountDisplayName(currentUser)}</span>
                   </div>
                   <div className="text-xs text-slate-400 font-mono mt-0.5">{currentUser.email}</div>
                 </div>
@@ -192,7 +193,7 @@ export const StudentAccountModal: React.FC<StudentAccountModalProps> = ({
               </div>
               <div>
                 <span className="text-slate-500 text-[11px]">Course Instructor:</span>
-                <div className="text-slate-200 font-medium">Dr. Robert Vance</div>
+                <div className="text-slate-200 font-medium">Dr. Robert Vance (Demo)</div>
               </div>
             </div>
           </div>
@@ -306,7 +307,7 @@ export const StudentAccountModal: React.FC<StudentAccountModalProps> = ({
                   ⚠️ Warning: Are you sure you want to permanently delete your account?
                 </div>
                 <p className="text-[11px] text-slate-300">
-                  This will immediately remove <span className="text-white font-bold">{currentUser.name}</span> ({currentUser.email}), all 3D scene snapshots, and lab grades. To confirm, click the button below.
+                  This will immediately remove <span className="text-white font-bold">{formatAccountDisplayName(currentUser)}</span> ({currentUser.email}), all 3D scene snapshots, and lab grades. To confirm, click the button below.
                 </p>
                 <div className="flex items-center justify-end space-x-2 pt-1">
                   <button

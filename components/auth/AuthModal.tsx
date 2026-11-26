@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { UserProfile, UserRole } from '@/lib/types/lab';
+import { formatAccountDisplayName } from '@/lib/services/labStorage';
 import {
   X,
   Lock,
@@ -228,7 +229,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 >
                   <div className="flex items-center space-x-1.5">
                     <span>🧑‍🎓</span>
-                    <span className="font-semibold text-white">Alex Chen</span>
+                    <span className="font-semibold text-white">Alex Chen (Demo)</span>
                   </div>
                   <div className="text-[10px] text-cyan-400 font-mono mt-0.5">Student Account</div>
                 </button>
@@ -242,7 +243,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 >
                   <div className="flex items-center space-x-1.5">
                     <span>👨‍🏫</span>
-                    <span className="font-semibold text-white">Dr. Vance</span>
+                    <span className="font-semibold text-white">Dr. Vance (Demo)</span>
                   </div>
                   <div className="text-[10px] text-amber-400 font-mono mt-0.5">Instructor Account</div>
                 </button>
@@ -382,7 +383,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         {activeTab === 'switch' && (
           <div className="p-6 space-y-3 text-xs max-h-96 overflow-y-auto">
             <div className="text-[11px] text-slate-400 mb-1">
-              Currently signed in as: <strong className="text-white">{currentUser.name}</strong> (
+              Currently signed in as: <strong className="text-white">{formatAccountDisplayName(currentUser)}</strong> (
               <span className={currentUser.role === 'instructor' ? 'text-amber-400 font-bold' : 'text-cyan-400 font-bold'}>
                 {currentUser.role.toUpperCase()}
               </span>
@@ -407,7 +408,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     <span className="text-xl">{u.avatar}</span>
                     <div>
                       <div className="font-semibold text-white flex items-center gap-1.5">
-                        <span>{u.name}</span>
+                        <span>{formatAccountDisplayName(u)}</span>
                         <span
                           className={`text-[9px] font-mono px-1.5 py-0.2 rounded ${
                             u.role === 'instructor'

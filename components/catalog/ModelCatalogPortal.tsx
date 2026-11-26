@@ -15,6 +15,7 @@ import {
   Layers,
 } from 'lucide-react';
 import { UserProfile } from '@/lib/types/lab';
+import { formatAccountDisplayName } from '@/lib/services/labStorage';
 import { MathFormula } from '@/components/ui/MathFormula';
 
 export type PhysicsCourseId = 'mechanics' | 'em';
@@ -29,7 +30,7 @@ export interface PhysicsModelSlot {
   equation: string;
   description: string;
   status: 'live' | 'blank';
-  simulationMode?: 'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors' | 'kinematics12' | 'relative14' | 'motion15' | 'systems21' | 'forces22' | 'newton23' | 'newton24' | 'newton25' | 'gravity26' | 'friction27' | 'springs28' | 'charging82' | 'distributions84' | 'flux85' | 'gauss86';
+  simulationMode?: 'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors' | 'kinematics12' | 'relative14' | 'motion15' | 'systems21' | 'forces22' | 'newton23' | 'newton24' | 'newton25' | 'gravity26' | 'friction27' | 'springs28' | 'resistive29' | 'charging82' | 'distributions84' | 'flux85' | 'gauss86';
   accentColor: 'cyan' | 'amber' | 'emerald' | 'rose' | 'sky';
   metrics: string[];
 }
@@ -55,7 +56,7 @@ export interface PhysicsUnitModule {
 }
 
 export const LIVE_SIMULATION_SLOTS: Record<
-  'vectors' | 'kinematics12' | 'projectile' | 'relative14' | 'motion15' | 'systems21' | 'forces22' | 'newton23' | 'newton24' | 'newton25' | 'gravity26' | 'friction27' | 'springs28' | 'field' | 'circuit' | 'coulomb' | 'charging82' | 'distributions84' | 'flux85' | 'gauss86',
+  'vectors' | 'kinematics12' | 'projectile' | 'relative14' | 'motion15' | 'systems21' | 'forces22' | 'newton23' | 'newton24' | 'newton25' | 'gravity26' | 'friction27' | 'springs28' | 'resistive29' | 'field' | 'circuit' | 'coulomb' | 'charging82' | 'distributions84' | 'flux85' | 'gauss86',
   PhysicsModelSlot
 > = {
   vectors: {
@@ -252,6 +253,21 @@ export const LIVE_SIMULATION_SLOTS: Record<
     simulationMode: 'springs28',
     accentColor: 'emerald',
     metrics: ['Ideal vs Nonideal F_s=-kΔx (2.8.A)', 'Vertical Eq & Restoring (2.8.A.3)', 'Series & Parallel k_eq (2.8.B)'],
+  },
+  resistive29: {
+    id: 'mech-resistive-forces-2-9',
+    course: 'mechanics',
+    code: '2.9',
+    title: 'Resistive Forces, ODE Calculus & Terminal Velocity',
+    subtitle: 'Linear Drag F_r = −kv, Separation of Variables, Asymptotes & Dual-Lane 2.C Race',
+    unit: 'Unit 2 · Force and Translational Dynamics (2.9 Resistive Forces)',
+    equation: 'F_r = -k v · v_T = mg / k',
+    description:
+      'Interactive 2D/3D workbench for AP Physics C Topic 2.9: solve m dv/dt = F_drive − kv via separation of variables (2.9.A.1–2.i), inspect exponential v(t), a(t), and s(t) curves with time-constant τ = m/k markers and asymptotes including finite horizontal stopping distance x_max = mv₀/k (2.9.A.2.ii–iii), verify terminal velocity v_T when F_net = 0 for drops, fast launches (v₀ > v_T), and constant thrust (2.9.A.3), and race two objects side-by-side (Skills 1.B, 2.A, 2.C, 3.A, 3.C).',
+    status: 'live',
+    simulationMode: 'resistive29',
+    accentColor: 'emerald',
+    metrics: ['ODE & Exp. Asymptotes (2.9.A.2)', 'Terminal Speed v_T & x_max (2.9.A.3)', 'Dual Race & Lab Design (1.B–3.C)'],
   },
   coulomb: {
     id: 'model-coulomb-force',
@@ -463,7 +479,12 @@ export const MECHANICS_UNITS: PhysicsUnitModule[] = [
         title: '2.8 Spring Forces',
         simulation: LIVE_SIMULATION_SLOTS.springs28,
       },
-      { id: 'sub-2-9', code: '2.9', title: '2.9 Resistive Forces' },
+      {
+        id: 'sub-2-9',
+        code: '2.9',
+        title: '2.9 Resistive Forces',
+        simulation: LIVE_SIMULATION_SLOTS.resistive29,
+      },
       { id: 'sub-2-10', code: '2.10', title: '2.10 Circular Motion' },
     ],
   },
@@ -749,6 +770,7 @@ export const PHYSICS_MODEL_SLOTS: PhysicsModelSlot[] = [
   LIVE_SIMULATION_SLOTS.gravity26,
   LIVE_SIMULATION_SLOTS.friction27,
   LIVE_SIMULATION_SLOTS.springs28,
+  LIVE_SIMULATION_SLOTS.resistive29,
   LIVE_SIMULATION_SLOTS.field,
   LIVE_SIMULATION_SLOTS.circuit,
   LIVE_SIMULATION_SLOTS.coulomb,
@@ -2144,8 +2166,8 @@ export const ModelCatalogPortal: React.FC<ModelCatalogPortalProps> = ({
                     My Course &amp; Account Choices
                   </h3>
                   <p className="text-xs text-slate-300/85 leading-relaxed">
-                    Enrolled as student {currentUser.name} in {currentUser.className}. Instructor:
-                    Dr. Robert Vance. Manage your account choices, reset progress, or manage device
+                    Enrolled as student {formatAccountDisplayName(currentUser)} in {currentUser.className}. Instructor:
+                    Dr. Robert Vance (Demo). Manage your account choices, reset progress, or manage device
                     logins.
                   </p>
                 </div>

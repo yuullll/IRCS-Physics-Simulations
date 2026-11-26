@@ -9,6 +9,22 @@ import {
   LabDataRow,
 } from '@/lib/types/lab';
 
+export const PRESET_USER_IDS = new Set<string>([
+  'user_teacher_1',
+  'user_student_1',
+  'user_student_2',
+  'user_student_3',
+]);
+
+export function isPresetUser(userId: string): boolean {
+  return PRESET_USER_IDS.has(userId);
+}
+
+export function formatAccountDisplayName(user: { id: string; name: string }): string {
+  if (!PRESET_USER_IDS.has(user.id)) return user.name;
+  return user.name.endsWith('(Demo)') ? user.name : `${user.name} (Demo)`;
+}
+
 export const MOCK_USERS: UserProfile[] = [
   {
     id: 'user_teacher_1',

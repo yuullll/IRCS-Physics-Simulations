@@ -572,6 +572,47 @@ export const AP_MATH_FORMULAS: Record<string, React.ReactNode> = {
     </span>
   ),
 
+  // Simulation 2.9: Resistive Forces
+  'sim-resistive29': (
+    <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
+      <span>
+        <Vec>F</Vec><Sub>r</Sub> <Op>=</Op> <Op>−</Op><Var>k</Var><Vec>v</Vec>
+      </span>
+      <span className="text-slate-500 font-sans mx-1">,</span>
+      <span>
+        <Var>v</Var><Sub>T</Sub> <Op>=</Op> <Frac num={<><Var>m</Var><Var>g</Var></>} den={<Var>k</Var>} />
+      </span>
+    </span>
+  ),
+
+  'sim-resistive29-ode': (
+    <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
+      <span>
+        <Var>m</Var><Frac num={<><Var>d</Var><Var>v</Var></>} den={<><Var>d</Var><Var>t</Var></>} /> <Op>=</Op> <Var>m</Var><Var>g</Var> <Op>−</Op> <Var>k</Var><Var>v</Var>
+      </span>
+    </span>
+  ),
+
+  'sim-resistive29-exp': (
+    <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
+      <span>
+        <Var>v</Var>(<Var>t</Var>) <Op>=</Op> <Var>v</Var><Sub>T</Sub> <Op>+</Op> (<Var>v</Var><Sub>0</Sub> <Op>−</Op> <Var>v</Var><Sub>T</Sub>)<Var>e</Var><Sup>−kt/m</Sup>
+      </span>
+    </span>
+  ),
+
+  'sim-resistive29-vt': (
+    <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
+      <span>
+        <Var>v</Var><Sub>T</Sub> <Op>=</Op> <Frac num={<><Var>F</Var><Sub>drive</Sub></>} den={<Var>k</Var>} />
+      </span>
+      <span className="text-slate-500 font-sans mx-1">,</span>
+      <span>
+        <Var>τ</Var> <Op>=</Op> <Frac num={<Var>m</Var>} den={<Var>k</Var>} />
+      </span>
+    </span>
+  ),
+
   // Simulation 8.2: Conservation of Electric Charge & Process of Charging
   'sim-charging82': (
     <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
@@ -809,6 +850,12 @@ function parseSimpleMathStringToJSX(text: string): React.ReactNode {
   }
   if (text.includes('k_eq,par')) {
     return AP_MATH_FORMULAS['sim-springs28-parallel'];
+  }
+  if (text.includes('F_r = -k v') || text.includes('F_r = -kv')) {
+    return AP_MATH_FORMULAS['sim-resistive29'];
+  }
+  if (text.includes('m dv/dt = mg - kv')) {
+    return AP_MATH_FORMULAS['sim-resistive29-ode'];
   }
 
   // If text has multiple sub-equations separated by ' · ' or ','
