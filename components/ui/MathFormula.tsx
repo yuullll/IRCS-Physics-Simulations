@@ -613,6 +613,51 @@ export const AP_MATH_FORMULAS: Record<string, React.ReactNode> = {
     </span>
   ),
 
+  // Simulation 2.10: Circular Motion & Kepler's Third Law
+  'sim-circular210': (
+    <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
+      <span>
+        <Var>a</Var><Sub>c</Sub> <Op>=</Op> <Frac num={<><Var>v</Var><Sup>2</Sup></>} den={<Var>r</Var>} />
+      </span>
+      <span className="text-slate-500 font-sans mx-1">,</span>
+      <span>
+        <Var>T</Var><Sup>2</Sup> <Op>=</Op> <Frac num={<>4<Var>π</Var><Sup>2</Sup></>} den={<><Var>G</Var><Var>M</Var></>} /><Var>R</Var><Sup>3</Sup>
+      </span>
+    </span>
+  ),
+
+  'sim-circular210-ac': (
+    <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
+      <span>
+        <Var>a</Var><Sub>c</Sub> <Op>=</Op> <Frac num={<><Var>v</Var><Sup>2</Sup></>} den={<Var>r</Var>} />
+      </span>
+    </span>
+  ),
+
+  'sim-circular210-vmin': (
+    <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
+      <span>
+        <Var>v</Var><Sub>min</Sub> <Op>=</Op> <span className="inline-flex items-center"><span className="font-sans mr-[1px]">√</span><span className="border-t border-current px-0.5 leading-tight"><Var>g</Var><Var>r</Var></span></span>
+      </span>
+    </span>
+  ),
+
+  'sim-circular210-period': (
+    <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
+      <span>
+        <Var>T</Var> <Op>=</Op> <Frac num="1" den={<Var>f</Var>} /> <Op>=</Op> <Frac num={<>2<Var>π</Var><Var>r</Var></>} den={<Var>v</Var>} />
+      </span>
+    </span>
+  ),
+
+  'sim-circular210-kepler': (
+    <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
+      <span>
+        <Var>T</Var><Sup>2</Sup> <Op>=</Op> <Frac num={<>4<Var>π</Var><Sup>2</Sup></>} den={<><Var>G</Var><Var>M</Var></>} /><Var>R</Var><Sup>3</Sup>
+      </span>
+    </span>
+  ),
+
   // Simulation 8.2: Conservation of Electric Charge & Process of Charging
   'sim-charging82': (
     <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
@@ -856,6 +901,15 @@ function parseSimpleMathStringToJSX(text: string): React.ReactNode {
   }
   if (text.includes('m dv/dt = mg - kv')) {
     return AP_MATH_FORMULAS['sim-resistive29-ode'];
+  }
+  if (text.includes('a_c = v²/r') && text.includes('T² =')) {
+    return AP_MATH_FORMULAS['sim-circular210'];
+  }
+  if (text.includes('4π² / GM') || text.includes('4π²/(GM)')) {
+    return AP_MATH_FORMULAS['sim-circular210-kepler'];
+  }
+  if (text.includes('a_c = v²/r') || text.includes('a_c = v² / r')) {
+    return AP_MATH_FORMULAS['sim-circular210-ac'];
   }
 
   // If text has multiple sub-equations separated by ' · ' or ','

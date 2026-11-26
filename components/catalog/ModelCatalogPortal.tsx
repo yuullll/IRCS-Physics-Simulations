@@ -30,7 +30,7 @@ export interface PhysicsModelSlot {
   equation: string;
   description: string;
   status: 'live' | 'blank';
-  simulationMode?: 'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors' | 'kinematics12' | 'relative14' | 'motion15' | 'systems21' | 'forces22' | 'newton23' | 'newton24' | 'newton25' | 'gravity26' | 'friction27' | 'springs28' | 'resistive29' | 'charging82' | 'distributions84' | 'flux85' | 'gauss86';
+  simulationMode?: 'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors' | 'kinematics12' | 'relative14' | 'motion15' | 'systems21' | 'forces22' | 'newton23' | 'newton24' | 'newton25' | 'gravity26' | 'friction27' | 'springs28' | 'resistive29' | 'circular210' | 'charging82' | 'distributions84' | 'flux85' | 'gauss86';
   accentColor: 'cyan' | 'amber' | 'emerald' | 'rose' | 'sky';
   metrics: string[];
 }
@@ -56,7 +56,7 @@ export interface PhysicsUnitModule {
 }
 
 export const LIVE_SIMULATION_SLOTS: Record<
-  'vectors' | 'kinematics12' | 'projectile' | 'relative14' | 'motion15' | 'systems21' | 'forces22' | 'newton23' | 'newton24' | 'newton25' | 'gravity26' | 'friction27' | 'springs28' | 'resistive29' | 'field' | 'circuit' | 'coulomb' | 'charging82' | 'distributions84' | 'flux85' | 'gauss86',
+  'vectors' | 'kinematics12' | 'projectile' | 'relative14' | 'motion15' | 'systems21' | 'forces22' | 'newton23' | 'newton24' | 'newton25' | 'gravity26' | 'friction27' | 'springs28' | 'resistive29' | 'circular210' | 'field' | 'circuit' | 'coulomb' | 'charging82' | 'distributions84' | 'flux85' | 'gauss86',
   PhysicsModelSlot
 > = {
   vectors: {
@@ -268,6 +268,21 @@ export const LIVE_SIMULATION_SLOTS: Record<
     simulationMode: 'resistive29',
     accentColor: 'emerald',
     metrics: ['ODE & Exp. Asymptotes (2.9.A.2)', 'Terminal Speed v_T & x_max (2.9.A.3)', 'Dual Race & Lab Design (1.B–3.C)'],
+  },
+  circular210: {
+    id: 'mech-circular-motion-2-10',
+    course: 'mechanics',
+    code: '2.10',
+    title: 'Circular Motion, Banked Turns & Kepler Orbits',
+    subtitle: 'Vertical Loop v_min=√(gr), Banked Friction, Conical Pendulum & Kepler’s 3rd Law',
+    unit: 'Unit 2 · Force and Translational Dynamics (2.10 Circular Motion)',
+    equation: 'a_c = v²/r · T² = (4π²/GM) R³',
+    description:
+      'Interactive 2D/3D workbench for AP Physics C Topic 2.10: investigate centripetal acceleration a_c = v²/r, tangential acceleration a_t, and vector sum a_net = a_c + a_t on a vertical loop with critical top speed v = √(gr) (2.10.A.1–5), analyze normal and static friction components on banked curves (2.10.A.2.ii), explore conical pendulum tension components (2.10.A.2.iii), and verify Kepler’s third law T² = (4π²/GM)R³ for circular orbits (LO 2.10.B; Skills 1.A, 2.A, 2.D, 3.C).',
+    status: 'live',
+    simulationMode: 'circular210',
+    accentColor: 'emerald',
+    metrics: ['Vertical Loop & a_net (2.10.A)', 'Banked & Conical FBD (2.10.A.2)', 'Kepler’s 3rd Law Orbits (2.10.B)'],
   },
   coulomb: {
     id: 'model-coulomb-force',
@@ -485,7 +500,12 @@ export const MECHANICS_UNITS: PhysicsUnitModule[] = [
         title: '2.9 Resistive Forces',
         simulation: LIVE_SIMULATION_SLOTS.resistive29,
       },
-      { id: 'sub-2-10', code: '2.10', title: '2.10 Circular Motion' },
+      {
+        id: 'sub-2-10',
+        code: '2.10',
+        title: '2.10 Circular Motion',
+        simulation: LIVE_SIMULATION_SLOTS.circular210,
+      },
     ],
   },
   {
@@ -771,6 +791,7 @@ export const PHYSICS_MODEL_SLOTS: PhysicsModelSlot[] = [
   LIVE_SIMULATION_SLOTS.friction27,
   LIVE_SIMULATION_SLOTS.springs28,
   LIVE_SIMULATION_SLOTS.resistive29,
+  LIVE_SIMULATION_SLOTS.circular210,
   LIVE_SIMULATION_SLOTS.field,
   LIVE_SIMULATION_SLOTS.circuit,
   LIVE_SIMULATION_SLOTS.coulomb,
