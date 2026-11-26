@@ -29,7 +29,7 @@ export interface PhysicsModelSlot {
   equation: string;
   description: string;
   status: 'live' | 'blank';
-  simulationMode?: 'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors' | 'kinematics12' | 'relative14' | 'motion15' | 'systems21' | 'forces22' | 'newton23' | 'newton24' | 'newton25' | 'gravity26' | 'friction27' | 'charging82' | 'distributions84' | 'flux85' | 'gauss86';
+  simulationMode?: 'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors' | 'kinematics12' | 'relative14' | 'motion15' | 'systems21' | 'forces22' | 'newton23' | 'newton24' | 'newton25' | 'gravity26' | 'friction27' | 'springs28' | 'charging82' | 'distributions84' | 'flux85' | 'gauss86';
   accentColor: 'cyan' | 'amber' | 'emerald' | 'rose' | 'sky';
   metrics: string[];
 }
@@ -55,7 +55,7 @@ export interface PhysicsUnitModule {
 }
 
 export const LIVE_SIMULATION_SLOTS: Record<
-  'vectors' | 'kinematics12' | 'projectile' | 'relative14' | 'motion15' | 'systems21' | 'forces22' | 'newton23' | 'newton24' | 'newton25' | 'gravity26' | 'friction27' | 'field' | 'circuit' | 'coulomb' | 'charging82' | 'distributions84' | 'flux85' | 'gauss86',
+  'vectors' | 'kinematics12' | 'projectile' | 'relative14' | 'motion15' | 'systems21' | 'forces22' | 'newton23' | 'newton24' | 'newton25' | 'gravity26' | 'friction27' | 'springs28' | 'field' | 'circuit' | 'coulomb' | 'charging82' | 'distributions84' | 'flux85' | 'gauss86',
   PhysicsModelSlot
 > = {
   vectors: {
@@ -237,6 +237,21 @@ export const LIVE_SIMULATION_SLOTS: Record<
     simulationMode: 'friction27',
     accentColor: 'emerald',
     metrics: ['Static→Kinetic Breakaway (2.7.B)', 'Incline θ_c & Uphill Flip (2.7.A)', '2-Block Stack & Area Proof (1.B/3.A)'],
+  },
+  springs28: {
+    id: 'mech-spring-forces-2-8',
+    course: 'mechanics',
+    code: '2.8',
+    title: 'Spring Forces & Equivalent k_eq Lab',
+    subtitle: 'Ideal vs. Nonideal Hooke’s Law, Vertical Equilibrium, Pure Series & Pure Parallel',
+    unit: 'Unit 2 · Force and Translational Dynamics (2.8 Spring Forces)',
+    equation: 'F_s = -k Δx · k_eq,par = Σk_i',
+    description:
+      'Interactive 2D/3D workbench for AP Physics C Topic 2.8: compare ideal Hookean springs F_s = -kΔx against nonideal nonlinear or massive springs (2.8.A.1–3), visualize vertical equilibrium shifts y_eq = -mg/k and restoring net force toward equilibrium, and test pure series (1/k_eq = Σ1/k_i < min k) and pure parallel (k_eq = Σk_i) combinations side-by-side against a single equivalent spring (2.8.B.1.i–iii; Skills 1.A, 2.B, 2.D, 3.C).',
+    status: 'live',
+    simulationMode: 'springs28',
+    accentColor: 'emerald',
+    metrics: ['Ideal vs Nonideal F_s=-kΔx (2.8.A)', 'Vertical Eq & Restoring (2.8.A.3)', 'Series & Parallel k_eq (2.8.B)'],
   },
   coulomb: {
     id: 'model-coulomb-force',
@@ -442,7 +457,12 @@ export const MECHANICS_UNITS: PhysicsUnitModule[] = [
         title: '2.7 Kinetic and Static Friction',
         simulation: LIVE_SIMULATION_SLOTS.friction27,
       },
-      { id: 'sub-2-8', code: '2.8', title: '2.8 Spring Forces' },
+      {
+        id: 'sub-2-8',
+        code: '2.8',
+        title: '2.8 Spring Forces',
+        simulation: LIVE_SIMULATION_SLOTS.springs28,
+      },
       { id: 'sub-2-9', code: '2.9', title: '2.9 Resistive Forces' },
       { id: 'sub-2-10', code: '2.10', title: '2.10 Circular Motion' },
     ],
@@ -728,6 +748,7 @@ export const PHYSICS_MODEL_SLOTS: PhysicsModelSlot[] = [
   LIVE_SIMULATION_SLOTS.newton25,
   LIVE_SIMULATION_SLOTS.gravity26,
   LIVE_SIMULATION_SLOTS.friction27,
+  LIVE_SIMULATION_SLOTS.springs28,
   LIVE_SIMULATION_SLOTS.field,
   LIVE_SIMULATION_SLOTS.circuit,
   LIVE_SIMULATION_SLOTS.coulomb,

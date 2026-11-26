@@ -107,6 +107,10 @@ const Friction27Workbench = dynamic(
   () => import('@/components/simulation/Friction27Workbench').then(m => m.Friction27Workbench),
   { ssr: false, loading: WorkbenchLoadingFallback }
 );
+const Springs28Workbench = dynamic(
+  () => import('@/components/simulation/Springs28Workbench').then(m => m.Springs28Workbench),
+  { ssr: false, loading: WorkbenchLoadingFallback }
+);
 const ChargeConservation82Workbench = dynamic(
   () => import('@/components/simulation/ChargeConservation82Workbench').then(m => m.ChargeConservation82Workbench),
   { ssr: false, loading: WorkbenchLoadingFallback }
@@ -172,7 +176,7 @@ type LayerRoute =
   | { layer: 'unit'; unit: PhysicsUnitModule }
     | {
       layer: 'workspace';
-      mode: 'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors' | 'kinematics12' | 'relative14' | 'motion15' | 'systems21' | 'forces22' | 'newton23' | 'newton24' | 'newton25' | 'gravity26' | 'friction27' | 'charging82' | 'distributions84' | 'flux85' | 'gauss86';
+      mode: 'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors' | 'kinematics12' | 'relative14' | 'motion15' | 'systems21' | 'forces22' | 'newton23' | 'newton24' | 'newton25' | 'gravity26' | 'friction27' | 'springs28' | 'charging82' | 'distributions84' | 'flux85' | 'gauss86';
       modelTitle: string;
       unit?: PhysicsUnitModule;
     }
@@ -189,7 +193,7 @@ export default function SimulationCockpit() {
   ]);
   const [navIndex, setNavIndex] = useState<number>(0);
   // Active simulation mode when in workspace layer
-  const [activeMode, setActiveMode] = useState<'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors' | 'kinematics12' | 'relative14' | 'motion15' | 'systems21' | 'forces22' | 'newton23' | 'newton24' | 'newton25' | 'gravity26' | 'friction27' | 'charging82' | 'distributions84' | 'flux85' | 'gauss86'>('projectile');
+  const [activeMode, setActiveMode] = useState<'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors' | 'kinematics12' | 'relative14' | 'motion15' | 'systems21' | 'forces22' | 'newton23' | 'newton24' | 'newton25' | 'gravity26' | 'friction27' | 'springs28' | 'charging82' | 'distributions84' | 'flux85' | 'gauss86'>('projectile');
   const [projectileViewMode, setProjectileViewMode] = useState<'3d' | '2d'>('3d');
   const [vectorsViewMode, setVectorsViewMode] = useState<'3d' | '2d'>('3d');
   const [kinematics12ViewMode, setKinematics12ViewMode] = useState<'3d' | '2d'>('3d');
@@ -202,6 +206,7 @@ export default function SimulationCockpit() {
   const [newton25ViewMode, setNewton25ViewMode] = useState<'3d' | '2d'>('3d');
   const [gravity26ViewMode, setGravity26ViewMode] = useState<'3d' | '2d'>('3d');
   const [friction27ViewMode, setFriction27ViewMode] = useState<'3d' | '2d'>('3d');
+  const [springs28ViewMode, setSprings28ViewMode] = useState<'3d' | '2d'>('3d');
   const [charging82ViewMode, setCharging82ViewMode] = useState<'3d' | '2d'>('3d');
   const [distributions84ViewMode, setDistributions84ViewMode] = useState<'3d' | '2d'>('3d');
   const [flux85ViewMode, setFlux85ViewMode] = useState<'3d' | '2d'>('3d');
@@ -240,7 +245,9 @@ export default function SimulationCockpit() {
           currentRoute.mode === 'gravity26' ||
           activeMode === 'gravity26' ||
           currentRoute.mode === 'friction27' ||
-          activeMode === 'friction27')
+          activeMode === 'friction27' ||
+          currentRoute.mode === 'springs28' ||
+          activeMode === 'springs28')
       ? 'mechanics'
       : currentRoute.layer === 'workspace' &&
         (currentRoute.mode === 'coulomb' ||
@@ -276,7 +283,8 @@ export default function SimulationCockpit() {
         activeMode === 'newton24' ||
         activeMode === 'newton25' ||
         activeMode === 'gravity26' ||
-        activeMode === 'friction27'));
+        activeMode === 'friction27' ||
+        activeMode === 'springs28'));
 
   // Header visibility on catalog scroll (disappears on scroll down, reappears on scroll up)
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
@@ -588,6 +596,14 @@ export default function SimulationCockpit() {
           timestamp: now,
           title,
           mode: 'friction27',
+        };
+      } else if (activeMode === 'springs28') {
+        return {
+          id,
+          version: '1.0',
+          timestamp: now,
+          title,
+          mode: 'springs28',
         };
       } else if (activeMode === 'projectile') {
         return {
@@ -1155,6 +1171,8 @@ export default function SimulationCockpit() {
                     ? '2.6 Gravitational Force'
                     : activeMode === 'friction27'
                     ? '2.7 Kinetic and Static Friction'
+                    : activeMode === 'springs28'
+                    ? '2.8 Spring Forces'
                     : '1.3 Projectile & Drag Ballistics'}
                 </span>
               </>
@@ -1222,6 +1240,8 @@ export default function SimulationCockpit() {
                     ? gravity26ViewMode === '3d'
                     : activeMode === 'friction27'
                     ? friction27ViewMode === '3d'
+                    : activeMode === 'springs28'
+                    ? springs28ViewMode === '3d'
                     : activeMode === 'charging82'
                     ? charging82ViewMode === '3d'
                     : activeMode === 'distributions84'
@@ -1265,6 +1285,8 @@ export default function SimulationCockpit() {
                           setGravity26ViewMode('3d');
                         else if (activeMode === 'friction27')
                           setFriction27ViewMode('3d');
+                        else if (activeMode === 'springs28')
+                          setSprings28ViewMode('3d');
                         else if (activeMode === 'charging82')
                           setCharging82ViewMode('3d');
                         else if (activeMode === 'distributions84')
@@ -1323,6 +1345,8 @@ export default function SimulationCockpit() {
                           setGravity26ViewMode('2d');
                         else if (activeMode === 'friction27')
                           setFriction27ViewMode('2d');
+                        else if (activeMode === 'springs28')
+                          setSprings28ViewMode('2d');
                         else if (activeMode === 'charging82')
                           setCharging82ViewMode('2d');
                         else if (activeMode === 'distributions84')
@@ -1445,7 +1469,8 @@ export default function SimulationCockpit() {
       {toastMessage && (
         <div
           className={`fixed ${
-            currentRoute.layer === 'workspace' && currentRoute.mode === 'friction27'
+            currentRoute.layer === 'workspace' &&
+            (currentRoute.mode === 'friction27' || currentRoute.mode === 'springs28')
               ? 'bottom-20'
               : 'bottom-6'
           } left-1/2 -translate-x-1/2 z-50 backdrop-blur-xl text-xs py-2.5 px-4 rounded-xl shadow-2xl transition-all duration-300 ${
@@ -1986,6 +2011,12 @@ export default function SimulationCockpit() {
                 onToast={showToast}
                 externalViewMode={friction27ViewMode}
                 onViewModeChange={setFriction27ViewMode}
+              />
+            ) : activeMode === 'springs28' ? (
+              <Springs28Workbench
+                onToast={showToast}
+                externalViewMode={springs28ViewMode}
+                onViewModeChange={setSprings28ViewMode}
               />
             ) : (
               <ProjectileSandbox

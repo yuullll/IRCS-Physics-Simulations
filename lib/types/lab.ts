@@ -51,7 +51,7 @@ export interface SceneSnapshot {
   timestamp: string;
   title: string;
   description?: string;
-  mode: 'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors' | 'kinematics12' | 'relative14' | 'motion15' | 'systems21' | 'forces22' | 'newton23' | 'newton24' | 'newton25' | 'gravity26' | 'friction27' | 'charging82' | 'distributions84' | 'flux85' | 'gauss86';
+  mode: 'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors' | 'kinematics12' | 'relative14' | 'motion15' | 'systems21' | 'forces22' | 'newton23' | 'newton24' | 'newton25' | 'gravity26' | 'friction27' | 'springs28' | 'charging82' | 'distributions84' | 'flux85' | 'gauss86';
   fieldData?: FieldSceneData;
   circuitData?: CircuitSceneData;
   camera?: CameraState;

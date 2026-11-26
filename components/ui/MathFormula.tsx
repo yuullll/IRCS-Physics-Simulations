@@ -534,6 +534,44 @@ export const AP_MATH_FORMULAS: Record<string, React.ReactNode> = {
     </span>
   ),
 
+  // Simulation 2.8: Spring Forces
+  'sim-springs28': (
+    <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
+      <span>
+        <Vec>F</Vec><Sub>s</Sub> <Op>=</Op> <Op>−</Op><Var>k</Var><Op>Δ</Op><Vec>x</Vec>
+      </span>
+      <span className="text-slate-500 font-sans mx-1">,</span>
+      <span>
+        <Var>k</Var><Sub>eq,par</Sub> <Op>=</Op> <BigSum /><Var>k</Var><Sub>i</Sub>
+      </span>
+    </span>
+  ),
+
+  'sim-springs28-hooke': (
+    <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
+      <span>
+        <Vec>F</Vec><Sub>s</Sub> <Op>=</Op> <Op>−</Op><Var>k</Var><Op>Δ</Op><Vec>x</Vec>
+      </span>
+    </span>
+  ),
+
+  'sim-springs28-series': (
+    <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
+      <span>
+        <Frac num={<span>1</span>} den={<span><Var>k</Var><Sub>eq,ser</Sub></span>} /> <Op>=</Op>{' '}
+        <BigSum /><Frac num={<span>1</span>} den={<span><Var>k</Var><Sub>i</Sub></span>} />
+      </span>
+    </span>
+  ),
+
+  'sim-springs28-parallel': (
+    <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
+      <span>
+        <Var>k</Var><Sub>eq,par</Sub> <Op>=</Op> <BigSum /><Var>k</Var><Sub>i</Sub>
+      </span>
+    </span>
+  ),
+
   // Simulation 8.2: Conservation of Electric Charge & Process of Charging
   'sim-charging82': (
     <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
@@ -759,6 +797,18 @@ function parseSimpleMathStringToJSX(text: string): React.ReactNode {
   }
   if (text.includes('F_f,s') || text.includes('μ_s F_N')) {
     return AP_MATH_FORMULAS['sim-friction27-static'];
+  }
+  if (text.includes('F_s = -k Δx') && text.includes('k_eq')) {
+    return AP_MATH_FORMULAS['sim-springs28'];
+  }
+  if (text.includes('F_s = -k Δx') || text.includes('F_s = -kΔx')) {
+    return AP_MATH_FORMULAS['sim-springs28-hooke'];
+  }
+  if (text.includes('1/k_eq') || text.includes('k_eq,ser')) {
+    return AP_MATH_FORMULAS['sim-springs28-series'];
+  }
+  if (text.includes('k_eq,par')) {
+    return AP_MATH_FORMULAS['sim-springs28-parallel'];
   }
 
   // If text has multiple sub-equations separated by ' · ' or ','
