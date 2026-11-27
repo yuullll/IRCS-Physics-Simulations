@@ -30,7 +30,7 @@ export interface PhysicsModelSlot {
   equation: string;
   description: string;
   status: 'live' | 'blank';
-  simulationMode?: 'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors' | 'kinematics12' | 'relative14' | 'motion15' | 'systems21' | 'forces22' | 'newton23' | 'newton24' | 'newton25' | 'gravity26' | 'friction27' | 'springs28' | 'resistive29' | 'circular210' | 'charging82' | 'distributions84' | 'flux85' | 'gauss86';
+  simulationMode?: 'field' | 'circuit' | 'projectile' | 'coulomb' | 'vectors' | 'kinematics12' | 'relative14' | 'motion15' | 'systems21' | 'forces22' | 'newton23' | 'newton24' | 'newton25' | 'gravity26' | 'friction27' | 'springs28' | 'resistive29' | 'circular210' | 'kinetic31' | 'charging82' | 'distributions84' | 'flux85' | 'gauss86';
   accentColor: 'cyan' | 'amber' | 'emerald' | 'rose' | 'sky';
   metrics: string[];
 }
@@ -56,7 +56,7 @@ export interface PhysicsUnitModule {
 }
 
 export const LIVE_SIMULATION_SLOTS: Record<
-  'vectors' | 'kinematics12' | 'projectile' | 'relative14' | 'motion15' | 'systems21' | 'forces22' | 'newton23' | 'newton24' | 'newton25' | 'gravity26' | 'friction27' | 'springs28' | 'resistive29' | 'circular210' | 'field' | 'circuit' | 'coulomb' | 'charging82' | 'distributions84' | 'flux85' | 'gauss86',
+  'vectors' | 'kinematics12' | 'projectile' | 'relative14' | 'motion15' | 'systems21' | 'forces22' | 'newton23' | 'newton24' | 'newton25' | 'gravity26' | 'friction27' | 'springs28' | 'resistive29' | 'circular210' | 'kinetic31' | 'field' | 'circuit' | 'coulomb' | 'charging82' | 'distributions84' | 'flux85' | 'gauss86',
   PhysicsModelSlot
 > = {
   vectors: {
@@ -283,6 +283,21 @@ export const LIVE_SIMULATION_SLOTS: Record<
     simulationMode: 'circular210',
     accentColor: 'emerald',
     metrics: ['Vertical Loop & a_net (2.10.A)', 'Banked & Conical FBD (2.10.A.2)', 'Kepler’s 3rd Law Orbits (2.10.B)'],
+  },
+  kinetic31: {
+    id: 'mech-kinetic-energy-3-1',
+    course: 'mechanics',
+    code: '3.1',
+    title: 'Translational Kinetic Energy Lab',
+    subtitle: 'Quadratic Speed Scaling K = ½mv², Scalar Direction Invariance & Reference Frames',
+    unit: 'Unit 3 · Work, Energy, and Power (3.1 Translational Kinetic Energy)',
+    equation: 'K = ½ m v² · K_obs = ½ m |v_rel|²',
+    description:
+      'Interactive 2D/3D workbench for AP Physics C Topic 3.1: investigate linear mass and quadratic speed scaling K = ½mv² (3.1.A.1), verify scalar non-negativity and direction invariance across 2D trajectories and opposite-moving systems (3.1.A.2), compare kinetic energy measured by different inertial observers (3.1.A.3), and practice Skills 1.C, 2.C, 3.B, and 3.C.',
+    status: 'live',
+    simulationMode: 'kinetic31',
+    accentColor: 'emerald',
+    metrics: ['Mass & v² Scaling Towers', 'Scalar 2D & 2-Puck System', 'Observer Frames & 1.C–3.C'],
   },
   coulomb: {
     id: 'model-coulomb-force',
@@ -519,7 +534,12 @@ export const MECHANICS_UNITS: PhysicsUnitModule[] = [
     equation: 'W = ∫ F · dr = ΔK · F(x) = -dU/dx',
     accentColor: 'cyan',
     subtopics: [
-      { id: 'sub-3-1', code: '3.1', title: 'Under Development' },
+      {
+        id: 'sub-3-1',
+        code: '3.1',
+        title: '3.1 Translational Kinetic Energy',
+        simulation: LIVE_SIMULATION_SLOTS.kinetic31,
+      },
       { id: 'sub-3-2', code: '3.2', title: 'Under Development' },
       { id: 'sub-3-3', code: '3.3', title: 'Under Development' },
       { id: 'sub-3-4', code: '3.4', title: 'Under Development' },
@@ -792,6 +812,7 @@ export const PHYSICS_MODEL_SLOTS: PhysicsModelSlot[] = [
   LIVE_SIMULATION_SLOTS.springs28,
   LIVE_SIMULATION_SLOTS.resistive29,
   LIVE_SIMULATION_SLOTS.circular210,
+  LIVE_SIMULATION_SLOTS.kinetic31,
   LIVE_SIMULATION_SLOTS.field,
   LIVE_SIMULATION_SLOTS.circuit,
   LIVE_SIMULATION_SLOTS.coulomb,

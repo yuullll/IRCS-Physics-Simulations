@@ -48,7 +48,7 @@ test('UNIT_HERO_SUMMARIES provides concise 2-line summaries for all 13 AP Physic
   assert.equal(getUnitHeroSummary('unknown-unit', 'Fallback summary.'), 'Fallback summary.');
 });
 
-test('ALL_SUBTOPIC_DISPLAY covers all 22 live simulations with concise single-sentence descriptions', () => {
+test('ALL_SUBTOPIC_DISPLAY covers all 23 live simulations with concise single-sentence descriptions', () => {
   const expectedLiveIds = [
     'sub-1-1',
     'sub-1-2',
@@ -65,6 +65,7 @@ test('ALL_SUBTOPIC_DISPLAY covers all 22 live simulations with concise single-se
     'sub-2-8',
     'sub-2-9',
     'sub-2-10',
+    'sub-3-1',
     'sub-8-1',
     'sub-8-2',
     'sub-8-3',

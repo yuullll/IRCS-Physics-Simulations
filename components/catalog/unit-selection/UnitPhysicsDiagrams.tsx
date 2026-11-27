@@ -361,6 +361,32 @@ export const UnitPhysicsDiagram: React.FC<UnitPhysicsDiagramProps> = ({
           </>
         )}
 
+        {/* 3.1 Translational Kinetic Energy */}
+        {subtopicId === 'sub-3-1' && (
+          <>
+            <g style={layerStyle(-2, -1.4)}>
+              {/* K(v) axes and parabolic curve */}
+              <line x1="20" y1="68" x2="112" y2="68" stroke={muted} strokeWidth="1.3" strokeLinecap="round" />
+              <line x1="24" y1="72" x2="24" y2="14" stroke={muted} strokeWidth="1.3" strokeLinecap="round" />
+              <path d="M24 68 Q 56 64 90 18" stroke={primary} strokeOpacity="0.65" strokeWidth="1.7" strokeLinecap="round" />
+              <text x="92" y="18" fill={highlight} fontSize="7.5" fontFamily="serif" fontStyle="italic">K∝v²</text>
+            </g>
+            <g style={layerStyle(3.2, 2.2)}>
+              {/* Sliding mass block */}
+              <rect x="44" y="47" width="24" height="20" rx="3" fill={blockFill} stroke={secondary} strokeWidth="1.5" />
+              <text x="52" y="60" fill={highlight} fontSize="8.5" fontFamily="serif" fontStyle="italic">m</text>
+            </g>
+            <g style={layerStyle(6.4, 4.8)}>
+              <circle cx="80" cy="30" r="10" fill={`url(#${glowId})`} />
+              {/* Velocity vector */}
+              <line x1="68" y1="57" x2="104" y2="57" stroke={primary} strokeWidth="1.9" strokeLinecap="round" markerEnd={`url(#${arrowPrimary})`} />
+              <text x="107" y="60" fill={highlight} fontSize="8.5" fontFamily="serif" fontStyle="italic">v</text>
+              {/* Operating point on parabola */}
+              <circle cx="80" cy="30" r="3.2" fill={highlight} stroke={darkFill} strokeWidth="1.2" />
+            </g>
+          </>
+        )}
+
         {/* 8.1 Electric Charge & Coulomb Force */}
         {subtopicId === 'sub-8-1' && (
           <>

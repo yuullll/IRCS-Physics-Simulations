@@ -211,6 +211,15 @@ export const ALL_SUBTOPIC_DISPLAY: Record<string, Unit1SubtopicDisplay> = {
     diagramLabel: 'Circular trajectory showing tangential velocity vector and inward centripetal acceleration',
   },
 
+  // Unit 3: Work, Energy, and Power (3.1)
+  'sub-3-1': {
+    code: '3.1',
+    title: 'Translational Kinetic Energy',
+    description:
+      'Explore quadratic speed scaling, verify scalar direction invariance, and compare kinetic energy across moving reference frames.',
+    diagramLabel: 'Parabolic K versus v curve paired with a sliding mass block and velocity vector',
+  },
+
   // Unit 8: Electric Charges, Fields, and Gauss's Law (8.1 – 8.6)
   'sub-8-1': {
     code: '8.1',

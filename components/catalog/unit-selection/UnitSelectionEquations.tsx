@@ -544,6 +544,25 @@ export const UnitSubtopicEquation: React.FC<{
         </div>
       );
 
+    // ── Unit 3: Work, Energy, and Power ─────────────────────────────────
+    case 'sub-3-1':
+      return (
+        <div className="flex flex-col items-center gap-1 font-serif text-[0.94rem] text-slate-100 leading-tight">
+          <div className="whitespace-nowrap">
+            <Var>K</Var> <TightOp>=</TightOp> <Frac num="1" den="2" />
+            <Var>m</Var>
+            <Var>v</Var>
+            <Sup>2</Sup>
+          </div>
+          <div className={`text-[0.79rem] ${secondaryTone} whitespace-nowrap`}>
+            <Var>K</Var>
+            <Sub>obs</Sub> <TightOp>=</TightOp> <Frac num="1" den="2" />
+            <Var>m</Var>|<Vec>v</Vec>
+            <Sub>rel</Sub>|<Sup>2</Sup>
+          </div>
+        </div>
+      );
+
     // ── Unit 8: Electric Charges, Fields, and Gauss's Law ───────────────
     case 'sub-8-1':
       return (

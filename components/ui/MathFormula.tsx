@@ -658,6 +658,43 @@ export const AP_MATH_FORMULAS: Record<string, React.ReactNode> = {
     </span>
   ),
 
+  // Simulation 3.1: Translational Kinetic Energy
+  'sim-kinetic31': (
+    <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
+      <span>
+        <Var>K</Var> <Op>=</Op> <Frac num="1" den="2" /><Var>m</Var><Var>v</Var><Sup>2</Sup>
+      </span>
+      <span className="text-slate-500 font-sans mx-1">,</span>
+      <span>
+        <Var>K</Var><Sub>obs</Sub> <Op>=</Op> <Frac num="1" den="2" /><Var>m</Var>|<Vec>v</Vec><Sub>rel</Sub>|<Sup>2</Sup>
+      </span>
+    </span>
+  ),
+
+  'sim-kinetic31-eq': (
+    <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
+      <span>
+        <Var>K</Var> <Op>=</Op> <Frac num="1" den="2" /><Var>m</Var><Var>v</Var><Sup>2</Sup>
+      </span>
+    </span>
+  ),
+
+  'sim-kinetic31-components': (
+    <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
+      <span>
+        <Var>K</Var> <Op>=</Op> <Frac num="1" den="2" /><Var>m</Var>(<Var>v</Var><Sub>x</Sub><Sup>2</Sup> <Op>+</Op> <Var>v</Var><Sub>y</Sub><Sup>2</Sup>)
+      </span>
+    </span>
+  ),
+
+  'sim-kinetic31-frame': (
+    <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
+      <span>
+        <Var>K</Var><Sub>P/O</Sub> <Op>=</Op> <Frac num="1" den="2" /><Var>m</Var>(<Var>v</Var><Sub>P/E</Sub> <Op>−</Op> <Var>v</Var><Sub>O/E</Sub>)<Sup>2</Sup>
+      </span>
+    </span>
+  ),
+
   // Simulation 8.2: Conservation of Electric Charge & Process of Charging
   'sim-charging82': (
     <span className="inline-flex items-center flex-wrap gap-x-1.5 font-serif text-[1.05em]">
@@ -910,6 +947,12 @@ function parseSimpleMathStringToJSX(text: string): React.ReactNode {
   }
   if (text.includes('a_c = v²/r') || text.includes('a_c = v² / r')) {
     return AP_MATH_FORMULAS['sim-circular210-ac'];
+  }
+  if (text.includes('K = ½ m v²') && text.includes('v_rel')) {
+    return AP_MATH_FORMULAS['sim-kinetic31'];
+  }
+  if (text.includes('K = ½ m v²') || text.includes('K = 1/2 m v²')) {
+    return AP_MATH_FORMULAS['sim-kinetic31-eq'];
   }
 
   // If text has multiple sub-equations separated by ' · ' or ','
