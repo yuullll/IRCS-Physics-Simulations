@@ -168,6 +168,7 @@ import {
   PhysicsCourseId,
   PhysicsUnitModule,
 } from '@/components/catalog/ModelCatalogPortal';
+import { Unit1ModelSelectionView } from '@/components/catalog/Unit1ModelSelectionView';
 import { SourceCharge, COULOMB_K } from '@/lib/physics/coulomb';
 import { CircuitComponentData } from '@/lib/physics/mna-solver';
 import { labStorage, MOCK_USERS } from '@/lib/services/labStorage';
@@ -1562,6 +1563,26 @@ export default function SimulationCockpit() {
       {/* ========================================================================= */}
       {currentRoute.layer === 'unit' && (() => {
         const unit = currentRoute.unit;
+
+        if (unit.id === 'unit-1-kinematics') {
+          return (
+            <div
+              onScroll={e => {
+                const top = e.currentTarget.scrollTop;
+                if (top < 50) setIsHeaderVisible(true);
+                else if (top > 90) setIsHeaderVisible(false);
+              }}
+              className="w-full h-full overflow-y-auto pt-[82px] pb-16 px-6 sm:px-10 bg-[#060b14]"
+            >
+              <Unit1ModelSelectionView
+                unit={unit}
+                onBack={() => navigateTo({ layer: 'catalog', course: unit.course })}
+                onSelectModel={sim => handleSelectCatalogModel(sim, unit)}
+              />
+            </div>
+          );
+        }
+
         const isMechUnit = unit.course === 'mechanics';
         const regularSubtopics = unit.subtopics.filter(s => !s.isSummaryBlock);
         const summaryBlocks = unit.subtopics.filter(s => s.isSummaryBlock);
