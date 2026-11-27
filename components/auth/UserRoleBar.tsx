@@ -28,6 +28,7 @@ interface UserRoleBarProps {
   hiddenAccountsCount?: number;
   onRestoreAllAccounts?: () => void;
   course?: 'mechanics' | 'em';
+  isUnitSelectionTheme?: boolean;
 }
 
 const emptySubscribe = () => () => {};
@@ -44,6 +45,7 @@ export const UserRoleBar: React.FC<UserRoleBarProps> = ({
   hiddenAccountsCount = 0,
   onRestoreAllAccounts,
   course = 'em',
+  isUnitSelectionTheme = false,
 }) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -81,8 +83,14 @@ export const UserRoleBar: React.FC<UserRoleBarProps> = ({
       {activeLoggedIn && (
         <button
           onClick={() => setDropdownOpen(prev => !prev)}
-          className={`flex items-center space-x-2 bg-slate-950/80 hover:bg-slate-800 border border-slate-700/80 px-3 py-1.5 rounded-xl text-slate-200 transition shadow-sm ${
-            isMechanics ? 'hover:border-emerald-500/60' : 'hover:border-cyan-500/60'
+          className={`flex items-center space-x-2 px-3 py-1.5 rounded-xl text-slate-200 transition shadow-sm border ${
+            isUnitSelectionTheme
+              ? isMechanics
+                ? 'bg-[#0f1f25]/85 hover:bg-[#142a32] border-slate-700/60 hover:border-emerald-400/45'
+                : 'bg-[#101d35]/85 hover:bg-[#162746] border-slate-700/60 hover:border-sky-400/45'
+              : `bg-slate-950/80 hover:bg-slate-800 border-slate-700/80 ${
+                  isMechanics ? 'hover:border-emerald-500/60' : 'hover:border-cyan-500/60'
+                }`
           }`}
           title="Account: Click to switch user, manage account, or sign out"
         >
@@ -94,6 +102,10 @@ export const UserRoleBar: React.FC<UserRoleBarProps> = ({
               className={`font-semibold uppercase text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1 ${
                 displayUser.role === 'instructor'
                   ? 'bg-amber-950 text-amber-400 border border-amber-800/60'
+                  : isUnitSelectionTheme
+                  ? isMechanics
+                    ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-400/30'
+                    : 'bg-sky-500/15 text-sky-300 border border-sky-400/30'
                   : isMechanics
                   ? 'bg-emerald-950 text-emerald-400 border border-emerald-800/60'
                   : 'bg-cyan-950 text-cyan-400 border border-cyan-800/60'
@@ -117,10 +129,16 @@ export const UserRoleBar: React.FC<UserRoleBarProps> = ({
       {!activeLoggedIn && (
         <button
           onClick={onOpenAuthModal}
-          className={`px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border transition flex items-center space-x-1.5 font-semibold text-xs shadow-sm ${
-            isMechanics
-              ? 'border-emerald-500/50 text-emerald-400 hover:text-emerald-300'
-              : 'border-cyan-500/50 text-cyan-400 hover:text-cyan-300'
+          className={`px-3 py-1.5 rounded-xl border transition flex items-center space-x-1.5 font-semibold text-xs shadow-sm ${
+            isUnitSelectionTheme
+              ? isMechanics
+                ? 'bg-[#0f1f25]/90 hover:bg-[#142a32] border-emerald-400/40 text-emerald-300 hover:text-emerald-200'
+                : 'bg-[#101d35]/90 hover:bg-[#162746] border-sky-400/40 text-sky-300 hover:text-sky-200'
+              : `bg-slate-900/90 hover:bg-slate-800 ${
+                  isMechanics
+                    ? 'border-emerald-500/50 text-emerald-400 hover:text-emerald-300'
+                    : 'border-cyan-500/50 text-cyan-400 hover:text-cyan-300'
+                }`
           }`}
           title="Log in with existing credentials or register a new account"
         >
@@ -133,7 +151,13 @@ export const UserRoleBar: React.FC<UserRoleBarProps> = ({
       {dropdownOpen && (
         <div
           className={`absolute right-0 top-full mt-2 w-80 border rounded-2xl shadow-2xl py-2 z-50 animate-fadeIn text-slate-200 backdrop-blur-2xl ${
-            isMechanics ? 'bg-[#040e0b]/95 border-emerald-500/25' : 'bg-[#080e1e]/95 border-white/15'
+            isUnitSelectionTheme
+              ? isMechanics
+                ? 'bg-[#0b171b]/95 border-slate-700/60'
+                : 'bg-[#0c1528]/95 border-slate-700/60'
+              : isMechanics
+              ? 'bg-[#040e0b]/95 border-emerald-500/25'
+              : 'bg-[#080e1e]/95 border-white/15'
           }`}
         >
           <div className="px-3.5 py-1.5 border-b border-white/10 flex items-center justify-between text-[10px] uppercase font-bold text-slate-400 tracking-wider">

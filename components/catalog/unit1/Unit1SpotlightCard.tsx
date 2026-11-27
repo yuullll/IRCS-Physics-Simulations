@@ -2,6 +2,7 @@
 
 import React, { useCallback, useRef } from 'react';
 import { computeCursorCardMetrics, getRestingCardMetrics } from '@/lib/ui/unit1-card-motion';
+import { getUnitThemePalette, type UnitThemeVariant } from '@/lib/ui/unit-selection-data';
 
 interface Unit1SpotlightCardBaseProps {
   children: React.ReactNode;
@@ -9,6 +10,7 @@ interface Unit1SpotlightCardBaseProps {
   enableTilt?: boolean;
   maxTiltDeg?: number;
   spotlightRadius?: number;
+  theme?: UnitThemeVariant;
   'data-testid'?: string;
 }
 
@@ -40,9 +42,11 @@ export const Unit1SpotlightCard: React.FC<Unit1SpotlightCardProps> = props => {
     enableTilt = false,
     maxTiltDeg = 1.25,
     spotlightRadius = 420,
+    theme = 'mechanics',
     'data-testid': dataTestId,
   } = props;
 
+  const palette = getUnitThemePalette(theme);
   const cardRef = useRef<HTMLElement | null>(null);
 
   const applyMetricsToDom = useCallback(
@@ -108,12 +112,11 @@ export const Unit1SpotlightCard: React.FC<Unit1SpotlightCardProps> = props => {
       'transform 260ms cubic-bezier(0.16, 1, 0.3, 1), border-color 220ms ease, box-shadow 260ms ease',
   } as React.CSSProperties;
 
-  const baseClasses =
-    'group relative overflow-hidden rounded-2xl border border-slate-700/45 bg-[#0c1624]/82 backdrop-blur-md shadow-[0_18px_42px_-20px_rgba(2,8,20,0.85)]';
+  const baseClasses = `group relative overflow-hidden rounded-2xl border ${palette.cardBgClass} backdrop-blur-md shadow-[0_18px_42px_-20px_rgba(2,8,20,0.85)]`;
 
   const interactiveClasses =
     props.as === 'button'
-      ? 'w-full text-left cursor-pointer hover:border-teal-400/35 hover:shadow-[0_24px_56px_-22px_rgba(13,148,136,0.28)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/75 focus-visible:ring-offset-2 focus-visible:ring-offset-[#060b14]'
+      ? `w-full text-left cursor-pointer ${palette.cardBorderHoverClass} ${palette.cardShadowHoverClass} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${palette.cardFocusRingClass}`
       : '';
 
   const overlays = (
@@ -121,7 +124,7 @@ export const Unit1SpotlightCard: React.FC<Unit1SpotlightCardProps> = props => {
       {/* Subtle atmospheric top-edge sheen */}
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-teal-300/[0.055] via-cyan-400/[0.015] to-transparent"
+        className={`pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b ${palette.topSheenClass}`}
       />
 
       {/* Cursor-tracking interior radial spotlight gradient */}
@@ -130,7 +133,7 @@ export const Unit1SpotlightCard: React.FC<Unit1SpotlightCardProps> = props => {
         className="pointer-events-none absolute inset-0 rounded-2xl transition-opacity duration-300 ease-out motion-reduce:hidden"
         style={{
           opacity: 'var(--spot-opacity, 0)',
-          background: `radial-gradient(${spotlightRadius}px circle at var(--spot-x, 50%) var(--spot-y, 50%), rgba(45, 212, 191, 0.13), rgba(34, 211, 238, 0.045) 42%, transparent 72%)`,
+          background: `radial-gradient(${spotlightRadius}px circle at var(--spot-x, 50%) var(--spot-y, 50%), ${palette.spotSurfaceGradient})`,
         }}
       />
 
@@ -140,7 +143,7 @@ export const Unit1SpotlightCard: React.FC<Unit1SpotlightCardProps> = props => {
         className="pointer-events-none absolute inset-0 rounded-2xl p-[1px] transition-opacity duration-300 ease-out motion-reduce:hidden"
         style={{
           opacity: 'var(--spot-opacity, 0)',
-          background: `radial-gradient(${Math.round(spotlightRadius * 0.68)}px circle at var(--spot-x, 50%) var(--spot-y, 50%), rgba(94, 234, 212, 0.72), rgba(34, 211, 238, 0.22) 45%, transparent 74%)`,
+          background: `radial-gradient(${Math.round(spotlightRadius * 0.68)}px circle at var(--spot-x, 50%) var(--spot-y, 50%), ${palette.spotBorderGradient})`,
           WebkitMask:
             'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
           WebkitMaskComposite: 'xor',
